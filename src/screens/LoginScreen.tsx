@@ -39,10 +39,11 @@ export default function LoginScreen({ navigation }: any) {
           setToken(storedToken);
           setUser(storedUser);
           
-          if (storedUser.role === 'admin' || storedUser.role === 'staff') {
+          if (storedUser.role === 'admin' || storedUser.role === 'staff' || storedUser.role === 'garage_admin') {
             navigation.replace('Main');
-          } else if (storedUser.role === 'customer' && storedUser.customerId) {
-            navigation.replace('CustomerPortal', { customerId: storedUser.customerId });
+          } else {
+            setToken(null);
+            setUser(null);
           }
         }
       } catch (err) {
@@ -74,7 +75,7 @@ export default function LoginScreen({ navigation }: any) {
     setErrorMessage(null);
     setLoading(true);
     try {
-      const response = await fetch(`${BASE_URL}/auth/login`, {
+      const response = await fetch(`${BASE_URL}/auth/admin/login`, {
         method: 'POST',
         headers: { 'Content-Type': 'application/json' },
         body: JSON.stringify({ email: email.trim().toLowerCase(), password: password.trim() })
@@ -92,16 +93,12 @@ export default function LoginScreen({ navigation }: any) {
       setUser(data.user);
 
       // Navigate based on actual backend user role
-      if (data.user?.role === 'admin' || data.user?.role === 'staff') {
+      if (data.user?.role === 'admin' || data.user?.role === 'staff' || data.user?.role === 'garage_admin') {
         navigation.replace('Main');
-      } else if (data.user?.role === 'customer') {
-        if (data.user.customerId) {
-          navigation.replace('CustomerPortal', { customerId: data.user.customerId });
-        } else {
-          Alert.alert('Error', 'No customer profile linked to this account.');
-        }
       } else {
-        Alert.alert('Error', 'Unknown user role returned from server.');
+        Alert.alert('Access Denied', 'This app is strictly for staff and admins.');
+        setToken(null);
+        setUser(null);
       }
     } catch (error) {
       setLoading(false);

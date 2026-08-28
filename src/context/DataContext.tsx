@@ -4,6 +4,7 @@ import AsyncStorage from '@react-native-async-storage/async-storage';
 
 export interface Customer {
   id: string;
+  _id?: string;
   firstName: string;
   lastName: string;
   email: string;
@@ -15,6 +16,7 @@ export interface Customer {
 
 export interface Vehicle {
   id: string;
+  _id?: string;
   customerId: string;
   registrationNumber: string;
   make: string;
@@ -22,7 +24,8 @@ export interface Vehicle {
   year: string;
   motExpiryDate: string;
   lastServiceDate?: string;
-  status: 'Active' | 'Sold' | 'Scrapped' | 'Pending';
+  status: 'Active' | 'Sold' | 'Scrapped' | 'Pending' | 'Rejected';
+  rejectionReason?: string;
 }
 
 export interface AlertNotification {
@@ -35,6 +38,11 @@ export interface AlertNotification {
   date: string;
   status: 'Pending' | 'Approved' | 'Acknowledged' | 'Rejected';
   rejectionReason?: string;
+  garageId?: string;
+  serviceName?: string;
+  price?: number;
+  duration?: number;
+  rescheduled?: boolean;
 }
 
 export interface AuditLog {
@@ -79,12 +87,7 @@ interface DataContextType {
 
 const DataContext = createContext<DataContextType | undefined>(undefined);
 
-// Automatically set base API URL based on Platform
-// export const BASE_URL = Platform.OS === 'android' 
-//   ? 'http://localhost:5000/api'  // ✅ Changed to localhost to use adb reverse tunnel
-//   : 'http://localhost:5000/api';
-
-export const BASE_URL = 'http://192.168.1.57:5000/api';
+export const BASE_URL = 'http://localhost:5000/api';
 
 const decodeToken = (tokenStr: string | null) => {
   if (!tokenStr) return null;
