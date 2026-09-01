@@ -31,9 +31,12 @@ if (Platform.OS === 'android' && UIManager.setLayoutAnimationEnabledExperimental
 
 export default function AdminCustomersScreen({ navigation }: any) {
   const { theme } = useAppTheme();
-  const { customers, vehicles, addCustomer, addVehicle, updateVehicleStatus, lookupVehicle, token } = useAppValues();
+  const { customers, vehicles, garages, user, addCustomer, addVehicle, updateVehicleStatus, lookupVehicle, token } = useAppValues();
 
   const [searchQuery, setSearchQuery] = useState('');
+  const [selectedGarageFilter, setSelectedGarageFilter] = useState<string>('ALL');
+  const [garageCustomers, setGarageCustomers] = useState<any[]>([]);
+  const [loadingGarageCusts, setLoadingGarageCusts] = useState<boolean>(false);
   const [expandedCustomerId, setExpandedCustomerId] = useState<string | null>(null);
   const [showAddCustomer, setShowAddCustomer] = useState(false);
   const [firstName, setFirstName] = useState('');
@@ -41,6 +44,33 @@ export default function AdminCustomersScreen({ navigation }: any) {
   const [email, setEmail] = useState('');
   const [mobile, setMobile] = useState('');
   const [address, setAddress] = useState('');
+
+  // Fetch customers specifically for selected garage when Super Admin changes filter
+  React.useEffect(() => {
+    if (user?.role === 'admin' && selectedGarageFilter !== 'ALL') {
+      setLoadingGarageCusts(true);
+      fetch(`${BASE_URL}/customers?garageId=${selectedGarageFilter}`, {
+        headers: {
+          'Authorization': `Bearer ${token}`
+        }
+      })
+        .then((res) => res.json())
+        .then((data) => {
+          if (Array.isArray(data)) {
+            setGarageCustomers(data);
+          } else {
+            setGarageCustomers([]);
+          }
+        })
+        .catch((err) => {
+          console.error('Error fetching garage customers:', err);
+          setGarageCustomers([]);
+        })
+        .finally(() => {
+          setLoadingGarageCusts(false);
+        });
+    }
+  }, [selectedGarageFilter, user?.role, token]);
   
   // States for new customer's vehicle form
   const [addVehicleNow, setAddVehicleNow] = useState(true);
@@ -323,13 +353,17 @@ export default function AdminCustomersScreen({ navigation }: any) {
     );
   };
 
-  const filteredCustomers = customers.filter((c) => {
+  const sourceCustomers = (user?.role === 'admin' && selectedGarageFilter !== 'ALL')
+    ? garageCustomers
+    : customers;
+
+  const filteredCustomers = sourceCustomers.filter((c) => {
     const query = searchQuery.trim().toLowerCase();
     if (!query) return true;
 
     const nameMatch = `${c.firstName} ${c.lastName}`.toLowerCase().includes(query);
-    const emailMatch = c.email.toLowerCase().includes(query);
-    const mobileMatch = c.mobile.toLowerCase().includes(query);
+    const emailMatch = (c.email || '').toLowerCase().includes(query);
+    const mobileMatch = (c.mobile || '').toLowerCase().includes(query);
     const customerVehicles = vehicles.filter((v) => 
       v.customerId && (
         String(v.customerId).toLowerCase() === String(c.id || '').toLowerCase() ||
@@ -389,6 +423,57 @@ export default function AdminCustomersScreen({ navigation }: any) {
             />
           </TouchableOpacity>
         </View>
+
+        {/* Super Admin Garage Filter Selector - Horizontal Scroll */}
+        {user?.role === 'admin' && garages.length > 0 && (
+          <View style={{ paddingTop: 10, paddingBottom: 2 }}>
+            <ScrollView
+              horizontal
+              showsHorizontalScrollIndicator={false}
+              contentContainerStyle={{ gap: 8, paddingHorizontal: 2 }}
+            >
+              <TouchableOpacity
+                onPress={() => setSelectedGarageFilter('ALL')}
+                style={{
+                  paddingHorizontal: 12,
+                  paddingVertical: 6,
+                  borderRadius: 8,
+                  borderWidth: 1,
+                  backgroundColor: selectedGarageFilter === 'ALL' ? theme.colors.secondary : theme.colors.card,
+                  borderColor: selectedGarageFilter === 'ALL' ? theme.colors.secondary : theme.colors.border,
+                }}
+              >
+                <Text style={{ fontSize: 11.5, fontWeight: '700', color: selectedGarageFilter === 'ALL' ? '#FFFFFF' : theme.colors.text }}>
+                  All Garages ({customers.length})
+                </Text>
+              </TouchableOpacity>
+
+              {garages.map((g) => {
+                const gId = g.id || g._id || '';
+                const isSelected = selectedGarageFilter === gId;
+                const custCount = g.customerCount ?? 0;
+                return (
+                  <TouchableOpacity
+                    key={gId}
+                    onPress={() => setSelectedGarageFilter(gId)}
+                    style={{
+                      paddingHorizontal: 12,
+                      paddingVertical: 6,
+                      borderRadius: 8,
+                      borderWidth: 1,
+                      backgroundColor: isSelected ? theme.colors.secondary : theme.colors.card,
+                      borderColor: isSelected ? theme.colors.secondary : theme.colors.border,
+                    }}
+                  >
+                    <Text style={{ fontSize: 11.5, fontWeight: '700', color: isSelected ? '#FFFFFF' : theme.colors.text }}>
+                      {g.name} ({custCount})
+                    </Text>
+                  </TouchableOpacity>
+                );
+              })}
+            </ScrollView>
+          </View>
+        )}
       </View>
 
       <ScrollView contentContainerStyle={styles.scrollContent} keyboardShouldPersistTaps="handled">

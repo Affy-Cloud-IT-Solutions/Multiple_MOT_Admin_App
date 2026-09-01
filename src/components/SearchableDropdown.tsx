@@ -39,7 +39,7 @@ export default function SearchableDropdown({
   const [page, setPage] = useState(1);
   const [hasMore, setHasMore] = useState(true);
 
-  const searchTimeoutRef = useRef<NodeJS.Timeout | null>(null);
+  const searchTimeoutRef = useRef<any>(null);
 
   // Reset state and fetch first page
   const openModal = () => {

@@ -2,6 +2,9 @@ import React from 'react';
 import { createBottomTabNavigator } from '@react-navigation/bottom-tabs';
 import MaterialCommunityIcons from 'react-native-vector-icons/MaterialCommunityIcons';
 import AdminDashboardScreen from '../screens/AdminDashboardScreen';
+import SuperAdminDashboardScreen from '../screens/SuperAdminDashboardScreen';
+import SuperAdminGaragesScreen from '../screens/SuperAdminGaragesScreen';
+import SuperAdminAuditsScreen from '../screens/SuperAdminAuditsScreen';
 import AdminCustomersScreen from '../screens/AdminCustomersScreen';
 import AdminRemindersScreen from '../screens/AdminRemindersScreen';
 import AdminAlertsScreen from '../screens/AdminAlertsScreen';
@@ -13,10 +16,14 @@ const Tab = createBottomTabNavigator();
 
 export default function MainTabNavigator() {
   const { theme } = useAppTheme();
-  const { alerts } = useAppValues();
+  const { alerts, user } = useAppValues();
 
-  // Calculate pending alerts to show badge count
-  const pendingAlertsCount = alerts.filter((a) => a.status === 'Pending').length;
+  const isSuperAdmin = user?.role === 'admin';
+
+  // Calculate pending alerts to show badge count only for garage staff/admin
+  const pendingAlertsCount = !isSuperAdmin
+    ? alerts.filter((a) => a.status === 'Pending').length
+    : 0;
 
   return (
     <Tab.Navigator
@@ -26,14 +33,18 @@ export default function MainTabNavigator() {
 
           if (route.name === 'Dashboard') {
             iconName = focused ? 'view-dashboard' : 'view-dashboard-outline';
+          } else if (route.name === 'Garages') {
+            iconName = focused ? 'garage' : 'garage-open-variant';
           } else if (route.name === 'Customers') {
             iconName = focused ? 'account-multiple' : 'account-multiple-outline';
+          } else if (route.name === 'Audits') {
+            iconName = focused ? 'clipboard-text-clock' : 'clipboard-text-clock-outline';
           } else if (route.name === 'Reminders') {
             iconName = focused ? 'bell-ring' : 'bell-ring-outline';
           } else if (route.name === 'Alerts') {
             iconName = focused ? 'bell-badge' : 'bell-badge-outline';
           } else if (route.name === 'Profile') {
-            iconName = focused ? 'account' : 'account-outline';
+            iconName = focused ? 'account-circle' : 'account-circle-outline';
           }
 
           return <MaterialCommunityIcons name={iconName} size={size} color={color} />;
@@ -66,39 +77,73 @@ export default function MainTabNavigator() {
         },
       })}
     >
-      <Tab.Screen 
-        name="Dashboard" 
-        component={AdminDashboardScreen} 
-        options={{ title: 'Dashboard' }} 
-      />
-      <Tab.Screen 
-        name="Customers" 
-        component={AdminCustomersScreen} 
-        options={{ title: 'Customers' }} 
-      />
-      <Tab.Screen 
-        name="Reminders" 
-        component={AdminRemindersScreen} 
-        options={{ title: 'Reminders & Reports' }} 
-      />
-      <Tab.Screen 
-        name="Alerts" 
-        component={AdminAlertsScreen} 
-        options={{
-          title: 'Alert Notifications',
-          tabBarBadge: pendingAlertsCount > 0 ? pendingAlertsCount : undefined,
-          tabBarBadgeStyle: {
-            backgroundColor: theme.colors.error,
-            color: '#FFFFFF',
-            fontSize: 10,
-          },
-        }} 
-      />
-      <Tab.Screen 
-        name="Profile" 
-        component={ProfileScreen} 
-        options={{ title: 'Settings' }} 
-      />
+      {isSuperAdmin ? (
+        // Super Admin Experience: Platform Management (NO Reminders & NO Alerts)
+        <>
+          <Tab.Screen 
+            name="Dashboard" 
+            component={SuperAdminDashboardScreen} 
+            options={{ title: 'Overview' }} 
+          />
+          <Tab.Screen 
+            name="Garages" 
+            component={SuperAdminGaragesScreen} 
+            options={{ title: 'Garages' }} 
+          />
+          <Tab.Screen 
+            name="Customers" 
+            component={AdminCustomersScreen} 
+            options={{ title: 'Customers' }} 
+          />
+          <Tab.Screen 
+            name="Audits" 
+            component={SuperAdminAuditsScreen} 
+            options={{ title: 'Logs' }} 
+          />
+          <Tab.Screen 
+            name="Profile" 
+            component={ProfileScreen} 
+            options={{ title: 'Settings' }} 
+          />
+        </>
+      ) : (
+        // Garage Admin & Staff Experience: Garage-specific operations & alerts
+        <>
+          <Tab.Screen 
+            name="Dashboard" 
+            component={AdminDashboardScreen} 
+            options={{ title: 'Dashboard' }} 
+          />
+          <Tab.Screen 
+            name="Customers" 
+            component={AdminCustomersScreen} 
+            options={{ title: 'Customers' }} 
+          />
+          <Tab.Screen 
+            name="Reminders" 
+            component={AdminRemindersScreen} 
+            options={{ title: 'Reminders' }} 
+          />
+          <Tab.Screen 
+            name="Alerts" 
+            component={AdminAlertsScreen} 
+            options={{
+              title: 'Alerts',
+              tabBarBadge: pendingAlertsCount > 0 ? pendingAlertsCount : undefined,
+              tabBarBadgeStyle: {
+                backgroundColor: theme.colors.error,
+                color: '#FFFFFF',
+                fontSize: 10,
+              },
+            }} 
+          />
+          <Tab.Screen 
+            name="Profile" 
+            component={ProfileScreen} 
+            options={{ title: 'Settings' }} 
+          />
+        </>
+      )}
     </Tab.Navigator>
   );
 }

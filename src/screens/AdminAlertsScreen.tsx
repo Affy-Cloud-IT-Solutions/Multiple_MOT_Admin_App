@@ -11,17 +11,24 @@ export default function AdminAlertsScreen() {
   // Show only pending alerts
   const pendingAlerts = alerts.filter((a) => a.status === 'Pending');
 
-  const handleApprove = (alertId: string, alertType: string) => {
-    approveAlert(alertId);
-    let message = 'Action approved successfully!';
-    if (alertType === 'NEW_VEHICLE') {
-      message = 'New vehicle has been approved and added to the customer profile!';
-    } else if (alertType === 'SOLD') {
-      message = 'Vehicle status updated to Sold. Future reminders stopped.';
-    } else if (alertType === 'BOOKED') {
-      message = 'MOT Booking confirmed!';
+  const handleApprove = async (alertId: string, alertType: string) => {
+    setLoadingAction(alertId);
+    try {
+      await approveAlert(alertId);
+      let message = 'Action approved successfully!';
+      if (alertType === 'NEW_VEHICLE') {
+        message = 'New vehicle has been approved and added to the customer profile!';
+      } else if (alertType === 'SOLD') {
+        message = 'Vehicle status updated to Sold. Future reminders stopped.';
+      } else if (alertType === 'BOOKED') {
+        message = 'MOT Booking confirmed!';
+      }
+      Alert.alert('Approved', message);
+    } catch (error: any) {
+      Alert.alert('Error', error?.message || 'Could not approve request.');
+    } finally {
+      setLoadingAction(null);
     }
-    Alert.alert('Approved', message);
   };
 
   const [rejectModalVisible, setRejectModalVisible] = useState(false);

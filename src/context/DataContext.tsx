@@ -52,12 +52,38 @@ export interface AuditLog {
   details: string;
 }
 
+export interface Garage {
+  id: string;
+  _id?: string;
+  name: string;
+  logoUrl?: string;
+  images?: string[];
+  address: string;
+  email: string;
+  phone: string;
+  openingTime?: string;
+  closingTime?: string;
+  description?: string;
+  services?: any[];
+  workingDays?: string[];
+  slots?: string[];
+  verificationStatus?: 'Pending' | 'Verified' | 'Rejected';
+  verificationDocuments?: { name: string; fileUrl: string; uploadDate?: string }[];
+  rating?: number;
+  distance?: number;
+  status: 'Approved' | 'Pending' | 'Suspended' | 'Rejected';
+  staffCount?: number;
+  bookingsCount?: number;
+  customerCount?: number;
+}
+
 export interface UserProfile {
   id: string;
   name: string;
   email: string;
-  role: 'admin' | 'staff' | 'customer';
+  role: 'admin' | 'staff' | 'customer' | 'garage_admin';
   customerId?: string;
+  garageId?: string;
 }
 
 interface DataContextType {
@@ -65,6 +91,7 @@ interface DataContextType {
   vehicles: Vehicle[];
   alerts: AlertNotification[];
   audits: AuditLog[];
+  garages: Garage[];
   token: string | null;
   setToken: (token: string | null) => void;
   user: UserProfile | null;
@@ -83,6 +110,8 @@ interface DataContextType {
   deleteStaffAccount: (staffId: string) => Promise<void>;
   rescheduleBooking: (alertId: string, date: string, slot: string) => Promise<void>;
   lookupVehicle: (vrn: string) => Promise<any>;
+  fetchGarages: () => Promise<Garage[]>;
+  updateGarageStatus: (garageId: string, status: string, verificationStatus?: string) => Promise<void>;
 }
 
 const DataContext = createContext<DataContextType | undefined>(undefined);
@@ -94,29 +123,37 @@ const decodeToken = (tokenStr: string | null) => {
   try {
     const payload = tokenStr.split('.')[1];
     const base64 = payload.replace(/-/g, '+').replace(/_/g, '/');
-    let decoded = '';
-    if (typeof atob === 'function') {
-      decoded = atob(base64);
-    } else {
-      const raw = base64.replace(/[^A-Za-z0-9+/]/g, '');
-      let output = '';
-      let i = 0;
-      while (i < raw.length) {
-        const enc1 = 'ABCDEFGHIJKLMNOPQRSTUVWXYZabcdefghijklmnopqrstuvwxyz0123456789+/'.indexOf(raw.charAt(i++));
-        const enc2 = enc1 !== -1 ? 'ABCDEFGHIJKLMNOPQRSTUVWXYZabcdefghijklmnopqrstuvwxyz0123456789+/'.indexOf(raw.charAt(i++)) : -1;
-        const enc3 = enc2 !== -1 ? 'ABCDEFGHIJKLMNOPQRSTUVWXYZabcdefghijklmnopqrstuvwxyz0123456789+/'.indexOf(raw.charAt(i++)) : -1;
-        const enc4 = enc3 !== -1 ? 'ABCDEFGHIJKLMNOPQRSTUVWXYZabcdefghijklmnopqrstuvwxyz0123456789+/'.indexOf(raw.charAt(i++)) : -1;
-        if (enc1 === -1 || enc2 === -1) break;
-        const chr1 = (enc1 << 2) | (enc2 >> 4);
+    const raw = base64.replace(/[^A-Za-z0-9+/]/g, '');
+    let output = '';
+    let i = 0;
+    const chars = 'ABCDEFGHIJKLMNOPQRSTUVWXYZabcdefghijklmnopqrstuvwxyz0123456789+/';
+    
+    while (i < raw.length) {
+      const char1 = i < raw.length ? raw.charAt(i++) : '';
+      const char2 = i < raw.length ? raw.charAt(i++) : '';
+      const char3 = i < raw.length ? raw.charAt(i++) : '';
+      const char4 = i < raw.length ? raw.charAt(i++) : '';
+
+      const enc1 = char1 ? chars.indexOf(char1) : -1;
+      const enc2 = char2 ? chars.indexOf(char2) : -1;
+      const enc3 = char3 ? chars.indexOf(char3) : -1;
+      const enc4 = char4 ? chars.indexOf(char4) : -1;
+
+      if (enc1 === -1 || enc2 === -1) break;
+
+      const chr1 = (enc1 << 2) | (enc2 >> 4);
+      output += String.fromCharCode(chr1);
+
+      if (enc3 !== -1) {
         const chr2 = ((enc2 & 15) << 4) | (enc3 >> 2);
-        const chr3 = ((enc3 & 3) << 6) | enc4;
-        output += String.fromCharCode(chr1);
-        if (enc3 !== 64 && enc3 !== -1) output += String.fromCharCode(chr2);
-        if (enc4 !== 64 && enc4 !== -1) output += String.fromCharCode(chr3);
+        output += String.fromCharCode(chr2);
       }
-      decoded = output;
+      if (enc4 !== -1 && enc3 !== -1) {
+        const chr3 = ((enc3 & 3) << 6) | enc4;
+        output += String.fromCharCode(chr3);
+      }
     }
-    return JSON.parse(decoded);
+    return JSON.parse(output);
   } catch (error) {
     console.error('Error decoding token:', error);
     return null;
@@ -128,6 +165,7 @@ export const DataProvider = ({ children }: { children: ReactNode }) => {
   const [vehicles, setVehicles] = useState<Vehicle[]>([]);
   const [alerts, setAlerts] = useState<AlertNotification[]>([]);
   const [audits, setAudits] = useState<AuditLog[]>([]);
+  const [garages, setGarages] = useState<Garage[]>([]);
   const [token, setTokenState] = useState<string | null>(null);
   const [user, setUserState] = useState<UserProfile | null>(null);
 
@@ -158,7 +196,33 @@ export const DataProvider = ({ children }: { children: ReactNode }) => {
 
       console.log(`[DATA CONTEXT] Fetching data for role: ${role}`);
 
-      if (role === 'admin' || role === 'staff') {
+      if (role === 'admin') {
+        // Super Admin: fetches all garages, all platform customers, all vehicles, and all audit logs (no garage alerts/reminders)
+        const [garagesRes, customersRes, vehiclesRes, auditsRes] = await Promise.all([
+          fetch(`${BASE_URL}/garages`, { headers }),
+          fetch(`${BASE_URL}/customers`, { headers }),
+          fetch(`${BASE_URL}/vehicles`, { headers }),
+          fetch(`${BASE_URL}/audit`, { headers }),
+        ]);
+
+        if (garagesRes.ok) {
+          const garagesData = await garagesRes.json();
+          setGarages(garagesData);
+        }
+        if (customersRes.ok) {
+          const customersData = await customersRes.json();
+          setCustomers(customersData);
+        }
+        if (vehiclesRes.ok) {
+          const vehiclesData = await vehiclesRes.json();
+          setVehicles(vehiclesData);
+        }
+        if (auditsRes.ok) {
+          const auditsData = await auditsRes.json();
+          setAudits(auditsData);
+        }
+        setAlerts([]); // Super Admin has no personal garage action alerts
+      } else if (role === 'staff' || role === 'garage_admin') {
         const [customersRes, vehiclesRes, auditsRes, alertsRes] = await Promise.all([
           fetch(`${BASE_URL}/customers`, { headers }),
           fetch(`${BASE_URL}/vehicles`, { headers }),
@@ -220,6 +284,7 @@ export const DataProvider = ({ children }: { children: ReactNode }) => {
       setVehicles([]);
       setAudits([]);
       setAlerts([]);
+      setGarages([]);
     }
   };
 
@@ -399,8 +464,8 @@ export const DataProvider = ({ children }: { children: ReactNode }) => {
   const fetchStaffList = async (): Promise<any[]> => {
     const decoded = decodeToken(token);
     const role = decoded?.role || user?.role || 'customer';
-    if (role !== 'admin') {
-      console.log('[DATA CONTEXT] Skipping staff list fetch: Insufficient permissions (role is not admin).');
+    if (role !== 'garage_admin') {
+      console.log('[DATA CONTEXT] Skipping staff list fetch: Insufficient permissions (role is not garage_admin).');
       return [];
     }
 
@@ -501,6 +566,46 @@ export const DataProvider = ({ children }: { children: ReactNode }) => {
     }
   };
 
+  const fetchGarages = async (): Promise<Garage[]> => {
+    try {
+      const response = await fetch(`${BASE_URL}/garages`, {
+        headers: {
+          'Authorization': `Bearer ${token}`
+        }
+      });
+      const data = await response.json();
+      if (!response.ok) {
+        throw new Error(data.error || 'Failed to fetch garages');
+      }
+      setGarages(data);
+      return data;
+    } catch (error) {
+      console.error('[DATA CONTEXT] fetchGarages error:', error);
+      throw error;
+    }
+  };
+
+  const updateGarageStatus = async (garageId: string, status: string, verificationStatus?: string): Promise<void> => {
+    try {
+      const response = await fetch(`${BASE_URL}/garages/${garageId}/status`, {
+        method: 'PUT',
+        headers: {
+          'Content-Type': 'application/json',
+          'Authorization': `Bearer ${token}`
+        },
+        body: JSON.stringify({ status, verificationStatus })
+      });
+      const data = await response.json();
+      if (!response.ok) {
+        throw new Error(data.error || 'Failed to update garage status');
+      }
+      await refreshData();
+    } catch (error) {
+      console.error('[DATA CONTEXT] updateGarageStatus error:', error);
+      throw error;
+    }
+  };
+
   return (
     <DataContext.Provider
       value={{
@@ -508,6 +613,7 @@ export const DataProvider = ({ children }: { children: ReactNode }) => {
         vehicles,
         alerts,
         audits,
+        garages,
         token,
         setToken,
         user,
@@ -526,6 +632,8 @@ export const DataProvider = ({ children }: { children: ReactNode }) => {
         deleteStaffAccount,
         rescheduleBooking,
         lookupVehicle,
+        fetchGarages,
+        updateGarageStatus,
       }}
     >
       {children}

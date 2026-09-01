@@ -260,15 +260,23 @@ export default function BookingScreen({ route, navigation }: any) {
       <ScrollView contentContainerStyle={styles.scrollContent}>
         {/* Vehicle Summary Header Card */}
         <View style={[styles.vehicleCard, { backgroundColor: theme.colors.card, borderColor: theme.colors.border }]}>
-          <View style={styles.plate}>
-            <Text style={styles.plateText}>{vehicle.registrationNumber}</Text>
+          <View style={styles.ukPlateContainer}>
+            <View style={styles.ukPlateBlueSide}>
+              <Text style={styles.ukPlateFlagText}>🇬🇧</Text>
+              <Text style={styles.ukPlateGbText}>UK</Text>
+            </View>
+            <View style={styles.ukPlateNumberSide}>
+              <Text style={styles.ukPlateNumberText}>
+                {(vehicle.registrationNumber || 'UNKNOWN').toUpperCase()}
+              </Text>
+            </View>
           </View>
           <View style={{ flex: 1 }}>
-            <Text style={[styles.vehicleMakeModel, { color: theme.colors.text }]}>
+            <Text style={[styles.vehicleMakeModel, { color: theme.colors.text }]} numberOfLines={1}>
               {vehicle.make} {vehicle.model}
             </Text>
             <Text style={[styles.vehicleSubText, { color: theme.colors.placeholder }]}>
-              {isReschedule ? 'Rescheduling appointment for this vehicle' : 'Booking an appointment for this vehicle'}
+              {isReschedule ? 'Rescheduling appointment for this vehicle' : 'Booking an MOT appointment for this vehicle'}
             </Text>
           </View>
         </View>
@@ -496,23 +504,51 @@ const styles = StyleSheet.create({
     shadowOpacity: 0.05,
     shadowRadius: 3,
   },
-  plate: {
-    backgroundColor: '#FFD300',
+  ukPlateContainer: {
+    flexDirection: 'row',
+    backgroundColor: '#FFD700',
     borderWidth: 1.5,
-    borderColor: '#000',
-    borderRadius: 4,
-    paddingHorizontal: 12,
-    paddingVertical: 5,
+    borderColor: '#000000',
+    borderRadius: 6,
+    overflow: 'hidden',
+    elevation: 2,
+    shadowColor: '#000',
+    shadowOffset: { width: 0, height: 1 },
+    shadowOpacity: 0.15,
+    shadowRadius: 2,
   },
-  plateText: {
-    color: '#000',
-    fontWeight: 'bold',
-    fontSize: 14,
+  ukPlateBlueSide: {
+    backgroundColor: '#003399',
+    paddingHorizontal: 4,
+    paddingVertical: 3,
+    alignItems: 'center',
+    justifyContent: 'center',
+  },
+  ukPlateFlagText: {
+    fontSize: 10,
+    lineHeight: 12,
+  },
+  ukPlateGbText: {
+    color: '#FFFFFF',
+    fontWeight: '900',
+    fontSize: 8,
     letterSpacing: 0.5,
+  },
+  ukPlateNumberSide: {
+    paddingHorizontal: 10,
+    paddingVertical: 6,
+    alignItems: 'center',
+    justifyContent: 'center',
+  },
+  ukPlateNumberText: {
+    color: '#000000',
+    fontWeight: '900',
+    fontSize: 14,
+    letterSpacing: 1.5,
   },
   vehicleMakeModel: {
     fontSize: 16,
-    fontWeight: 'bold',
+    fontWeight: '800',
     marginBottom: 2,
   },
   vehicleSubText: {

@@ -191,33 +191,118 @@ export default function AdminBookMotScreen({ route, navigation }: any) {
         <View style={{ width: 60 }} />
       </View>
 
-      <ScrollView contentContainerStyle={styles.scrollContent}>
-        {/* Customer & Vehicle Summary Header Card */}
-        <View style={[styles.summaryCard, { backgroundColor: theme.colors.card, borderColor: theme.colors.border }]}>
-          <View style={styles.summaryRow}>
-            <MaterialCommunityIcons name="account" size={18} color={theme.colors.secondary} />
-            <Text style={[styles.summaryLabel, { color: theme.colors.text }]}>
-              Customer: <Text style={{ fontWeight: 'bold' }}>{customer.firstName} {customer.lastName}</Text>
-            </Text>
-          </View>
-          <View style={[styles.summaryRow, { marginTop: 4 }]}>
-            <MaterialCommunityIcons name="email" size={16} color={theme.colors.placeholder} />
-            <Text style={[styles.summarySubLabel, { color: theme.colors.placeholder }]}>
-              {customer.email}
-            </Text>
-          </View>
-          <View style={[styles.divider, { borderColor: theme.colors.border }]} />
-          <View style={styles.summaryRow}>
-            <View style={styles.plate}>
-              <Text style={styles.plateText}>{vehicle.registrationNumber}</Text>
+      <ScrollView contentContainerStyle={styles.scrollContent} showsVerticalScrollIndicator={false}>
+        {/* Modern Vehicle & Customer Summary Card */}
+        <View style={[styles.vehicleMasterCard, { backgroundColor: theme.colors.card, borderColor: theme.colors.border }]}>
+          {/* Card Top: Garage Action Badge */}
+          <View style={styles.cardTopBadgeRow}>
+            <View style={[styles.staffDirectBadge, { backgroundColor: '#10B98115', borderColor: '#10B98140' }]}>
+              <MaterialCommunityIcons name="shield-check" size={14} color="#10B981" />
+              <Text style={styles.staffDirectBadgeText}>Garage Staff Direct Booking • Instant Approval</Text>
             </View>
-            <View style={{ marginLeft: 12 }}>
-              <Text style={[styles.vehicleMakeModel, { color: theme.colors.text }]}>
-                {vehicle.make} {vehicle.model} {vehicle.year ? `(${vehicle.year})` : ''}
+          </View>
+
+          {/* Vehicle Main Section */}
+          <View style={styles.vehicleMainSection}>
+            {/* Realistic UK Plate */}
+            <View style={styles.ukPlateContainer}>
+              <View style={styles.ukPlateBlueSide}>
+                <Text style={styles.ukPlateFlagText}>🇬🇧</Text>
+                <Text style={styles.ukPlateGbText}>UK</Text>
+              </View>
+              <View style={styles.ukPlateNumberSide}>
+                <Text style={styles.ukPlateNumberText}>
+                  {(vehicle.registrationNumber || 'UNKNOWN').toUpperCase()}
+                </Text>
+              </View>
+            </View>
+
+            {/* Vehicle Details */}
+            <View style={styles.vehicleTextInfo}>
+              <Text style={[styles.vehicleTitleText, { color: theme.colors.text }]} numberOfLines={1}>
+                {vehicle.make} {vehicle.model}
               </Text>
-              <Text style={{ fontSize: 11, color: theme.colors.placeholder }}>
-                Booking appointment directly to Confirmed status
+              <View style={styles.vehicleBadgesRow}>
+                {vehicle.year ? (
+                  <View style={[styles.specChip, { backgroundColor: theme.colors.background, borderColor: theme.colors.border }]}>
+                    <MaterialCommunityIcons name="calendar" size={11} color={theme.colors.placeholder} />
+                    <Text style={[styles.specChipText, { color: theme.colors.placeholder }]}>{vehicle.year}</Text>
+                  </View>
+                ) : null}
+                <View style={[styles.specChip, { backgroundColor: '#10B98115', borderColor: '#10B98140' }]}>
+                  <View style={[styles.statusDot, { backgroundColor: '#10B981' }]} />
+                  <Text style={[styles.specChipText, { color: '#10B981', fontWeight: '700' }]}>
+                    {vehicle.status || 'Active'}
+                  </Text>
+                </View>
+              </View>
+            </View>
+          </View>
+
+          {/* Key Vehicle Dates Row */}
+          {(vehicle.motExpiryDate || vehicle.lastServiceDate) && (
+            <View style={[styles.datesInfoGrid, { backgroundColor: theme.colors.background, borderColor: theme.colors.border }]}>
+              {vehicle.motExpiryDate && (
+                <View style={styles.dateCol}>
+                  <View style={styles.dateColHeader}>
+                    <MaterialCommunityIcons name="calendar-clock" size={13} color={theme.colors.warning} />
+                    <Text style={[styles.dateColLabel, { color: theme.colors.placeholder }]}>MOT Expiry</Text>
+                  </View>
+                  <Text style={[styles.dateColValue, { color: theme.colors.text }]}>
+                    {new Date(vehicle.motExpiryDate).toLocaleDateString('en-GB', { day: '2-digit', month: 'short', year: 'numeric' })}
+                  </Text>
+                </View>
+              )}
+              {vehicle.lastServiceDate && (
+                <View style={[styles.dateCol, { borderLeftWidth: 1, borderLeftColor: theme.colors.border, paddingLeft: 12 }]}>
+                  <View style={styles.dateColHeader}>
+                    <MaterialCommunityIcons name="wrench-clock" size={13} color={theme.colors.secondary} />
+                    <Text style={[styles.dateColLabel, { color: theme.colors.placeholder }]}>Last Service</Text>
+                  </View>
+                  <Text style={[styles.dateColValue, { color: theme.colors.text }]}>
+                    {new Date(vehicle.lastServiceDate).toLocaleDateString('en-GB', { day: '2-digit', month: 'short', year: 'numeric' })}
+                  </Text>
+                </View>
+              )}
+            </View>
+          )}
+
+          {/* Customer Strip Footer */}
+          <View style={[styles.customerStrip, { borderTopColor: theme.colors.border }]}>
+            <View style={[styles.customerAvatar, { backgroundColor: theme.colors.secondary + '20' }]}>
+              <Text style={[styles.customerAvatarText, { color: theme.colors.secondary }]}>
+                {((customer.firstName?.[0] || '') + (customer.lastName?.[0] || '')).toUpperCase() || 'CU'}
               </Text>
+            </View>
+            <View style={{ flex: 1, marginLeft: 10 }}>
+              <View style={styles.custNameRow}>
+                <Text style={[styles.customerNameText, { color: theme.colors.text }]}>
+                  {customer.firstName} {customer.lastName}
+                </Text>
+                {customer.preferredContact && (
+                  <View style={[styles.contactPrefBadge, { backgroundColor: theme.colors.primary + '15' }]}>
+                    <Text style={[styles.contactPrefText, { color: theme.colors.primary }]}>
+                      {customer.preferredContact}
+                    </Text>
+                  </View>
+                )}
+              </View>
+              <View style={styles.custContactMeta}>
+                {customer.mobile ? (
+                  <View style={styles.contactItem}>
+                    <MaterialCommunityIcons name="phone" size={12} color={theme.colors.placeholder} />
+                    <Text style={[styles.contactItemText, { color: theme.colors.placeholder }]}>{customer.mobile}</Text>
+                  </View>
+                ) : null}
+                {customer.email ? (
+                  <View style={[styles.contactItem, { marginLeft: 10 }]}>
+                    <MaterialCommunityIcons name="email" size={12} color={theme.colors.placeholder} />
+                    <Text style={[styles.contactItemText, { color: theme.colors.placeholder }]} numberOfLines={1}>
+                      {customer.email}
+                    </Text>
+                  </View>
+                ) : null}
+              </View>
             </View>
           </View>
         </View>
@@ -405,51 +490,189 @@ const styles = StyleSheet.create({
     padding: 16,
     paddingBottom: 40,
   },
-  summaryCard: {
-    padding: 14,
-    borderRadius: 14,
+  vehicleMasterCard: {
+    borderRadius: 16,
     borderWidth: 1,
+    padding: 16,
     marginBottom: 24,
+    elevation: 3,
+    shadowColor: '#000',
+    shadowOffset: { width: 0, height: 2 },
+    shadowOpacity: 0.08,
+    shadowRadius: 5,
+  },
+  cardTopBadgeRow: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    marginBottom: 14,
+  },
+  staffDirectBadge: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    paddingHorizontal: 8,
+    paddingVertical: 4,
+    borderRadius: 6,
+    borderWidth: 1,
+    gap: 5,
+  },
+  staffDirectBadgeText: {
+    fontSize: 11,
+    fontWeight: '700',
+    color: '#10B981',
+  },
+  vehicleMainSection: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    gap: 14,
+  },
+  ukPlateContainer: {
+    flexDirection: 'row',
+    backgroundColor: '#FFD700',
+    borderWidth: 1.5,
+    borderColor: '#000000',
+    borderRadius: 6,
+    overflow: 'hidden',
     elevation: 2,
     shadowColor: '#000',
     shadowOffset: { width: 0, height: 1 },
-    shadowOpacity: 0.05,
-    shadowRadius: 3,
+    shadowOpacity: 0.15,
+    shadowRadius: 2,
   },
-  summaryRow: {
-    flexDirection: 'row',
+  ukPlateBlueSide: {
+    backgroundColor: '#003399',
+    paddingHorizontal: 4,
+    paddingVertical: 3,
     alignItems: 'center',
+    justifyContent: 'center',
   },
-  summaryLabel: {
-    fontSize: 13.5,
-    marginLeft: 6,
+  ukPlateFlagText: {
+    fontSize: 10,
+    lineHeight: 12,
   },
-  summarySubLabel: {
-    fontSize: 12,
-    marginLeft: 24,
-  },
-  divider: {
-    borderBottomWidth: 0.5,
-    marginVertical: 12,
-  },
-  plate: {
-    backgroundColor: '#FFD300',
-    borderWidth: 1.5,
-    borderColor: '#000',
-    borderRadius: 4,
-    paddingHorizontal: 10,
-    paddingVertical: 4,
-  },
-  plateText: {
-    color: '#000',
-    fontWeight: 'bold',
-    fontSize: 13,
+  ukPlateGbText: {
+    color: '#FFFFFF',
+    fontWeight: '900',
+    fontSize: 8,
     letterSpacing: 0.5,
   },
-  vehicleMakeModel: {
+  ukPlateNumberSide: {
+    paddingHorizontal: 10,
+    paddingVertical: 6,
+    alignItems: 'center',
+    justifyContent: 'center',
+  },
+  ukPlateNumberText: {
+    color: '#000000',
+    fontWeight: '900',
     fontSize: 15,
-    fontWeight: 'bold',
+    letterSpacing: 1.5,
+  },
+  vehicleTextInfo: {
+    flex: 1,
+  },
+  vehicleTitleText: {
+    fontSize: 16,
+    fontWeight: '800',
+    letterSpacing: -0.3,
+    marginBottom: 4,
+  },
+  vehicleBadgesRow: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    gap: 6,
+    flexWrap: 'wrap',
+  },
+  specChip: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    paddingHorizontal: 7,
+    paddingVertical: 3,
+    borderRadius: 6,
+    borderWidth: 1,
+    gap: 4,
+  },
+  specChipText: {
+    fontSize: 11,
+    fontWeight: '600',
+  },
+  statusDot: {
+    width: 6,
+    height: 6,
+    borderRadius: 3,
+  },
+  datesInfoGrid: {
+    flexDirection: 'row',
+    marginTop: 14,
+    padding: 10,
+    borderRadius: 10,
+    borderWidth: 1,
+  },
+  dateCol: {
+    flex: 1,
+  },
+  dateColHeader: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    gap: 4,
     marginBottom: 2,
+  },
+  dateColLabel: {
+    fontSize: 11,
+    fontWeight: '600',
+    textTransform: 'uppercase',
+  },
+  dateColValue: {
+    fontSize: 13,
+    fontWeight: '700',
+  },
+  customerStrip: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    marginTop: 14,
+    paddingTop: 12,
+    borderTopWidth: 1,
+  },
+  customerAvatar: {
+    width: 36,
+    height: 36,
+    borderRadius: 18,
+    alignItems: 'center',
+    justifyContent: 'center',
+  },
+  customerAvatarText: {
+    fontSize: 13,
+    fontWeight: '800',
+  },
+  custNameRow: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    justifyContent: 'space-between',
+  },
+  customerNameText: {
+    fontSize: 13.5,
+    fontWeight: '700',
+  },
+  contactPrefBadge: {
+    paddingHorizontal: 6,
+    paddingVertical: 2,
+    borderRadius: 4,
+  },
+  contactPrefText: {
+    fontSize: 10,
+    fontWeight: '700',
+  },
+  custContactMeta: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    marginTop: 2,
+  },
+  contactItem: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    gap: 4,
+  },
+  contactItemText: {
+    fontSize: 11.5,
   },
   sectionHeading: {
     fontSize: 13,

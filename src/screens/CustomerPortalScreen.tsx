@@ -205,7 +205,7 @@ export default function CustomerPortalScreen({ route, navigation }: any) {
 
     setLoadingAction('add_vehicle');
     try {
-      // 1. Create the vehicle directly in the database
+      // 1. Create the vehicle directly in the database as Active
       await addVehicle({
         customerId: customer.id,
         registrationNumber: regNo.trim().toUpperCase(),
@@ -213,7 +213,7 @@ export default function CustomerPortalScreen({ route, navigation }: any) {
         model: model.trim().toUpperCase(),
         year: year.trim(),
         motExpiryDate: expiry,
-        status: 'Pending'
+        status: 'Active'
       });
 
       // 2. Send alert notification to Admin for log/info
@@ -223,11 +223,12 @@ export default function CustomerPortalScreen({ route, navigation }: any) {
         customerId: customer.id,
         registrationNumber: regNo.trim().toUpperCase(),
         makeModel: `${make.trim().toUpperCase()} ${model.trim().toUpperCase()}`,
+        status: 'Approved'
       });
 
       await addAudit(
         'New Vehicle Registered', 
-        `${customer.firstName} ${customer.lastName} registered vehicle ${make.trim().toUpperCase()} (${regNo.trim().toUpperCase()})`
+        `${customer.firstName} ${customer.lastName} added vehicle ${make.trim().toUpperCase()} (${regNo.trim().toUpperCase()}) - active immediately`
       );
 
       setLoadingAction(null);
@@ -241,8 +242,8 @@ export default function CustomerPortalScreen({ route, navigation }: any) {
       setShowAddForm(false);
 
       Alert.alert(
-        'Vehicle Registration Pending',
-        'Your new vehicle has been registered successfully and is awaiting approval from the garage staff. You will be able to book an MOT once approved!'
+        'Vehicle Added',
+        'Your vehicle has been added successfully! You can now book an MOT.'
       );
     } catch (error: any) {
       setLoadingAction(null);
