@@ -305,11 +305,7 @@ export default function ProfileScreen({ navigation }: any) {
               />
               <StatCard
                 icon="car-multiple"
-                value={
-                  vehicles.filter(
-                    (v) => v.status !== 'Sold' && v.status !== 'Scrapped'
-                  ).length
-                }
+                value={vehicles.filter((v) => v.status === 'Active').length}
                 label="Active Cars"
                 color={theme.colors.warning}
                 theme={theme}

@@ -8,6 +8,7 @@ import SuperAdminAuditsScreen from '../screens/SuperAdminAuditsScreen';
 import AdminCustomersScreen from '../screens/AdminCustomersScreen';
 import AdminRemindersScreen from '../screens/AdminRemindersScreen';
 import AdminAlertsScreen from '../screens/AdminAlertsScreen';
+import AdminSlotsScreen from '../screens/AdminSlotsScreen';
 import ProfileScreen from '../screens/ProfileScreen';
 import { useAppTheme } from '../context/ThemeContext';
 import { useAppValues } from '../context/DataContext';
@@ -41,6 +42,8 @@ export default function MainTabNavigator() {
             iconName = focused ? 'clipboard-text-clock' : 'clipboard-text-clock-outline';
           } else if (route.name === 'Reminders') {
             iconName = focused ? 'bell-ring' : 'bell-ring-outline';
+          } else if (route.name === 'Slots') {
+            iconName = focused ? 'calendar-clock' : 'calendar-clock-outline';
           } else if (route.name === 'Alerts') {
             iconName = focused ? 'bell-badge' : 'bell-badge-outline';
           } else if (route.name === 'Profile') {
@@ -125,17 +128,9 @@ export default function MainTabNavigator() {
             options={{ title: 'Reminders' }} 
           />
           <Tab.Screen 
-            name="Alerts" 
-            component={AdminAlertsScreen} 
-            options={{
-              title: 'Alerts',
-              tabBarBadge: pendingAlertsCount > 0 ? pendingAlertsCount : undefined,
-              tabBarBadgeStyle: {
-                backgroundColor: theme.colors.error,
-                color: '#FFFFFF',
-                fontSize: 10,
-              },
-            }} 
+            name="Slots" 
+            component={AdminSlotsScreen} 
+            options={{ title: 'Slots' }} 
           />
           <Tab.Screen 
             name="Profile" 

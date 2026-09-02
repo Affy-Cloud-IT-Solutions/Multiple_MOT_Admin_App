@@ -71,6 +71,34 @@ export default function SuperAdminGaragesScreen({ navigation }: any) {
     }
   };
 
+  const [approvingStationId, setApprovingStationId] = useState<string | null>(null);
+
+  const handleStationStatusChange = async (garageId: string, stationId: string, status: 'Approved' | 'Rejected') => {
+    setApprovingStationId(stationId);
+    try {
+      const res = await fetch(`${BASE_URL}/garages/${garageId}/stations/${stationId}/status`, {
+        method: 'PUT',
+        headers: {
+          'Content-Type': 'application/json',
+          Authorization: `Bearer ${token}`
+        },
+        body: JSON.stringify({ status })
+      });
+      const data = await res.json();
+      if (res.ok) {
+        Alert.alert('Success', `Station successfully ${status.toLowerCase()}.`);
+        await fetchFullGarageDetails(garageId);
+        await refreshData();
+      } else {
+        Alert.alert('Error', data.error || 'Failed to update station status.');
+      }
+    } catch (e: any) {
+      Alert.alert('Error', e?.message || 'Failed to update station status.');
+    } finally {
+      setApprovingStationId(null);
+    }
+  };
+
   // Filter garages
   const filteredGarages = garages.filter((g) => {
     const matchesFilter = selectedFilter === 'ALL' || g.status === selectedFilter;
@@ -377,6 +405,118 @@ export default function SuperAdminGaragesScreen({ navigation }: any) {
                       ))}
                     </View>
                   )}
+
+                  {/* Testing Stations & Bays Management */}
+                  <View style={[styles.infoSection, { backgroundColor: theme.colors.background, borderColor: theme.colors.border }]}>
+                    <View style={{ flexDirection: 'row', justifyContent: 'space-between', alignItems: 'center', marginBottom: 10 }}>
+                      <Text style={[styles.infoSectionTitle, { color: theme.colors.text }]}>MOT Testing Stations</Text>
+                      <View style={{ backgroundColor: theme.colors.primary + '20', paddingHorizontal: 8, paddingVertical: 2, borderRadius: 6 }}>
+                        <Text style={{ fontSize: 11, fontWeight: '700', color: theme.colors.primary }}>
+                          {(garageDetails?.stations || []).filter((s: any) => s.status === 'Approved').length} Approved
+                        </Text>
+                      </View>
+                    </View>
+
+                    {(!garageDetails?.stations || garageDetails.stations.length === 0) ? (
+                      <Text style={{ fontSize: 12, color: theme.colors.placeholder }}>No stations configured yet.</Text>
+                    ) : (
+                      garageDetails.stations.map((st: any) => {
+                        const isPending = st.status === 'Pending';
+                        const isApproved = st.status === 'Approved';
+                        const isProcessing = approvingStationId === (st.id || st._id);
+
+                        return (
+                          <View
+                            key={st.id || st._id}
+                            style={{
+                              borderWidth: 1,
+                              borderColor: isPending ? '#F59E0B' : theme.colors.border,
+                              borderRadius: 8,
+                              padding: 10,
+                              marginBottom: 8,
+                              backgroundColor: theme.colors.card,
+                            }}
+                          >
+                            <View style={{ flexDirection: 'row', justifyContent: 'space-between', alignItems: 'center' }}>
+                              <View style={{ flex: 1 }}>
+                                <Text style={{ fontSize: 13, fontWeight: '700', color: theme.colors.text }}>{st.name}</Text>
+                                <Text style={{ fontSize: 11, color: theme.colors.placeholder, marginTop: 2 }}>
+                                  {st.type || 'Class 4 MOT Bay'} • {st.slotDuration || 40} mins/slot
+                                </Text>
+                              </View>
+                              <View
+                                style={{
+                                  paddingHorizontal: 6,
+                                  paddingVertical: 2,
+                                  borderRadius: 4,
+                                  backgroundColor: isApproved ? '#10B98120' : isPending ? '#F59E0B20' : '#EF444420',
+                                }}
+                              >
+                                <Text
+                                  style={{
+                                    fontSize: 10.5,
+                                    fontWeight: '700',
+                                    color: isApproved ? '#10B981' : isPending ? '#F59E0B' : '#EF4444',
+                                  }}
+                                >
+                                  {st.status}
+                                </Text>
+                              </View>
+                            </View>
+
+                            {isPending && (
+                              <View style={{ flexDirection: 'row', gap: 8, marginTop: 10, justifyContent: 'flex-end' }}>
+                                <TouchableOpacity
+                                  style={{
+                                    paddingHorizontal: 12,
+                                    paddingVertical: 6,
+                                    borderRadius: 6,
+                                    backgroundColor: '#EF444415',
+                                    borderWidth: 1,
+                                    borderColor: '#EF4444',
+                                  }}
+                                  disabled={isProcessing}
+                                  onPress={() =>
+                                    handleStationStatusChange(
+                                      selectedGarage.id || selectedGarage._id || '',
+                                      st.id || st._id,
+                                      'Rejected'
+                                    )
+                                  }
+                                >
+                                  <Text style={{ fontSize: 11.5, fontWeight: '700', color: '#EF4444' }}>Reject</Text>
+                                </TouchableOpacity>
+                                <TouchableOpacity
+                                  style={{
+                                    paddingHorizontal: 14,
+                                    paddingVertical: 6,
+                                    borderRadius: 6,
+                                    backgroundColor: '#10B981',
+                                  }}
+                                  disabled={isProcessing}
+                                  onPress={() =>
+                                    handleStationStatusChange(
+                                      selectedGarage.id || selectedGarage._id || '',
+                                      st.id || st._id,
+                                      'Approved'
+                                    )
+                                  }
+                                >
+                                  {isProcessing ? (
+                                    <ActivityIndicator size="small" color="#FFFFFF" />
+                                  ) : (
+                                    <Text style={{ fontSize: 11.5, fontWeight: '700', color: '#FFFFFF' }}>
+                                      Approve Station
+                                    </Text>
+                                  )}
+                                </TouchableOpacity>
+                              </View>
+                            )}
+                          </View>
+                        );
+                      })
+                    )}
+                  </View>
 
                   {/* Action Buttons */}
                   <Text style={[styles.actionsHeading, { color: theme.colors.text }]}>Platform Governance Actions</Text>

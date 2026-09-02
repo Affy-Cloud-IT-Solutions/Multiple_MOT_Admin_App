@@ -42,6 +42,9 @@ export interface AlertNotification {
   serviceName?: string;
   price?: number;
   duration?: number;
+  slotTime?: string;
+  stationId?: string;
+  stationName?: string;
   rescheduled?: boolean;
 }
 
@@ -244,7 +247,11 @@ export const DataProvider = ({ children }: { children: ReactNode }) => {
         }
         if (alertsRes.ok) {
           const alertsData = await alertsRes.json();
-          setAlerts(alertsData);
+          const garageId = decoded?.garageId;
+          const filteredAlerts = garageId
+            ? alertsData.filter((a: any) => !a.garageId || String(a.garageId) === String(garageId))
+            : alertsData;
+          setAlerts(filteredAlerts);
         }
       } else {
         // Customer: only fetch their own customer profile (which includes vehicles) and their alerts

@@ -13,12 +13,12 @@ import {
 import MaterialCommunityIcons from 'react-native-vector-icons/MaterialCommunityIcons';
 import Toast from 'react-native-toast-message';
 import { useAppTheme } from '../context/ThemeContext';
-import { useAppValues } from '../context/DataContext';
+import { useAppValues, BASE_URL } from '../context/DataContext';
 import { SafeAreaView } from 'react-native-safe-area-context';
 
 export default function AdminBookMotScreen({ route, navigation }: any) {
   const { theme } = useAppTheme();
-  const { addAlert, addAudit, refreshData } = useAppValues();
+  const { addAlert, addAudit, refreshData, user } = useAppValues();
 
   // Selected customer and vehicle passed from AdminCustomersScreen
   const customer = route?.params?.customer || {
@@ -37,8 +37,13 @@ export default function AdminBookMotScreen({ route, navigation }: any) {
 
   const [selectedDate, setSelectedDate] = useState('');
   const [selectedTime, setSelectedTime] = useState('');
+  const [selectedSlot, setSelectedSlot] = useState<any>(null);
+  const [garageSlots, setGarageSlots] = useState<any[]>([]);
+  const [loadingSlots, setLoadingSlots] = useState(false);
   const [notes, setNotes] = useState('');
   const [loading, setLoading] = useState(false);
+
+  const garageId = user?.garageId;
 
   // Date and Time options for slot selection
   const [currentViewDate, setCurrentViewDate] = useState(new Date());
@@ -99,29 +104,84 @@ export default function AdminBookMotScreen({ route, navigation }: any) {
 
   const calendarDays = getDaysInMonth(currentViewDate.getFullYear(), currentViewDate.getMonth());
 
-  // Available slots logic (Morning, Afternoon, Evening)
-  const timeSlots = [
-    { id: 't1', time: '09:00 AM', label: 'Early Morning' },
-    { id: 't2', time: '11:30 AM', label: 'Late Morning' },
-    { id: 't3', time: '02:00 PM', label: 'Early Afternoon' },
-    { id: 't4', time: '04:30 PM', label: 'Late Afternoon' },
-  ];
+  // Fetch live slots for the garage
+  const fetchGarageSlots = React.useCallback(async () => {
+    if (!garageId || !selectedDate) {
+      setGarageSlots([]);
+      return;
+    }
+
+    setLoadingSlots(true);
+    try {
+      const res = await fetch(`${BASE_URL}/garages/${garageId}/slots?date=${selectedDate}`);
+      if (res.ok) {
+        const data = await res.json();
+        setGarageSlots(data.slots || []);
+      } else {
+        setGarageSlots([]);
+      }
+    } catch (e) {
+      console.error('Error fetching garage slots in AdminBookMot:', e);
+      setGarageSlots([]);
+    } finally {
+      setLoadingSlots(false);
+    }
+  }, [garageId, selectedDate]);
+
+  React.useEffect(() => {
+    fetchGarageSlots();
+  }, [fetchGarageSlots]);
 
   const isTimeSlotPassed = (timeStr: string) => {
     if (!selectedDate) return false;
     const todayStr = formatLocalDate(new Date());
     if (selectedDate !== todayStr) return false;
 
-    const [time, modifier] = timeStr.split(' ');
-    let [hours, minutes] = time.split(':').map(Number);
-    if (modifier === 'PM' && hours < 12) hours += 12;
-    if (modifier === 'AM' && hours === 12) hours = 0;
+    const now = new Date();
+    const currentHour = now.getHours();
+    const currentMin = now.getMinutes();
 
-    const slotDateTime = new Date();
-    slotDateTime.setHours(hours, minutes, 0, 0);
+    const match12 = timeStr.match(/^(\d{1,2}):(\d{2})\s*(AM|PM)$/i);
+    if (match12) {
+      let hour = parseInt(match12[1], 10);
+      const min = parseInt(match12[2], 10);
+      const period = match12[3].toUpperCase();
+      if (period === 'PM' && hour !== 12) hour += 12;
+      if (period === 'AM' && hour === 12) hour = 0;
+      return currentHour > hour || (currentHour === hour && currentMin >= min);
+    }
 
-    return slotDateTime < new Date();
+    const match24 = timeStr.match(/^(\d{1,2}):(\d{2})/);
+    if (match24) {
+      const hour = parseInt(match24[1], 10);
+      const min = parseInt(match24[2], 10);
+      return currentHour > hour || (currentHour === hour && currentMin >= min);
+    }
+
+    return false;
   };
+
+  // Only free slots are shown to user/staff
+  const freeSlots = React.useMemo(() => {
+    return garageSlots.filter((s: any) => {
+      if (s.isBlocked) return false;
+      if (s.status === 'Full' || s.availableCount <= 0) return false;
+      if (isTimeSlotPassed(s.time)) return false;
+      return true;
+    });
+  }, [garageSlots, selectedDate]);
+
+  React.useEffect(() => {
+    if (freeSlots.length > 0) {
+      if (!selectedSlot || !freeSlots.some((s: any) => s.time === selectedSlot.time)) {
+        setSelectedSlot(freeSlots[0]);
+        setSelectedTime(freeSlots[0].time);
+      }
+    } else {
+      setSelectedSlot(null);
+      setSelectedTime('');
+    }
+  }, [freeSlots]);
 
   const handleConfirmBooking = async () => {
     if (!selectedDate) {
@@ -147,8 +207,11 @@ export default function AdminBookMotScreen({ route, navigation }: any) {
         type: 'BOOKED',
         customerName: `${customer.firstName} ${customer.lastName}`,
         customerId: customer.id,
+        garageId: user?.garageId,
+        slotTime: selectedSlot?.time || selectedTime,
+        duration: selectedSlot?.slotDuration || 45,
         registrationNumber: vehicle.registrationNumber,
-        makeModel: `${vehicle.make} ${vehicle.model} - Slot: ${displayDateStr} at ${selectedTime}`,
+        makeModel: `${vehicle.make} ${vehicle.model} - Slot: ${selectedSlot?.time || selectedTime}`,
         status: 'Approved',
         date: selectedDate,
       });
@@ -375,57 +438,85 @@ export default function AdminBookMotScreen({ route, navigation }: any) {
           </View>
         </View>
 
-        {/* Time Selector Section */}
-        <Text style={[styles.sectionHeading, { color: theme.colors.text }]}>2. Choose Time Slot</Text>
-        {timeSlots.filter(slot => !isTimeSlotPassed(slot.time)).length === 0 ? (
-          <View
-            style={{
-              flexDirection: 'row',
-              alignItems: 'center',
-              padding: 16,
-              borderRadius: 10,
-              borderWidth: 1,
-              borderColor: theme.colors.border,
-              backgroundColor: theme.colors.card,
-              marginTop: 8,
-              marginBottom: 20
-            }}
-          >
-            <MaterialCommunityIcons name="clock-alert-outline" size={24} color={theme.colors.error} />
-            <Text style={{ marginLeft: 8, color: theme.colors.placeholder, fontSize: 13 }}>
-              No slots available for today. Please choose a future date.
+        {/* Time Selector Section (Only Free 45-Min Slots) */}
+        <View style={{ flexDirection: 'row', alignItems: 'center', justifyContent: 'space-between', marginBottom: 12 }}>
+          <View style={{ flexDirection: 'row', alignItems: 'center' }}>
+            <MaterialCommunityIcons name="clock-outline" size={16} color={theme.colors.placeholder} style={{ marginRight: 6 }} />
+            <Text style={[styles.sectionHeading, { color: theme.colors.text, marginBottom: 0 }]}>
+              2. Choose Time Slot (45 Mins)
             </Text>
+          </View>
+          {loadingSlots && <ActivityIndicator size="small" color={theme.colors.secondary} />}
+        </View>
+
+        {!selectedDate ? (
+          <View style={[styles.emptyNoticeCard, { backgroundColor: theme.colors.card, borderColor: theme.colors.border }]}>
+            <MaterialCommunityIcons name="calendar-clock" size={22} color={theme.colors.placeholder} />
+            <Text style={{ marginLeft: 8, color: theme.colors.placeholder, fontSize: 13 }}>
+              Please select an appointment date above to view free slots.
+            </Text>
+          </View>
+        ) : loadingSlots ? (
+          <View style={[styles.emptyNoticeCard, { backgroundColor: theme.colors.card, borderColor: theme.colors.border }]}>
+            <ActivityIndicator size="small" color={theme.colors.secondary} style={{ marginRight: 8 }} />
+            <Text style={{ color: theme.colors.placeholder, fontSize: 13 }}>
+              Checking free slots...
+            </Text>
+          </View>
+        ) : freeSlots.length === 0 ? (
+          <View style={[styles.emptyNoticeCard, { backgroundColor: theme.colors.card, borderColor: theme.colors.border }]}>
+            <MaterialCommunityIcons name="calendar-remove" size={24} color={theme.colors.error} />
+            <View style={{ marginLeft: 10, flex: 1 }}>
+              <Text style={{ color: theme.colors.text, fontSize: 13.5, fontWeight: '700' }}>
+                No Free Slots Available
+              </Text>
+              <Text style={{ color: theme.colors.placeholder, fontSize: 12, marginTop: 2 }}>
+                All MOT slots are fully booked or closed on this date. Please select another date.
+              </Text>
+            </View>
           </View>
         ) : (
           <View style={styles.timePickerContainer}>
-            {timeSlots
-              .filter(slot => !isTimeSlotPassed(slot.time))
-              .map((slot) => {
-                const isSelected = selectedTime === slot.time;
-                return (
-                  <TouchableOpacity
-                    key={slot.id}
-                    onPress={() => setSelectedTime(slot.time)}
-                    style={[
-                      styles.timeCard,
-                      {
-                        backgroundColor: isSelected ? theme.colors.secondary + '12' : theme.colors.card,
-                        borderColor: isSelected ? theme.colors.secondary : theme.colors.border,
-                      }
-                    ]}
-                  >
-                    <MaterialCommunityIcons
-                      name={isSelected ? 'clock-check' : 'clock-outline'}
-                      size={20}
-                      color={isSelected ? theme.colors.secondary : theme.colors.placeholder}
-                    />
-                    <View style={{ marginLeft: 10 }}>
-                      <Text style={[styles.timeLabel, { color: theme.colors.text }]}>{slot.label}</Text>
-                      <Text style={[styles.timeText, { color: theme.colors.placeholder }]}>{slot.time}</Text>
+            {freeSlots.map((slot: any) => {
+              const isSelected = selectedTime === slot.time;
+              return (
+                <TouchableOpacity
+                  key={slot.time}
+                  onPress={() => {
+                    setSelectedSlot(slot);
+                    setSelectedTime(slot.time);
+                  }}
+                  style={[
+                    styles.timeCard,
+                    {
+                      backgroundColor: isSelected ? theme.colors.secondary + '18' : theme.colors.card,
+                      borderColor: isSelected ? theme.colors.secondary : theme.colors.border,
+                      borderWidth: isSelected ? 2 : 1.5,
+                    },
+                  ]}
+                >
+                  <View style={{ flex: 1 }}>
+                    <View style={{ flexDirection: 'row', alignItems: 'center', justifyContent: 'space-between' }}>
+                      <Text style={[styles.timeLabel, { color: theme.colors.text, fontSize: 14, fontWeight: '800' }]}>
+                        {slot.time}
+                      </Text>
+                      {isSelected ? (
+                        <MaterialCommunityIcons name="check-circle" size={16} color={theme.colors.secondary} />
+                      ) : (
+                        <View style={{ backgroundColor: '#10B98115', paddingHorizontal: 5, paddingVertical: 1, borderRadius: 4 }}>
+                          <Text style={{ color: '#10B981', fontSize: 10, fontWeight: '700' }}>
+                            {slot.availableCount} Open
+                          </Text>
+                        </View>
+                      )}
                     </View>
-                  </TouchableOpacity>
-                );
-              })}
+                    <Text style={[styles.timeText, { color: theme.colors.placeholder, fontSize: 11, marginTop: 2 }]}>
+                      {slot.slotLabel || `${slot.time} - ${slot.endTime || '45m'}`}
+                    </Text>
+                  </View>
+                </TouchableOpacity>
+              );
+            })}
           </View>
         )}
 
@@ -741,11 +832,18 @@ const styles = StyleSheet.create({
   },
   timeCard: {
     width: '48%',
-    flexDirection: 'row',
-    alignItems: 'center',
-    padding: 12,
+    padding: 10,
     borderRadius: 10,
     borderWidth: 1.5,
+  },
+  emptyNoticeCard: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    padding: 14,
+    borderRadius: 10,
+    borderWidth: 1,
+    marginTop: 4,
+    marginBottom: 20,
   },
   timeLabel: {
     fontSize: 12,

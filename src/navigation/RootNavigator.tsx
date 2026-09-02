@@ -8,6 +8,7 @@ import BookedMotsScreen from '../screens/BookedMotsScreen';
 import StaffListScreen from '../screens/StaffListScreen';
 import CustomerDetailScreen from '../screens/CustomerDetailScreen';
 import AdminBookMotScreen from '../screens/AdminBookMotScreen';
+import AdminAlertsScreen from '../screens/AdminAlertsScreen';
 import MainTabNavigator from './MainTabNavigator';
 import { useAppTheme } from '../context/ThemeContext';
 
@@ -74,6 +75,11 @@ export default function RootNavigator() {
         name="CustomerDetail"
         component={CustomerDetailScreen}
         options={{ headerShown: false }}
+      />
+      <Stack.Screen
+        name="AdminAlerts"
+        component={AdminAlertsScreen}
+        options={{ title: 'Action Alerts', headerShown: true }}
       />
     </Stack.Navigator>
   );

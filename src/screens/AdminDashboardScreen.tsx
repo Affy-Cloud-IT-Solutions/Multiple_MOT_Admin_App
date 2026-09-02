@@ -114,27 +114,46 @@ export default function AdminDashboardScreen({ navigation }: any) {
             MOT Reminder Management
           </Text>
         </View>
-        <TouchableOpacity 
-          style={[styles.refreshButton, { borderColor: theme.colors.border }]}
-          disabled={isRefreshing}
-          onPress={async () => {
-            setIsRefreshing(true);
-            try {
-              await refreshData();
-              Alert.alert('Refreshed', 'Database reloaded successfully!');
-            } catch (error) {
-              console.error('Refresh error:', error);
-            } finally {
-              setIsRefreshing(false);
-            }
-          }}
-        >
-          {isRefreshing ? (
-            <ActivityIndicator size="small" color={theme.colors.secondary} />
-          ) : (
-            <MaterialCommunityIcons name="refresh" size={20} color={theme.colors.secondary} />
-          )}
-        </TouchableOpacity>
+        <View style={styles.headerActions}>
+          {/* Bell Notification Icon with Pending Alerts Badge */}
+          <TouchableOpacity 
+            style={[styles.headerIconButton, { borderColor: theme.colors.border, backgroundColor: theme.colors.card }]}
+            onPress={() => navigation.navigate('AdminAlerts')}
+            activeOpacity={0.7}
+          >
+            <MaterialCommunityIcons name="bell-outline" size={20} color={theme.colors.text} />
+            {alerts.filter((a) => a.status === 'Pending').length > 0 && (
+              <View style={styles.bellBadge}>
+                <Text style={styles.bellBadgeText}>
+                  {alerts.filter((a) => a.status === 'Pending').length}
+                </Text>
+              </View>
+            )}
+          </TouchableOpacity>
+
+          {/* Refresh Button */}
+          <TouchableOpacity 
+            style={[styles.headerIconButton, { borderColor: theme.colors.border, backgroundColor: theme.colors.card }]}
+            disabled={isRefreshing}
+            onPress={async () => {
+              setIsRefreshing(true);
+              try {
+                await refreshData();
+                Alert.alert('Refreshed', 'Database reloaded successfully!');
+              } catch (error) {
+                console.error('Refresh error:', error);
+              } finally {
+                setIsRefreshing(false);
+              }
+            }}
+          >
+            {isRefreshing ? (
+              <ActivityIndicator size="small" color={theme.colors.secondary} />
+            ) : (
+              <MaterialCommunityIcons name="refresh" size={20} color={theme.colors.secondary} />
+            )}
+          </TouchableOpacity>
+        </View>
       </View>
 
       {/* Stats Grid - Uniform 2-column layout */}
@@ -314,6 +333,39 @@ const styles = StyleSheet.create({
     fontWeight: '400',
     marginTop: 2,
     letterSpacing: -0.2,
+  },
+  headerActions: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    gap: 8,
+  },
+  headerIconButton: {
+    width: 40,
+    height: 40,
+    borderRadius: 10,
+    borderWidth: 1,
+    alignItems: 'center',
+    justifyContent: 'center',
+    position: 'relative',
+  },
+  bellBadge: {
+    position: 'absolute',
+    top: -4,
+    right: -4,
+    backgroundColor: '#EF4444',
+    borderRadius: 9,
+    minWidth: 18,
+    height: 18,
+    alignItems: 'center',
+    justifyContent: 'center',
+    paddingHorizontal: 3,
+    borderWidth: 1.5,
+    borderColor: '#FFFFFF',
+  },
+  bellBadgeText: {
+    color: '#FFFFFF',
+    fontSize: 9.5,
+    fontWeight: 'bold',
   },
   refreshButton: {
     width: 40,
