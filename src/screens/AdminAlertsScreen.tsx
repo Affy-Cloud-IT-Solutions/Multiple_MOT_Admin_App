@@ -4,6 +4,53 @@ import MaterialCommunityIcons from 'react-native-vector-icons/MaterialCommunityI
 import { useAppTheme } from '../context/ThemeContext';
 import { useAppValues } from '../context/DataContext';
 
+const STANDARD_SLOTS = [
+  '08:30', '09:15', '10:00', '10:45',
+  '11:30', '12:15', '13:00', '13:45',
+  '14:30', '15:15', '16:00', '16:45'
+];
+
+const getSlotNumber = (item: any) => {
+  if (item.slotNumber) return item.slotNumber;
+  let timeStr = item.slotTime || '';
+  if (!timeStr && item.makeModel) {
+    const match = item.makeModel.match(/Slot:\s*(\d{1,2}:\d{2}(?:\s*[AP]M)?)/i) ||
+                  item.makeModel.match(/at\s+(\d{1,2}:\d{2}(?:\s*[AP]M)?)/i);
+    if (match) timeStr = match[1];
+  }
+  if (timeStr) {
+    const start = timeStr.split(' - ')[0].trim();
+    const idx = STANDARD_SLOTS.indexOf(start);
+    if (idx !== -1) return idx + 1;
+  }
+  return null;
+};
+
+const getSlotDisplay = (item: any) => {
+  const num = getSlotNumber(item);
+  return num ? `Slot #${num}` : 'MOT Slot';
+};
+
+const getSlotTimeDisplay = (item: any) => {
+  if (item.slotTime) return item.slotTime;
+  if (item.makeModel) {
+    const match = item.makeModel.match(/Slot:\s*([^\n\r]+)/i);
+    if (match) return match[1].trim();
+  }
+  return '45-Min MOT Slot';
+};
+
+const formatBookingDate = (dateVal: any) => {
+  if (!dateVal) return 'Date not specified';
+  try {
+    const d = new Date(dateVal);
+    if (!isNaN(d.getTime())) {
+      return d.toLocaleDateString('en-GB', { day: 'numeric', month: 'short', year: 'numeric' });
+    }
+  } catch (e) {}
+  return String(dateVal);
+};
+
 export default function AdminAlertsScreen() {
   const { theme } = useAppTheme();
   const { alerts, approveAlert, acknowledgeAlert, rejectAlert } = useAppValues();
@@ -135,6 +182,31 @@ export default function AdminAlertsScreen() {
                       {item.makeModel}
                     </Text>
                   </View>
+
+                  {item.type === 'BOOKED' && (
+                    <View style={[styles.slotDetailsCard, { backgroundColor: theme.colors.secondary + '12', borderColor: theme.colors.secondary + '30' }]}>
+                      <View style={{ flexDirection: 'row', alignItems: 'center', justifyContent: 'space-between' }}>
+                        <View style={{ flexDirection: 'row', alignItems: 'center' }}>
+                          <MaterialCommunityIcons name="calendar-clock" size={16} color={theme.colors.secondary} style={{ marginRight: 6 }} />
+                          <Text style={{ fontSize: 13, fontWeight: 'bold', color: theme.colors.text }}>
+                            Requested Date: {formatBookingDate(item.date)}
+                          </Text>
+                        </View>
+                        <View style={[styles.slotNumberBadge, { backgroundColor: theme.colors.secondary }]}>
+                          <Text style={{ fontSize: 11, fontWeight: 'bold', color: '#FFFFFF' }}>
+                            {getSlotDisplay(item)}
+                          </Text>
+                        </View>
+                      </View>
+                      <View style={{ flexDirection: 'row', alignItems: 'center', marginTop: 6 }}>
+                        <MaterialCommunityIcons name="clock-outline" size={14} color={theme.colors.placeholder} style={{ marginRight: 6 }} />
+                        <Text style={{ fontSize: 12, color: theme.colors.placeholder }}>
+                          Requested Slot: <Text style={{ color: theme.colors.text, fontWeight: '700' }}>{getSlotTimeDisplay(item)}</Text>
+                          {item.stationName ? ` • Bay: ${item.stationName}` : ''}
+                        </Text>
+                      </View>
+                    </View>
+                  )}
                 </View>
 
                 <View style={[styles.divider, { backgroundColor: theme.colors.border }]} />
@@ -387,5 +459,16 @@ const styles = StyleSheet.create({
   modalBtnText: {
     fontSize: 12,
     fontWeight: 'bold',
+  },
+  slotDetailsCard: {
+    marginTop: 10,
+    padding: 10,
+    borderRadius: 8,
+    borderWidth: 1,
+  },
+  slotNumberBadge: {
+    paddingHorizontal: 8,
+    paddingVertical: 3,
+    borderRadius: 6,
   },
 });

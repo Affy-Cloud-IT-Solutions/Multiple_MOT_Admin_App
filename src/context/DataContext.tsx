@@ -43,6 +43,7 @@ export interface AlertNotification {
   price?: number;
   duration?: number;
   slotTime?: string;
+  slotNumber?: number;
   stationId?: string;
   stationName?: string;
   rescheduled?: boolean;
@@ -115,6 +116,7 @@ interface DataContextType {
   lookupVehicle: (vrn: string) => Promise<any>;
   fetchGarages: () => Promise<Garage[]>;
   updateGarageStatus: (garageId: string, status: string, verificationStatus?: string) => Promise<void>;
+  updateGarageProfile: (garageId: string, updates: Partial<Garage>) => Promise<any>;
 }
 
 const DataContext = createContext<DataContextType | undefined>(undefined);
@@ -613,6 +615,28 @@ export const DataProvider = ({ children }: { children: ReactNode }) => {
     }
   };
 
+  const updateGarageProfile = async (garageId: string, updates: Partial<Garage>): Promise<any> => {
+    try {
+      const response = await fetch(`${BASE_URL}/garages/${garageId}`, {
+        method: 'PUT',
+        headers: {
+          'Content-Type': 'application/json',
+          'Authorization': `Bearer ${token}`
+        },
+        body: JSON.stringify(updates)
+      });
+      const data = await response.json();
+      if (!response.ok) {
+        throw new Error(data.error || 'Failed to update garage profile');
+      }
+      await refreshData();
+      return data.garage;
+    } catch (error) {
+      console.error('[DATA CONTEXT] updateGarageProfile error:', error);
+      throw error;
+    }
+  };
+
   return (
     <DataContext.Provider
       value={{
@@ -641,6 +665,7 @@ export const DataProvider = ({ children }: { children: ReactNode }) => {
         lookupVehicle,
         fetchGarages,
         updateGarageStatus,
+        updateGarageProfile,
       }}
     >
       {children}

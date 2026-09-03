@@ -10,6 +10,7 @@ import {
   Modal,
   ActivityIndicator,
   Linking,
+  Image,
 } from 'react-native';
 import MaterialCommunityIcons from 'react-native-vector-icons/MaterialCommunityIcons';
 import { useAppTheme } from '../context/ThemeContext';
@@ -17,7 +18,7 @@ import { useAppValues, Garage, BASE_URL } from '../context/DataContext';
 
 export default function SuperAdminGaragesScreen({ navigation }: any) {
   const { theme } = useAppTheme();
-  const { garages, refreshData, updateGarageStatus, token } = useAppValues();
+  const { garages, refreshData, updateGarageStatus, updateGarageProfile, token } = useAppValues();
 
   const [searchQuery, setSearchQuery] = useState('');
   const [selectedFilter, setSelectedFilter] = useState<'ALL' | 'Approved' | 'Pending' | 'Suspended'>('ALL');
@@ -26,6 +27,11 @@ export default function SuperAdminGaragesScreen({ navigation }: any) {
   const [loadingAction, setLoadingAction] = useState(false);
   const [garageDetails, setGarageDetails] = useState<any>(null);
   const [loadingDetails, setLoadingDetails] = useState(false);
+
+  // Dynamic Garage Images Management States
+  const [garageImages, setGarageImages] = useState<string[]>([]);
+  const [newImageUrl, setNewImageUrl] = useState('');
+  const [savingImages, setSavingImages] = useState(false);
 
   const fetchFullGarageDetails = async (garageId: string) => {
     setLoadingDetails(true);
@@ -36,6 +42,9 @@ export default function SuperAdminGaragesScreen({ navigation }: any) {
       if (response.ok) {
         const data = await response.json();
         setGarageDetails(data);
+        if (data.images && data.images.length > 0) {
+          setGarageImages(data.images);
+        }
       }
     } catch (e) {
       console.error('Error fetching garage details:', e);
@@ -46,9 +55,52 @@ export default function SuperAdminGaragesScreen({ navigation }: any) {
 
   const openGarageModal = (garage: Garage) => {
     setSelectedGarage(garage);
+    setGarageImages(garage.images || []);
+    setNewImageUrl('');
     setGarageDetails(null);
     setModalVisible(true);
     fetchFullGarageDetails(garage.id || garage._id || '');
+  };
+
+  const handleRemoveImage = (indexToRemove: number) => {
+    const updated = garageImages.filter((_, idx) => idx !== indexToRemove);
+    setGarageImages(updated);
+  };
+
+  const handleAddImage = (urlToAdd?: string) => {
+    const targetUrl = (urlToAdd || newImageUrl).trim();
+    if (!targetUrl) {
+      Alert.alert('Error', 'Please enter a valid image URL');
+      return;
+    }
+    if (garageImages.includes(targetUrl)) {
+      Alert.alert('Notice', 'This image is already in the gallery.');
+      return;
+    }
+    setGarageImages([...garageImages, targetUrl]);
+    setNewImageUrl('');
+  };
+
+  const handleSaveImages = async () => {
+    if (!selectedGarage) return;
+    const garageId = selectedGarage.id || selectedGarage._id || '';
+    setSavingImages(true);
+    try {
+      await updateGarageProfile(garageId, { 
+        images: garageImages,
+        logoUrl: garageImages[0] || selectedGarage.logoUrl 
+      });
+      setSelectedGarage({
+        ...selectedGarage,
+        images: garageImages,
+        logoUrl: garageImages[0] || selectedGarage.logoUrl
+      });
+      Alert.alert('Success', 'Garage images updated successfully!');
+    } catch (err: any) {
+      Alert.alert('Error', err.message || 'Failed to save garage images.');
+    } finally {
+      setSavingImages(false);
+    }
   };
 
   const handleStatusChange = async (garageId: string, status: string, verificationStatus?: string) => {
@@ -227,10 +279,16 @@ export default function SuperAdminGaragesScreen({ navigation }: any) {
                   { backgroundColor: theme.colors.card, borderColor: theme.colors.border }
                 ]}
               >
-                {/* Top Row: Icon, Name, Status & Verification Badge */}
+                {/* Top Row: Icon/Thumbnail, Name, Status & Verification Badge */}
                 <View style={styles.cardHeader}>
                   <View style={[styles.garageAvatar, { backgroundColor: statusColor + '15' }]}>
-                    <MaterialCommunityIcons name="garage" size={26} color={statusColor} />
+                    {(garage.images && garage.images.length > 0) ? (
+                      <Image source={{ uri: garage.images[0] }} style={styles.garageAvatarImg} />
+                    ) : garage.logoUrl ? (
+                      <Image source={{ uri: garage.logoUrl }} style={styles.garageAvatarImg} />
+                    ) : (
+                      <MaterialCommunityIcons name="garage" size={26} color={statusColor} />
+                    )}
                   </View>
 
                   <View style={{ flex: 1 }}>
@@ -292,9 +350,18 @@ export default function SuperAdminGaragesScreen({ navigation }: any) {
                       color={isVerified ? '#10B981' : '#F59E0B'}
                     />
                     <Text style={[styles.metricChipText, { color: isVerified ? '#10B981' : '#F59E0B' }]}>
-                      {isVerified ? 'Verified' : 'Unverified'}
+                      {garage.verificationStatus || 'Pending'}
                     </Text>
                   </View>
+
+                  {garage.images && garage.images.length > 0 && (
+                    <View style={styles.metricChip}>
+                      <MaterialCommunityIcons name="camera-outline" size={13} color="#0284C7" />
+                      <Text style={[styles.metricChipText, { color: theme.colors.text }]}>
+                        {garage.images.length} Photos
+                      </Text>
+                    </View>
+                  )}
                   <MaterialCommunityIcons name="chevron-right" size={18} color={theme.colors.placeholder} />
                 </View>
               </TouchableOpacity>
@@ -330,6 +397,23 @@ export default function SuperAdminGaragesScreen({ navigation }: any) {
                 </View>
 
                 <ScrollView style={styles.modalBody} showsVerticalScrollIndicator={false}>
+                  {/* Garage Photos Carousel */}
+                  {garageImages.length > 0 && (
+                    <View style={styles.modalCarouselContainer}>
+                      <ScrollView horizontal pagingEnabled showsHorizontalScrollIndicator={false} style={styles.modalCarousel}>
+                        {garageImages.map((imgUri, idx) => (
+                          <View key={`modal-img-${idx}`} style={styles.modalCarouselSlide}>
+                            <Image source={{ uri: imgUri }} style={styles.modalCarouselImage} />
+                            <View style={styles.modalCarouselTag}>
+                              <MaterialCommunityIcons name="camera" size={11} color="#FFF" style={{ marginRight: 4 }} />
+                              <Text style={styles.modalCarouselTagText}>{idx + 1} / {garageImages.length}</Text>
+                            </View>
+                          </View>
+                        ))}
+                      </ScrollView>
+                    </View>
+                  )}
+
                   {/* Status Banner */}
                   <View style={[styles.modalStatusBanner, { backgroundColor: getStatusColor(selectedGarage.status) + '15', borderColor: getStatusColor(selectedGarage.status) }]}>
                     <MaterialCommunityIcons name="shield-check" size={20} color={getStatusColor(selectedGarage.status)} />
@@ -387,6 +471,89 @@ export default function SuperAdminGaragesScreen({ navigation }: any) {
                       )}
                     </View>
                   )}
+
+                  {/* Dynamic Garage Images & Gallery Management */}
+                  <View style={[styles.infoSection, { backgroundColor: theme.colors.background, borderColor: theme.colors.border }]}>
+                    <View style={{ flexDirection: 'row', alignItems: 'center', justifyContent: 'space-between', marginBottom: 10 }}>
+                      <View style={{ flexDirection: 'row', alignItems: 'center' }}>
+                        <MaterialCommunityIcons name="image-multiple-outline" size={18} color="#0284C7" style={{ marginRight: 6 }} />
+                        <Text style={[styles.infoSectionTitle, { color: theme.colors.text, marginBottom: 0 }]}>
+                          Garage Photos ({garageImages.length})
+                        </Text>
+                      </View>
+                      <TouchableOpacity
+                        style={[styles.saveGalleryBtn, { backgroundColor: theme.colors.primary }]}
+                        onPress={handleSaveImages}
+                        disabled={savingImages}
+                      >
+                        {savingImages ? (
+                          <ActivityIndicator size="small" color="#FFF" />
+                        ) : (
+                          <Text style={styles.saveGalleryBtnText}>Save Photos</Text>
+                        )}
+                      </TouchableOpacity>
+                    </View>
+
+                    {/* Image Thumbnails Strip with Delete Button */}
+                    {garageImages.length === 0 ? (
+                      <Text style={{ fontSize: 12, color: theme.colors.placeholder, marginVertical: 8 }}>
+                        No gallery photos added yet. Add one below.
+                      </Text>
+                    ) : (
+                      <ScrollView horizontal showsHorizontalScrollIndicator={false} contentContainerStyle={{ gap: 8, paddingVertical: 4 }}>
+                        {garageImages.map((imgUri, idx) => (
+                          <View key={`gallery-${idx}`} style={styles.adminGalleryThumbBox}>
+                            <Image source={{ uri: imgUri }} style={styles.adminGalleryThumb} />
+                            <TouchableOpacity
+                              style={styles.adminGalleryDeleteBtn}
+                              onPress={() => handleRemoveImage(idx)}
+                            >
+                              <MaterialCommunityIcons name="close" size={12} color="#FFFFFF" />
+                            </TouchableOpacity>
+                          </View>
+                        ))}
+                      </ScrollView>
+                    )}
+
+                    {/* Quick Preset Badges */}
+                    <Text style={[styles.presetSectionLabel, { color: theme.colors.placeholder }]}>
+                      Quick Add Sample Photos:
+                    </Text>
+                    <View style={styles.presetRow}>
+                      {[
+                        { label: '+ Sample 1', url: 'https://images.unsplash.com/photo-1617886322168-72b886573c3c?w=800&h=500&fit=crop' },
+                        { label: '+ Sample 2', url: 'https://images.unsplash.com/photo-1486006920555-c77dce18193b?w=800&h=500&fit=crop' },
+                        { label: '+ Sample 3', url: 'https://images.unsplash.com/photo-1517524206127-48bbd363f3d7?w=800&h=500&fit=crop' },
+                        { label: '+ Sample 4', url: 'https://images.unsplash.com/photo-1580273916550-e323be2ae537?w=800&h=500&fit=crop' },
+                      ].map((preset) => (
+                        <TouchableOpacity
+                          key={preset.label}
+                          style={[styles.presetChip, { backgroundColor: theme.colors.card, borderColor: theme.colors.border }]}
+                          onPress={() => handleAddImage(preset.url)}
+                        >
+                          <Text style={[styles.presetChipText, { color: theme.colors.text }]}>{preset.label}</Text>
+                        </TouchableOpacity>
+                      ))}
+                    </View>
+
+                    {/* Add Custom Image URL Input */}
+                    <View style={styles.addImageInputRow}>
+                      <TextInput
+                        value={newImageUrl}
+                        onChangeText={setNewImageUrl}
+                        placeholder="Paste image URL (https://...)..."
+                        placeholderTextColor={theme.colors.placeholder}
+                        style={[styles.imageUrlInput, { color: theme.colors.text, borderColor: theme.colors.border, backgroundColor: theme.colors.card }]}
+                      />
+                      <TouchableOpacity
+                        style={[styles.addImageBtn, { backgroundColor: theme.colors.secondary }]}
+                        onPress={() => handleAddImage()}
+                      >
+                        <MaterialCommunityIcons name="plus" size={16} color="#FFFFFF" />
+                        <Text style={styles.addImageBtnText}>Add</Text>
+                      </TouchableOpacity>
+                    </View>
+                  </View>
 
                   {/* Staff List */}
                   {garageDetails?.staffList && garageDetails.staffList.length > 0 && (
@@ -833,5 +1000,146 @@ const styles = StyleSheet.create({
     color: '#FFFFFF',
     fontSize: 14,
     fontWeight: '700',
+  },
+  garageAvatarImg: {
+    width: '100%',
+    height: '100%',
+    borderRadius: 10,
+    resizeMode: 'cover',
+  },
+  modalCarouselContainer: {
+    height: 160,
+    width: '100%',
+    borderRadius: 12,
+    overflow: 'hidden',
+    marginBottom: 14,
+  },
+  modalCarousel: {
+    width: '100%',
+    height: '100%',
+  },
+  modalCarouselSlide: {
+    width: 340,
+    height: 160,
+    position: 'relative',
+  },
+  modalCarouselImage: {
+    width: '100%',
+    height: '100%',
+    resizeMode: 'cover',
+  },
+  modalCarouselTag: {
+    position: 'absolute',
+    bottom: 8,
+    right: 8,
+    flexDirection: 'row',
+    alignItems: 'center',
+    backgroundColor: 'rgba(0, 0, 0, 0.65)',
+    paddingHorizontal: 8,
+    paddingVertical: 3,
+    borderRadius: 10,
+  },
+  modalCarouselTagText: {
+    color: '#FFFFFF',
+    fontSize: 11,
+    fontWeight: 'bold',
+  },
+  saveGalleryBtn: {
+    paddingHorizontal: 12,
+    paddingVertical: 5,
+    borderRadius: 6,
+  },
+  saveGalleryBtnText: {
+    color: '#FFFFFF',
+    fontSize: 12,
+    fontWeight: 'bold',
+  },
+  adminGalleryThumbBox: {
+    width: 90,
+    height: 65,
+    borderRadius: 8,
+    borderWidth: 1,
+    borderColor: 'rgba(150, 150, 150, 0.3)',
+    overflow: 'hidden',
+    position: 'relative',
+    backgroundColor: '#F3F4F6',
+  },
+  adminGalleryThumb: {
+    width: '100%',
+    height: '100%',
+    resizeMode: 'cover',
+  },
+  adminGalleryDeleteBtn: {
+    position: 'absolute',
+    top: 3,
+    right: 3,
+    width: 18,
+    height: 18,
+    borderRadius: 9,
+    backgroundColor: 'rgba(239, 68, 68, 0.9)',
+    justifyContent: 'center',
+    alignItems: 'center',
+  },
+  adminGalleryIndexBadge: {
+    position: 'absolute',
+    bottom: 2,
+    left: 2,
+    backgroundColor: 'rgba(0, 0, 0, 0.6)',
+    paddingHorizontal: 4,
+    paddingVertical: 1,
+    borderRadius: 3,
+  },
+  adminGalleryIndexText: {
+    color: '#FFFFFF',
+    fontSize: 8,
+    fontWeight: 'bold',
+  },
+  presetSectionLabel: {
+    fontSize: 11,
+    fontWeight: '600',
+    marginTop: 10,
+    marginBottom: 6,
+  },
+  presetRow: {
+    flexDirection: 'row',
+    flexWrap: 'wrap',
+    gap: 6,
+    marginBottom: 10,
+  },
+  presetChip: {
+    paddingHorizontal: 8,
+    paddingVertical: 4,
+    borderRadius: 6,
+    borderWidth: 1,
+  },
+  presetChipText: {
+    fontSize: 10,
+    fontWeight: '600',
+  },
+  addImageInputRow: {
+    flexDirection: 'row',
+    gap: 8,
+    alignItems: 'center',
+  },
+  imageUrlInput: {
+    flex: 1,
+    height: 38,
+    borderWidth: 1,
+    borderRadius: 6,
+    paddingHorizontal: 10,
+    fontSize: 12,
+  },
+  addImageBtn: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    height: 38,
+    paddingHorizontal: 12,
+    borderRadius: 6,
+    gap: 4,
+  },
+  addImageBtnText: {
+    color: '#FFFFFF',
+    fontSize: 12,
+    fontWeight: 'bold',
   },
 });

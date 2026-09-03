@@ -31,7 +31,7 @@ if (Platform.OS === 'android' && UIManager.setLayoutAnimationEnabledExperimental
 
 export default function AdminCustomersScreen({ navigation }: any) {
   const { theme } = useAppTheme();
-  const { customers, vehicles, garages, user, addCustomer, addVehicle, updateVehicleStatus, lookupVehicle, token } = useAppValues();
+  const { customers, vehicles, garages, alerts = [], user, addCustomer, addVehicle, updateVehicleStatus, lookupVehicle, token } = useAppValues();
 
   const [searchQuery, setSearchQuery] = useState('');
   const [selectedGarageFilter, setSelectedGarageFilter] = useState<string>('ALL');
@@ -756,11 +756,40 @@ export default function AdminCustomersScreen({ navigation }: any) {
                             return;
                           }
                           
-                          // If they only have 1 active vehicle, directly navigate to booking
+                          // If they only have 1 active vehicle
                           if (bookableVehicles.length === 1) {
+                            const singleVeh = bookableVehicles[0];
+                            const existingBooking = alerts.find(a => 
+                              a.type === 'BOOKED' && 
+                              a.registrationNumber?.toUpperCase() === singleVeh.registrationNumber?.toUpperCase() && 
+                              (a.status === 'Approved' || a.status === 'Pending')
+                            );
+
+                            if (existingBooking) {
+                              Alert.alert(
+                                'Vehicle Already Booked',
+                                `${singleVeh.registrationNumber} already has an MOT booking (${existingBooking.status === 'Approved' ? 'Confirmed' : 'Pending'}) for ${new Date(existingBooking.date).toLocaleDateString('en-GB', { day: 'numeric', month: 'short' })} at ${existingBooking.slotTime || 'Slot'}.\n\nWould you like to manage/reschedule this booking?`,
+                                [
+                                  { text: 'Cancel', style: 'cancel' },
+                                  {
+                                    text: 'Manage / Reschedule',
+                                    onPress: () => {
+                                      navigation.navigate('AdminBookMot', {
+                                        customer: c,
+                                        vehicle: singleVeh,
+                                        allVehicles: customerVehicles,
+                                      });
+                                    }
+                                  }
+                                ]
+                              );
+                              return;
+                            }
+
                             navigation.navigate('AdminBookMot', {
                               customer: c,
-                              vehicle: bookableVehicles[0]
+                              vehicle: singleVeh,
+                              allVehicles: customerVehicles,
                             });
                             return;
                           }
@@ -782,35 +811,72 @@ export default function AdminCustomersScreen({ navigation }: any) {
                         <Text style={{ fontWeight: 'bold', fontSize: 13, color: theme.colors.text, marginBottom: 10 }}>
                           Select Vehicle for MOT Booking:
                         </Text>
-                        {customerVehicles.filter(v => v.status === 'Active').map(v => (
-                          <TouchableOpacity
-                            key={v.id}
-                            onPress={() => {
-                              LayoutAnimation.configureNext(LayoutAnimation.Presets.easeInEaseOut);
-                              setIsBookingMotForCustId(null);
-                              navigation.navigate('AdminBookMot', {
-                                customer: c,
-                                vehicle: v
-                              });
-                            }}
-                            style={{
-                              flexDirection: 'row',
-                              justifyContent: 'space-between',
-                              alignItems: 'center',
-                              paddingVertical: 10,
-                              borderBottomWidth: 0.5,
-                              borderColor: theme.colors.border
-                            }}
-                          >
-                            <View style={styles.recentPlate}>
-                              <Text style={styles.recentPlateText}>{v.registrationNumber}</Text>
-                            </View>
-                            <Text style={{ color: theme.colors.text, fontWeight: '500', fontSize: 12, flex: 1, marginLeft: 10 }}>
-                              {v.make} {v.model} {v.year ? `(${v.year})` : ''}
-                            </Text>
-                            <MaterialCommunityIcons name="chevron-right" size={18} color={theme.colors.placeholder} />
-                          </TouchableOpacity>
-                        ))}
+                        {customerVehicles.filter(v => v.status === 'Active').map(v => {
+                          const existingBooking = alerts.find(a => 
+                            a.type === 'BOOKED' && 
+                            a.registrationNumber?.toUpperCase() === v.registrationNumber?.toUpperCase() && 
+                            (a.status === 'Approved' || a.status === 'Pending')
+                          );
+                          const isBooked = existingBooking?.status === 'Approved';
+                          const isPending = existingBooking?.status === 'Pending';
+
+                          return (
+                            <TouchableOpacity
+                              key={v.id}
+                              onPress={() => {
+                                LayoutAnimation.configureNext(LayoutAnimation.Presets.easeInEaseOut);
+                                setIsBookingMotForCustId(null);
+                                navigation.navigate('AdminBookMot', {
+                                  customer: c,
+                                  vehicle: v,
+                                  allVehicles: customerVehicles,
+                                });
+                              }}
+                              style={{
+                                flexDirection: 'row',
+                                justifyContent: 'space-between',
+                                alignItems: 'center',
+                                paddingVertical: 10,
+                                borderBottomWidth: 0.5,
+                                borderColor: theme.colors.border
+                              }}
+                            >
+                              <View style={styles.recentPlate}>
+                                <Text style={styles.recentPlateText}>{v.registrationNumber}</Text>
+                              </View>
+                              <View style={{ flex: 1, marginLeft: 10 }}>
+                                <Text style={{ color: theme.colors.text, fontWeight: '600', fontSize: 12 }}>
+                                  {v.make} {v.model} {v.year ? `(${v.year})` : ''}
+                                </Text>
+                                <View style={{ flexDirection: 'row', alignItems: 'center', marginTop: 3 }}>
+                                  {isBooked ? (
+                                    <View style={{ flexDirection: 'row', alignItems: 'center', backgroundColor: theme.colors.secondary + '18', paddingHorizontal: 6, paddingVertical: 2, borderRadius: 4 }}>
+                                      <MaterialCommunityIcons name="calendar-check" size={11} color={theme.colors.secondary} style={{ marginRight: 4 }} />
+                                      <Text style={{ fontSize: 10, fontWeight: 'bold', color: theme.colors.secondary }}>
+                                        Booked: {new Date(existingBooking.date).toLocaleDateString('en-GB', { day: 'numeric', month: 'short' })} ({existingBooking.slotTime || 'Slot'})
+                                      </Text>
+                                    </View>
+                                  ) : isPending ? (
+                                    <View style={{ flexDirection: 'row', alignItems: 'center', backgroundColor: theme.colors.warning + '18', paddingHorizontal: 6, paddingVertical: 2, borderRadius: 4 }}>
+                                      <MaterialCommunityIcons name="clock-outline" size={11} color={theme.colors.warning} style={{ marginRight: 4 }} />
+                                      <Text style={{ fontSize: 10, fontWeight: 'bold', color: theme.colors.warning }}>
+                                        Booking Pending Approval
+                                      </Text>
+                                    </View>
+                                  ) : (
+                                    <View style={{ flexDirection: 'row', alignItems: 'center', backgroundColor: '#10B98118', paddingHorizontal: 6, paddingVertical: 2, borderRadius: 4 }}>
+                                      <MaterialCommunityIcons name="check-circle-outline" size={11} color="#10B981" style={{ marginRight: 4 }} />
+                                      <Text style={{ fontSize: 10, fontWeight: 'bold', color: '#10B981' }}>
+                                        Available to Book
+                                      </Text>
+                                    </View>
+                                  )}
+                                </View>
+                              </View>
+                              <MaterialCommunityIcons name="chevron-right" size={18} color={theme.colors.placeholder} />
+                            </TouchableOpacity>
+                          );
+                        })}
                         <TouchableOpacity
                           onPress={() => {
                             LayoutAnimation.configureNext(LayoutAnimation.Presets.easeInEaseOut);

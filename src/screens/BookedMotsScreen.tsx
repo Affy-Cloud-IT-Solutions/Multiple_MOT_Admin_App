@@ -16,6 +16,53 @@ import { useAppTheme } from '../context/ThemeContext';
 import { useAppValues } from '../context/DataContext';
 import { SafeAreaView } from 'react-native-safe-area-context';
 
+const STANDARD_SLOTS = [
+  '08:30', '09:15', '10:00', '10:45',
+  '11:30', '12:15', '13:00', '13:45',
+  '14:30', '15:15', '16:00', '16:45'
+];
+
+const getSlotNumber = (item: any) => {
+  if (item.slotNumber) return item.slotNumber;
+  let timeStr = item.slotTime || '';
+  if (!timeStr && item.makeModel) {
+    const match = item.makeModel.match(/Slot:\s*(\d{1,2}:\d{2}(?:\s*[AP]M)?)/i) ||
+                  item.makeModel.match(/at\s+(\d{1,2}:\d{2}(?:\s*[AP]M)?)/i);
+    if (match) timeStr = match[1];
+  }
+  if (timeStr) {
+    const start = timeStr.split(' - ')[0].trim();
+    const idx = STANDARD_SLOTS.indexOf(start);
+    if (idx !== -1) return idx + 1;
+  }
+  return null;
+};
+
+const getSlotDisplay = (item: any) => {
+  const num = getSlotNumber(item);
+  return num ? `Slot #${num}` : 'MOT Slot';
+};
+
+const getSlotTimeDisplay = (item: any) => {
+  if (item.slotTime) return item.slotTime;
+  if (item.makeModel) {
+    const match = item.makeModel.match(/Slot:\s*([^\n\r]+)/i);
+    if (match) return match[1].trim();
+  }
+  return '45-Min Test Slot';
+};
+
+const formatBookingDate = (dateVal: any) => {
+  if (!dateVal) return 'N/A';
+  try {
+    const d = new Date(dateVal);
+    if (!isNaN(d.getTime())) {
+      return d.toLocaleDateString('en-GB', { day: 'numeric', month: 'short', year: 'numeric' });
+    }
+  } catch (e) {}
+  return String(dateVal);
+};
+
 export default function BookedMotsScreen({ navigation }: any) {
   const { theme } = useAppTheme();
   const { alerts, approveAlert, acknowledgeAlert, rejectAlert, refreshData } = useAppValues();
@@ -214,6 +261,21 @@ export default function BookedMotsScreen({ navigation }: any) {
                               <Text style={{ fontSize: 12, color: theme.colors.text, marginTop: 2 }}>{item.rejectionReason}</Text>
                             </View>
                           )}
+
+                          {/* Prominent Slot Info Banner */}
+                          <View style={[styles.slotInfoBanner, { backgroundColor: theme.colors.card, borderColor: theme.colors.border }]}>
+                            <View style={{ flexDirection: 'row', alignItems: 'center' }}>
+                              <MaterialCommunityIcons name="calendar-clock" size={14} color={theme.colors.secondary} style={{ marginRight: 6 }} />
+                              <Text style={{ fontSize: 11, fontWeight: 'bold', color: theme.colors.text }}>
+                                Date: {formatBookingDate(item.date)}
+                              </Text>
+                            </View>
+                            <View style={[styles.slotPill, { backgroundColor: theme.colors.secondary + '18' }]}>
+                              <Text style={{ fontSize: 11, fontWeight: 'bold', color: theme.colors.secondary }}>
+                                {getSlotDisplay(item)} • {getSlotTimeDisplay(item)}
+                              </Text>
+                            </View>
+                          </View>
                         </View>
 
                         {/* Action buttons inside sub-card (If Pending) */}
@@ -567,5 +629,20 @@ const styles = StyleSheet.create({
   modalBtnText: {
     fontSize: 12,
     fontWeight: 'bold',
+  },
+  slotInfoBanner: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    justifyContent: 'space-between',
+    paddingHorizontal: 10,
+    paddingVertical: 7,
+    borderRadius: 6,
+    borderWidth: 1,
+    marginTop: 8,
+  },
+  slotPill: {
+    paddingHorizontal: 8,
+    paddingVertical: 2,
+    borderRadius: 4,
   },
 });

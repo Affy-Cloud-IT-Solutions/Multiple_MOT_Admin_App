@@ -81,7 +81,7 @@ android {
 
     namespace "com.motcheckerapp"
     defaultConfig {
-        applicationId "com.motcheckerapp"
+        applicationId "com.motcheckerapp.admin"
         minSdkVersion rootProject.ext.minSdkVersion
         targetSdkVersion rootProject.ext.targetSdkVersion
         versionCode 1

@@ -16,9 +16,42 @@ import { useAppTheme } from '../context/ThemeContext';
 import { useAppValues, BASE_URL } from '../context/DataContext';
 import { SafeAreaView } from 'react-native-safe-area-context';
 
+const STANDARD_SLOTS = [
+  '08:30', '09:15', '10:00', '10:45',
+  '11:30', '12:15', '13:00', '13:45',
+  '14:30', '15:15', '16:00', '16:45'
+];
+
+const getSlotNumber = (item: any) => {
+  if (item?.slotNumber) return item.slotNumber;
+  let timeStr = item?.slotTime || '';
+  if (!timeStr && item?.makeModel) {
+    const match = item.makeModel.match(/Slot:\s*(\d{1,2}:\d{2}(?:\s*[AP]M)?)/i) ||
+                  item.makeModel.match(/at\s+(\d{1,2}:\d{2}(?:\s*[AP]M)?)/i);
+    if (match) timeStr = match[1];
+  }
+  if (timeStr) {
+    const start = timeStr.split(' - ')[0].trim();
+    const idx = STANDARD_SLOTS.indexOf(start);
+    if (idx !== -1) return idx + 1;
+  }
+  return null;
+};
+
+const formatBookingDate = (dateVal: any) => {
+  if (!dateVal) return 'N/A';
+  try {
+    const d = new Date(dateVal);
+    if (!isNaN(d.getTime())) {
+      return d.toLocaleDateString('en-GB', { day: 'numeric', month: 'short', year: 'numeric' });
+    }
+  } catch (e) {}
+  return String(dateVal);
+};
+
 export default function AdminBookMotScreen({ route, navigation }: any) {
   const { theme } = useAppTheme();
-  const { addAlert, addAudit, refreshData, user } = useAppValues();
+  const { addAlert, addAudit, refreshData, user, vehicles = [], alerts = [] } = useAppValues();
 
   // Selected customer and vehicle passed from AdminCustomersScreen
   const customer = route?.params?.customer || {
@@ -28,18 +61,45 @@ export default function AdminBookMotScreen({ route, navigation }: any) {
     email: 'N/A',
   };
 
-  const vehicle = route?.params?.vehicle || {
+  const initialVehicle = route?.params?.vehicle || {
     registrationNumber: 'AB18 CDE',
     make: 'FORD',
     model: 'FOCUS TDCI',
     customerId: 'c1',
   };
 
+  // Find all customer vehicles to allow switching & showing booking status
+  const customerVehicles = React.useMemo(() => {
+    const directList = route?.params?.allVehicles;
+    if (Array.isArray(directList) && directList.length > 0) return directList;
+    return vehicles.filter((v: any) => 
+      v.customerId && (
+        String(v.customerId).toLowerCase() === String(customer.id).toLowerCase() ||
+        String(v.customerId).toLowerCase() === String(customer._id || '').toLowerCase()
+      ) && v.status !== 'Sold' && v.status !== 'Scrapped'
+    );
+  }, [vehicles, customer, route?.params?.allVehicles]);
+
+  const [selectedVehicle, setSelectedVehicle] = useState<any>(
+    initialVehicle || (customerVehicles.length > 0 ? customerVehicles[0] : null)
+  );
+
+  // Check if selected vehicle already has an active MOT booking
+  const existingBooking = React.useMemo(() => {
+    if (!selectedVehicle?.registrationNumber) return null;
+    return alerts.find(a => 
+      a.type === 'BOOKED' && 
+      a.registrationNumber?.toUpperCase() === selectedVehicle.registrationNumber.toUpperCase() && 
+      (a.status === 'Approved' || a.status === 'Pending')
+    );
+  }, [alerts, selectedVehicle]);
+
   const [selectedDate, setSelectedDate] = useState('');
   const [selectedTime, setSelectedTime] = useState('');
   const [selectedSlot, setSelectedSlot] = useState<any>(null);
   const [garageSlots, setGarageSlots] = useState<any[]>([]);
   const [loadingSlots, setLoadingSlots] = useState(false);
+  const [slotFilter, setSlotFilter] = useState<'all' | 'available' | 'booked'>('all');
   const [notes, setNotes] = useState('');
   const [loading, setLoading] = useState(false);
 
@@ -161,7 +221,7 @@ export default function AdminBookMotScreen({ route, navigation }: any) {
     return false;
   };
 
-  // Only free slots are shown to user/staff
+  // Only free slots are eligible for selection
   const freeSlots = React.useMemo(() => {
     return garageSlots.filter((s: any) => {
       if (s.isBlocked) return false;
@@ -170,6 +230,17 @@ export default function AdminBookMotScreen({ route, navigation }: any) {
       return true;
     });
   }, [garageSlots, selectedDate]);
+
+  // Slots to display based on staff filter
+  const displayedSlots = React.useMemo(() => {
+    return garageSlots.filter((s: any) => {
+      const isPassed = isTimeSlotPassed(s.time);
+      const isAvailable = !s.isBlocked && s.status !== 'Full' && s.availableCount > 0 && !isPassed;
+      if (slotFilter === 'available') return isAvailable;
+      if (slotFilter === 'booked') return !isAvailable;
+      return true;
+    });
+  }, [garageSlots, slotFilter, selectedDate]);
 
   React.useEffect(() => {
     if (freeSlots.length > 0) {
@@ -184,6 +255,10 @@ export default function AdminBookMotScreen({ route, navigation }: any) {
   }, [freeSlots]);
 
   const handleConfirmBooking = async () => {
+    if (!selectedVehicle) {
+      Alert.alert('Vehicle Missing', 'Please select a vehicle to book MOT.');
+      return;
+    }
     if (!selectedDate) {
       Alert.alert('Selection Missing', 'Please select an appointment date.');
       return;
@@ -202,6 +277,8 @@ export default function AdminBookMotScreen({ route, navigation }: any) {
         ? `${parseInt(parts[2])} ${monthsList[parseInt(parts[1]) - 1]}`
         : selectedDate;
 
+      const slotNum = selectedSlot?.slotNumber || getSlotNumber({ slotTime: selectedTime });
+
       // Add BOOKED alert notification directly with Approved status
       await addAlert({
         type: 'BOOKED',
@@ -209,24 +286,28 @@ export default function AdminBookMotScreen({ route, navigation }: any) {
         customerId: customer.id,
         garageId: user?.garageId,
         slotTime: selectedSlot?.time || selectedTime,
+        slotNumber: slotNum,
         duration: selectedSlot?.slotDuration || 45,
-        registrationNumber: vehicle.registrationNumber,
-        makeModel: `${vehicle.make} ${vehicle.model} - Slot: ${selectedSlot?.time || selectedTime}`,
+        registrationNumber: selectedVehicle.registrationNumber,
+        makeModel: `${selectedVehicle.make} ${selectedVehicle.model} - Slot: ${selectedSlot?.time || selectedTime}`,
         status: 'Approved',
         date: selectedDate,
       });
 
       // Log to audit history
       await addAudit(
-        'MOT Booking Booked',
-        `Garage staff booked MOT booking slot for ${customer.firstName} ${customer.lastName}'s ${vehicle.make} ${vehicle.model} (${vehicle.registrationNumber}) on ${displayDateStr} at ${selectedTime}`
+        existingBooking ? 'MOT Booking Rescheduled' : 'MOT Booking Booked',
+        `Garage staff ${existingBooking ? 'rescheduled' : 'booked'} MOT slot for ${customer.firstName} ${customer.lastName}'s ${selectedVehicle.make} ${selectedVehicle.model} (${selectedVehicle.registrationNumber}) on ${displayDateStr} at Slot #${slotNum || 'Slot'} (${selectedTime})`
       );
 
       await refreshData();
       setLoading(false);
 
       // Show Toast Notification
-      const successMessage = `MOT Booking confirmed and approved for ${customer.firstName} ${customer.lastName}!`;
+      const successMessage = existingBooking
+        ? `MOT Booking successfully rescheduled for ${customer.firstName} ${customer.lastName} (${selectedVehicle.registrationNumber})!`
+        : `MOT Booking confirmed and approved for ${customer.firstName} ${customer.lastName}!`;
+      
       Toast.show({
         type: 'success',
         text1: 'Success',
@@ -265,6 +346,76 @@ export default function AdminBookMotScreen({ route, navigation }: any) {
             </View>
           </View>
 
+          {/* Customer Vehicles Selector Strip (If Multiple Vehicles) */}
+          {customerVehicles.length > 1 && (
+            <View style={{ marginBottom: 14 }}>
+              <Text style={{ fontSize: 11, fontWeight: '700', color: theme.colors.placeholder, textTransform: 'uppercase', marginBottom: 8, letterSpacing: 0.5 }}>
+                Select Vehicle to Book ({customerVehicles.length} Registered):
+              </Text>
+              <ScrollView horizontal showsHorizontalScrollIndicator={false} contentContainerStyle={{ gap: 8, paddingBottom: 2 }}>
+                {customerVehicles.map((v: any) => {
+                  const isSel = selectedVehicle?.registrationNumber === v.registrationNumber;
+                  const vBooking = alerts.find(a => 
+                    a.type === 'BOOKED' && 
+                    a.registrationNumber?.toUpperCase() === v.registrationNumber?.toUpperCase() && 
+                    (a.status === 'Approved' || a.status === 'Pending')
+                  );
+                  const isBk = vBooking?.status === 'Approved';
+                  const isPend = vBooking?.status === 'Pending';
+
+                  return (
+                    <TouchableOpacity
+                      key={v.id || v.registrationNumber}
+                      onPress={() => setSelectedVehicle(v)}
+                      style={[
+                        styles.vehicleSelectorChip,
+                        {
+                          backgroundColor: isSel ? theme.colors.secondary + '18' : theme.colors.background,
+                          borderColor: isSel ? theme.colors.secondary : theme.colors.border,
+                          borderWidth: isSel ? 2 : 1,
+                        }
+                      ]}
+                    >
+                      <View style={{ flexDirection: 'row', alignItems: 'center', justifyContent: 'space-between' }}>
+                        <Text style={{ fontSize: 12, fontWeight: '800', color: theme.colors.text }}>
+                          {v.registrationNumber}
+                        </Text>
+                        {isSel && (
+                          <MaterialCommunityIcons name="check-circle" size={13} color={theme.colors.secondary} style={{ marginLeft: 4 }} />
+                        )}
+                      </View>
+                      <Text style={{ fontSize: 10, color: theme.colors.placeholder, marginTop: 1 }}>
+                        {v.make} {v.model}
+                      </Text>
+                      {isBk ? (
+                        <View style={{ backgroundColor: theme.colors.secondary + '20', paddingHorizontal: 5, paddingVertical: 1.5, borderRadius: 3, marginTop: 4, flexDirection: 'row', alignItems: 'center' }}>
+                          <MaterialCommunityIcons name="calendar-check" size={10} color={theme.colors.secondary} style={{ marginRight: 3 }} />
+                          <Text style={{ fontSize: 9, fontWeight: 'bold', color: theme.colors.secondary }}>
+                            Booked: {formatBookingDate(vBooking.date)}
+                          </Text>
+                        </View>
+                      ) : isPend ? (
+                        <View style={{ backgroundColor: theme.colors.warning + '20', paddingHorizontal: 5, paddingVertical: 1.5, borderRadius: 3, marginTop: 4, flexDirection: 'row', alignItems: 'center' }}>
+                          <MaterialCommunityIcons name="clock-outline" size={10} color={theme.colors.warning} style={{ marginRight: 3 }} />
+                          <Text style={{ fontSize: 9, fontWeight: 'bold', color: theme.colors.warning }}>
+                            Pending Approval
+                          </Text>
+                        </View>
+                      ) : (
+                        <View style={{ backgroundColor: '#10B98120', paddingHorizontal: 5, paddingVertical: 1.5, borderRadius: 3, marginTop: 4, flexDirection: 'row', alignItems: 'center' }}>
+                          <MaterialCommunityIcons name="check-circle-outline" size={10} color="#10B981" style={{ marginRight: 3 }} />
+                          <Text style={{ fontSize: 9, fontWeight: 'bold', color: '#10B981' }}>
+                            Available
+                          </Text>
+                        </View>
+                      )}
+                    </TouchableOpacity>
+                  );
+                })}
+              </ScrollView>
+            </View>
+          )}
+
           {/* Vehicle Main Section */}
           <View style={styles.vehicleMainSection}>
             {/* Realistic UK Plate */}
@@ -275,7 +426,7 @@ export default function AdminBookMotScreen({ route, navigation }: any) {
               </View>
               <View style={styles.ukPlateNumberSide}>
                 <Text style={styles.ukPlateNumberText}>
-                  {(vehicle.registrationNumber || 'UNKNOWN').toUpperCase()}
+                  {(selectedVehicle?.registrationNumber || 'UNKNOWN').toUpperCase()}
                 </Text>
               </View>
             </View>
@@ -283,47 +434,70 @@ export default function AdminBookMotScreen({ route, navigation }: any) {
             {/* Vehicle Details */}
             <View style={styles.vehicleTextInfo}>
               <Text style={[styles.vehicleTitleText, { color: theme.colors.text }]} numberOfLines={1}>
-                {vehicle.make} {vehicle.model}
+                {selectedVehicle?.make} {selectedVehicle?.model}
               </Text>
               <View style={styles.vehicleBadgesRow}>
-                {vehicle.year ? (
+                {selectedVehicle?.year ? (
                   <View style={[styles.specChip, { backgroundColor: theme.colors.background, borderColor: theme.colors.border }]}>
                     <MaterialCommunityIcons name="calendar" size={11} color={theme.colors.placeholder} />
-                    <Text style={[styles.specChipText, { color: theme.colors.placeholder }]}>{vehicle.year}</Text>
+                    <Text style={[styles.specChipText, { color: theme.colors.placeholder }]}>{selectedVehicle.year}</Text>
                   </View>
                 ) : null}
                 <View style={[styles.specChip, { backgroundColor: '#10B98115', borderColor: '#10B98140' }]}>
                   <View style={[styles.statusDot, { backgroundColor: '#10B981' }]} />
                   <Text style={[styles.specChipText, { color: '#10B981', fontWeight: '700' }]}>
-                    {vehicle.status || 'Active'}
+                    {selectedVehicle?.status || 'Active'}
                   </Text>
                 </View>
               </View>
             </View>
           </View>
 
+          {/* Already Booked MOT Alert Banner */}
+          {existingBooking && (
+            <View style={[styles.existingBookingBanner, { backgroundColor: theme.colors.secondary + '14', borderColor: theme.colors.secondary + '40' }]}>
+              <View style={{ flexDirection: 'row', alignItems: 'center' }}>
+                <MaterialCommunityIcons name="calendar-clock" size={18} color={theme.colors.secondary} style={{ marginRight: 8 }} />
+                <Text style={{ fontSize: 13, fontWeight: 'bold', color: theme.colors.text, flex: 1 }}>
+                  Vehicle Already Has A Booked MOT Slot
+                </Text>
+                <View style={[styles.bookingStatusTag, { backgroundColor: existingBooking.status === 'Approved' ? theme.colors.secondary : theme.colors.warning }]}>
+                  <Text style={{ fontSize: 10, fontWeight: 'bold', color: '#FFFFFF' }}>
+                    {existingBooking.status === 'Approved' ? 'Confirmed' : 'Pending'}
+                  </Text>
+                </View>
+              </View>
+              <Text style={{ fontSize: 12, color: theme.colors.text, marginTop: 4 }}>
+                Existing Appointment: <Text style={{ fontWeight: 'bold' }}>{formatBookingDate(existingBooking.date)}</Text> at <Text style={{ fontWeight: 'bold' }}>{existingBooking.slotTime || 'Slot'}</Text>
+              </Text>
+              <Text style={{ fontSize: 11, color: theme.colors.secondary, marginTop: 4, fontWeight: '600' }}>
+                ℹ️ Proceeding with a new slot below will reschedule / update this vehicle's appointment.
+              </Text>
+            </View>
+          )}
+
           {/* Key Vehicle Dates Row */}
-          {(vehicle.motExpiryDate || vehicle.lastServiceDate) && (
+          {(selectedVehicle?.motExpiryDate || selectedVehicle?.lastServiceDate) && (
             <View style={[styles.datesInfoGrid, { backgroundColor: theme.colors.background, borderColor: theme.colors.border }]}>
-              {vehicle.motExpiryDate && (
+              {selectedVehicle?.motExpiryDate && (
                 <View style={styles.dateCol}>
                   <View style={styles.dateColHeader}>
                     <MaterialCommunityIcons name="calendar-clock" size={13} color={theme.colors.warning} />
                     <Text style={[styles.dateColLabel, { color: theme.colors.placeholder }]}>MOT Expiry</Text>
                   </View>
                   <Text style={[styles.dateColValue, { color: theme.colors.text }]}>
-                    {new Date(vehicle.motExpiryDate).toLocaleDateString('en-GB', { day: '2-digit', month: 'short', year: 'numeric' })}
+                    {new Date(selectedVehicle.motExpiryDate).toLocaleDateString('en-GB', { day: '2-digit', month: 'short', year: 'numeric' })}
                   </Text>
                 </View>
               )}
-              {vehicle.lastServiceDate && (
+              {selectedVehicle?.lastServiceDate && (
                 <View style={[styles.dateCol, { borderLeftWidth: 1, borderLeftColor: theme.colors.border, paddingLeft: 12 }]}>
                   <View style={styles.dateColHeader}>
                     <MaterialCommunityIcons name="wrench-clock" size={13} color={theme.colors.secondary} />
                     <Text style={[styles.dateColLabel, { color: theme.colors.placeholder }]}>Last Service</Text>
                   </View>
                   <Text style={[styles.dateColValue, { color: theme.colors.text }]}>
-                    {new Date(vehicle.lastServiceDate).toLocaleDateString('en-GB', { day: '2-digit', month: 'short', year: 'numeric' })}
+                    {new Date(selectedVehicle.lastServiceDate).toLocaleDateString('en-GB', { day: '2-digit', month: 'short', year: 'numeric' })}
                   </Text>
                 </View>
               )}
@@ -438,12 +612,12 @@ export default function AdminBookMotScreen({ route, navigation }: any) {
           </View>
         </View>
 
-        {/* Time Selector Section (Only Free 45-Min Slots) */}
+        {/* Time Selector Section */}
         <View style={{ flexDirection: 'row', alignItems: 'center', justifyContent: 'space-between', marginBottom: 12 }}>
           <View style={{ flexDirection: 'row', alignItems: 'center' }}>
             <MaterialCommunityIcons name="clock-outline" size={16} color={theme.colors.placeholder} style={{ marginRight: 6 }} />
             <Text style={[styles.sectionHeading, { color: theme.colors.text, marginBottom: 0 }]}>
-              2. Choose Time Slot (45 Mins)
+              2. Choose MOT Test Slot
             </Text>
           </View>
           {loadingSlots && <ActivityIndicator size="small" color={theme.colors.secondary} />}
@@ -453,75 +627,203 @@ export default function AdminBookMotScreen({ route, navigation }: any) {
           <View style={[styles.emptyNoticeCard, { backgroundColor: theme.colors.card, borderColor: theme.colors.border }]}>
             <MaterialCommunityIcons name="calendar-clock" size={22} color={theme.colors.placeholder} />
             <Text style={{ marginLeft: 8, color: theme.colors.placeholder, fontSize: 13 }}>
-              Please select an appointment date above to view free slots.
+              Please select an appointment date above to view garage slots.
             </Text>
           </View>
         ) : loadingSlots ? (
           <View style={[styles.emptyNoticeCard, { backgroundColor: theme.colors.card, borderColor: theme.colors.border }]}>
             <ActivityIndicator size="small" color={theme.colors.secondary} style={{ marginRight: 8 }} />
             <Text style={{ color: theme.colors.placeholder, fontSize: 13 }}>
-              Checking free slots...
+              Checking garage slot schedule...
             </Text>
           </View>
-        ) : freeSlots.length === 0 ? (
+        ) : garageSlots.length === 0 ? (
           <View style={[styles.emptyNoticeCard, { backgroundColor: theme.colors.card, borderColor: theme.colors.border }]}>
             <MaterialCommunityIcons name="calendar-remove" size={24} color={theme.colors.error} />
             <View style={{ marginLeft: 10, flex: 1 }}>
               <Text style={{ color: theme.colors.text, fontSize: 13.5, fontWeight: '700' }}>
-                No Free Slots Available
+                No Slots Configured
               </Text>
               <Text style={{ color: theme.colors.placeholder, fontSize: 12, marginTop: 2 }}>
-                All MOT slots are fully booked or closed on this date. Please select another date.
+                No MOT slots were found for this garage on this date.
               </Text>
             </View>
           </View>
         ) : (
-          <View style={styles.timePickerContainer}>
-            {freeSlots.map((slot: any) => {
-              const isSelected = selectedTime === slot.time;
-              return (
-                <TouchableOpacity
-                  key={slot.time}
-                  onPress={() => {
-                    setSelectedSlot(slot);
-                    setSelectedTime(slot.time);
-                  }}
-                  style={[
-                    styles.timeCard,
-                    {
-                      backgroundColor: isSelected ? theme.colors.secondary + '18' : theme.colors.card,
-                      borderColor: isSelected ? theme.colors.secondary : theme.colors.border,
-                      borderWidth: isSelected ? 2 : 1.5,
-                    },
-                  ]}
-                >
-                  <View style={{ flex: 1 }}>
+          <View>
+            {/* Slot Summary Bar */}
+            <View style={[styles.slotSummaryBar, { backgroundColor: theme.colors.card, borderColor: theme.colors.border }]}>
+              <View style={styles.summaryStat}>
+                <Text style={[styles.statValue, { color: theme.colors.text }]}>{garageSlots.length}</Text>
+                <Text style={[styles.statLabel, { color: theme.colors.placeholder }]}>Total Slots</Text>
+              </View>
+              <View style={[styles.statDivider, { backgroundColor: theme.colors.border }]} />
+              <View style={styles.summaryStat}>
+                <Text style={[styles.statValue, { color: '#10B981' }]}>{freeSlots.length}</Text>
+                <Text style={[styles.statLabel, { color: theme.colors.placeholder }]}>Available</Text>
+              </View>
+              <View style={[styles.statDivider, { backgroundColor: theme.colors.border }]} />
+              <View style={styles.summaryStat}>
+                <Text style={[styles.statValue, { color: theme.colors.error }]}>
+                  {garageSlots.length - freeSlots.length}
+                </Text>
+                <Text style={[styles.statLabel, { color: theme.colors.placeholder }]}>Booked / Full</Text>
+              </View>
+            </View>
+
+            {/* Filter Tabs */}
+            <View style={styles.slotFilterRow}>
+              <TouchableOpacity
+                onPress={() => setSlotFilter('all')}
+                style={[
+                  styles.slotFilterTab,
+                  {
+                    backgroundColor: slotFilter === 'all' ? theme.colors.secondary : theme.colors.card,
+                    borderColor: slotFilter === 'all' ? theme.colors.secondary : theme.colors.border,
+                  }
+                ]}
+              >
+                <Text style={[styles.slotFilterText, { color: slotFilter === 'all' ? '#FFFFFF' : theme.colors.text }]}>
+                  All Slots ({garageSlots.length})
+                </Text>
+              </TouchableOpacity>
+              <TouchableOpacity
+                onPress={() => setSlotFilter('available')}
+                style={[
+                  styles.slotFilterTab,
+                  {
+                    backgroundColor: slotFilter === 'available' ? '#10B981' : theme.colors.card,
+                    borderColor: slotFilter === 'available' ? '#10B981' : theme.colors.border,
+                  }
+                ]}
+              >
+                <Text style={[styles.slotFilterText, { color: slotFilter === 'available' ? '#FFFFFF' : theme.colors.text }]}>
+                  Available ({freeSlots.length})
+                </Text>
+              </TouchableOpacity>
+              <TouchableOpacity
+                onPress={() => setSlotFilter('booked')}
+                style={[
+                  styles.slotFilterTab,
+                  {
+                    backgroundColor: slotFilter === 'booked' ? theme.colors.error : theme.colors.card,
+                    borderColor: slotFilter === 'booked' ? theme.colors.error : theme.colors.border,
+                  }
+                ]}
+              >
+                <Text style={[styles.slotFilterText, { color: slotFilter === 'booked' ? '#FFFFFF' : theme.colors.text }]}>
+                  Booked / Full ({garageSlots.length - freeSlots.length})
+                </Text>
+              </TouchableOpacity>
+            </View>
+
+            {/* Slots List */}
+            <View style={styles.slotsListContainer}>
+              {displayedSlots.map((slot: any, idx: number) => {
+                const isPassed = isTimeSlotPassed(slot.time);
+                const isAvailable = !slot.isBlocked && slot.status !== 'Full' && slot.availableCount > 0 && !isPassed;
+                const isSelected = selectedTime === slot.time;
+                const slotNum = slot.slotNumber || (idx + 1);
+
+                return (
+                  <TouchableOpacity
+                    key={slot.time}
+                    disabled={!isAvailable}
+                    onPress={() => {
+                      setSelectedSlot(slot);
+                      setSelectedTime(slot.time);
+                    }}
+                    style={[
+                      styles.detailedSlotCard,
+                      {
+                        backgroundColor: isSelected 
+                          ? theme.colors.secondary + '18' 
+                          : isAvailable 
+                            ? theme.colors.card 
+                            : theme.colors.background,
+                        borderColor: isSelected 
+                          ? theme.colors.secondary 
+                          : isAvailable 
+                            ? theme.colors.border 
+                            : theme.colors.border + '60',
+                        borderWidth: isSelected ? 2 : 1,
+                        opacity: isAvailable ? 1 : 0.75,
+                      }
+                    ]}
+                  >
                     <View style={{ flexDirection: 'row', alignItems: 'center', justifyContent: 'space-between' }}>
-                      <Text style={[styles.timeLabel, { color: theme.colors.text, fontSize: 14, fontWeight: '800' }]}>
-                        {slot.time}
-                      </Text>
-                      {isSelected ? (
-                        <MaterialCommunityIcons name="check-circle" size={16} color={theme.colors.secondary} />
-                      ) : (
-                        <View style={{ backgroundColor: '#10B98115', paddingHorizontal: 5, paddingVertical: 1, borderRadius: 4 }}>
-                          <Text style={{ color: '#10B981', fontSize: 10, fontWeight: '700' }}>
-                            {slot.availableCount} Open
+                      <View style={{ flexDirection: 'row', alignItems: 'center' }}>
+                        <View style={[styles.slotIndexBadge, { backgroundColor: isSelected ? theme.colors.secondary : theme.colors.border + '40' }]}>
+                          <Text style={{ fontSize: 11, fontWeight: '800', color: isSelected ? '#FFFFFF' : theme.colors.text }}>
+                            #{slotNum}
                           </Text>
+                        </View>
+                        <Text style={[styles.slotTimeTitle, { color: theme.colors.text, marginLeft: 8 }]}>
+                          {slot.time} - {slot.endTime || '45m'}
+                        </Text>
+                      </View>
+
+                      {/* Status Tag */}
+                      {isSelected ? (
+                        <View style={[styles.slotStatusTag, { backgroundColor: theme.colors.secondary }]}>
+                          <MaterialCommunityIcons name="check" size={12} color="#FFFFFF" style={{ marginRight: 3 }} />
+                          <Text style={[styles.slotStatusTagText, { color: '#FFFFFF' }]}>Selected</Text>
+                        </View>
+                      ) : isPassed ? (
+                        <View style={[styles.slotStatusTag, { backgroundColor: theme.colors.border }]}>
+                          <MaterialCommunityIcons name="clock-alert-outline" size={11} color={theme.colors.placeholder} style={{ marginRight: 3 }} />
+                          <Text style={[styles.slotStatusTagText, { color: theme.colors.placeholder }]}>Past Time</Text>
+                        </View>
+                      ) : slot.isBlocked ? (
+                        <View style={[styles.slotStatusTag, { backgroundColor: theme.colors.border }]}>
+                          <MaterialCommunityIcons name="cancel" size={11} color={theme.colors.error} style={{ marginRight: 3 }} />
+                          <Text style={[styles.slotStatusTagText, { color: theme.colors.error }]}>Blocked</Text>
+                        </View>
+                      ) : isAvailable ? (
+                        <View style={[styles.slotStatusTag, { backgroundColor: '#10B98118', borderColor: '#10B98140', borderWidth: 0.5 }]}>
+                          <MaterialCommunityIcons name="check-circle" size={11} color="#10B981" style={{ marginRight: 3 }} />
+                          <Text style={[styles.slotStatusTagText, { color: '#10B981' }]}>
+                            {slot.availableCount} {slot.availableCount === 1 ? 'Bay' : 'Bays'} Available
+                          </Text>
+                        </View>
+                      ) : (
+                        <View style={[styles.slotStatusTag, { backgroundColor: theme.colors.error + '18', borderColor: theme.colors.error + '40', borderWidth: 0.5 }]}>
+                          <MaterialCommunityIcons name="close-circle" size={11} color={theme.colors.error} style={{ marginRight: 3 }} />
+                          <Text style={[styles.slotStatusTagText, { color: theme.colors.error }]}>Fully Booked</Text>
                         </View>
                       )}
                     </View>
-                    <Text style={[styles.timeText, { color: theme.colors.placeholder, fontSize: 11, marginTop: 2 }]}>
-                      {slot.slotLabel || `${slot.time} - ${slot.endTime || '45m'}`}
-                    </Text>
-                  </View>
-                </TouchableOpacity>
-              );
-            })}
+
+                    {/* Booked vehicle / customer details if occupied */}
+                    {slot.bookings && slot.bookings.length > 0 && (
+                      <View style={[styles.slotOccupiedBox, { backgroundColor: theme.colors.background, borderColor: theme.colors.border }]}>
+                        <Text style={{ fontSize: 10, fontWeight: '700', color: theme.colors.placeholder, textTransform: 'uppercase', marginBottom: 2 }}>
+                          Occupied Bays ({slot.bookings.length}/{slot.totalCapacity || slot.bookings.length}):
+                        </Text>
+                        {slot.bookings.map((b: any, bIdx: number) => (
+                          <View key={b.id || bIdx} style={{ flexDirection: 'row', alignItems: 'center', marginTop: 2 }}>
+                            <MaterialCommunityIcons name="car-side" size={12} color={theme.colors.secondary} style={{ marginRight: 4 }} />
+                            <Text style={{ fontSize: 11, fontWeight: '600', color: theme.colors.text }}>
+                              {b.registrationNumber || 'Vehicle'} • {b.customerName || 'Customer'}
+                            </Text>
+                            {b.stationName ? (
+                              <Text style={{ fontSize: 10, color: theme.colors.placeholder, marginLeft: 4 }}>
+                                ({b.stationName})
+                              </Text>
+                            ) : null}
+                          </View>
+                        ))}
+                      </View>
+                    )}
+                  </TouchableOpacity>
+                );
+              })}
+            </View>
           </View>
         )}
 
         {/* Notes Input */}
-        <Text style={[styles.sectionHeading, { color: theme.colors.text }]}>3. Staff Booking Notes (Optional)</Text>
+        <Text style={[styles.sectionHeading, { color: theme.colors.text, marginTop: 16 }]}>3. Staff Booking Notes (Optional)</Text>
         <TextInput
           style={[styles.notesInput, { borderColor: theme.colors.border, color: theme.colors.text, backgroundColor: theme.colors.card }]}
           placeholder="Enter any customer requests, parts updates or booking comments here..."
@@ -532,12 +834,59 @@ export default function AdminBookMotScreen({ route, navigation }: any) {
           numberOfLines={3}
         />
 
+        {/* Booking Summary Box Before Confirmation */}
+        {selectedDate && selectedTime && (
+          <View style={[styles.bookingSummaryCard, { backgroundColor: theme.colors.card, borderColor: theme.colors.border }]}>
+            <View style={{ flexDirection: 'row', alignItems: 'center', marginBottom: 10 }}>
+              <MaterialCommunityIcons name="file-document-check-outline" size={18} color={theme.colors.secondary} style={{ marginRight: 6 }} />
+              <Text style={[styles.summaryTitle, { color: theme.colors.text }]}>
+                Booking Confirmation Summary
+              </Text>
+            </View>
+
+            <View style={styles.summaryRow}>
+              <Text style={[styles.summaryLabel, { color: theme.colors.placeholder }]}>Customer:</Text>
+              <Text style={[styles.summaryValue, { color: theme.colors.text }]}>
+                {customer.firstName} {customer.lastName}
+              </Text>
+            </View>
+
+            <View style={styles.summaryRow}>
+              <Text style={[styles.summaryLabel, { color: theme.colors.placeholder }]}>Vehicle:</Text>
+              <Text style={[styles.summaryValue, { color: theme.colors.text }]}>
+                {selectedVehicle?.registrationNumber} ({selectedVehicle?.make} {selectedVehicle?.model})
+              </Text>
+            </View>
+
+            <View style={styles.summaryRow}>
+              <Text style={[styles.summaryLabel, { color: theme.colors.placeholder }]}>Appointment Date:</Text>
+              <Text style={[styles.summaryValue, { color: theme.colors.text }]}>
+                {formatBookingDate(selectedDate)}
+              </Text>
+            </View>
+
+            <View style={styles.summaryRow}>
+              <Text style={[styles.summaryLabel, { color: theme.colors.placeholder }]}>Selected Slot:</Text>
+              <Text style={[styles.summaryValue, { color: theme.colors.secondary, fontWeight: 'bold' }]}>
+                Slot #{selectedSlot?.slotNumber || getSlotNumber({ slotTime: selectedTime })} ({selectedSlot?.time || selectedTime} - {selectedSlot?.endTime || '45m'})
+              </Text>
+            </View>
+
+            <View style={styles.summaryRow}>
+              <Text style={[styles.summaryLabel, { color: theme.colors.placeholder }]}>Action Type:</Text>
+              <Text style={[styles.summaryValue, { color: existingBooking ? theme.colors.warning : '#10B981', fontWeight: 'bold' }]}>
+                {existingBooking ? 'Reschedule Active Booking' : 'Direct Booking & Instant Approval'}
+              </Text>
+            </View>
+          </View>
+        )}
+
         {/* Submit Action */}
         <View style={styles.actionContainer}>
           <TouchableOpacity
             onPress={handleConfirmBooking}
             disabled={loading}
-            style={[styles.submitBtn, { backgroundColor: theme.colors.secondary }]}
+            style={[styles.submitBtn, { backgroundColor: existingBooking ? theme.colors.warning : theme.colors.secondary }]}
           >
             {loading ? (
               <ActivityIndicator color={theme.dark ? theme.colors.background : '#FFFFFF'} />
@@ -545,7 +894,7 @@ export default function AdminBookMotScreen({ route, navigation }: any) {
               <View style={styles.btnContent}>
                 <MaterialCommunityIcons name="calendar-check" size={20} color={theme.dark ? theme.colors.background : '#FFFFFF'} style={{ marginRight: 6 }} />
                 <Text style={[styles.submitBtnText, { color: theme.dark ? theme.colors.background : '#FFFFFF' }]}>
-                  Confirm & Approve Booking
+                  {existingBooking ? 'Confirm & Reschedule Booking' : 'Confirm & Approve Booking'}
                 </Text>
               </View>
             )}
@@ -883,5 +1232,127 @@ const styles = StyleSheet.create({
   submitBtnText: {
     fontWeight: 'bold',
     fontSize: 14,
+  },
+  vehicleSelectorChip: {
+    paddingHorizontal: 12,
+    paddingVertical: 8,
+    borderRadius: 8,
+    minWidth: 120,
+  },
+  existingBookingBanner: {
+    marginTop: 14,
+    padding: 12,
+    borderRadius: 10,
+    borderWidth: 1,
+  },
+  bookingStatusTag: {
+    paddingHorizontal: 7,
+    paddingVertical: 2,
+    borderRadius: 4,
+  },
+  slotSummaryBar: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    justifyContent: 'space-around',
+    paddingVertical: 12,
+    paddingHorizontal: 16,
+    borderRadius: 10,
+    borderWidth: 1,
+    marginBottom: 14,
+  },
+  summaryStat: {
+    alignItems: 'center',
+  },
+  statValue: {
+    fontSize: 16,
+    fontWeight: '800',
+  },
+  statLabel: {
+    fontSize: 11,
+    fontWeight: '600',
+    marginTop: 2,
+  },
+  statDivider: {
+    width: 1,
+    height: 24,
+  },
+  slotFilterRow: {
+    flexDirection: 'row',
+    gap: 8,
+    marginBottom: 14,
+  },
+  slotFilterTab: {
+    flex: 1,
+    paddingVertical: 8,
+    paddingHorizontal: 6,
+    borderRadius: 8,
+    borderWidth: 1,
+    alignItems: 'center',
+    justifyContent: 'center',
+  },
+  slotFilterText: {
+    fontSize: 11,
+    fontWeight: '700',
+  },
+  slotsListContainer: {
+    gap: 10,
+    marginBottom: 14,
+  },
+  detailedSlotCard: {
+    padding: 12,
+    borderRadius: 10,
+  },
+  slotIndexBadge: {
+    paddingHorizontal: 6,
+    paddingVertical: 2,
+    borderRadius: 4,
+  },
+  slotTimeTitle: {
+    fontSize: 13.5,
+    fontWeight: '700',
+  },
+  slotStatusTag: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    paddingHorizontal: 8,
+    paddingVertical: 3,
+    borderRadius: 6,
+  },
+  slotStatusTagText: {
+    fontSize: 11,
+    fontWeight: '700',
+  },
+  slotOccupiedBox: {
+    marginTop: 8,
+    padding: 8,
+    borderRadius: 6,
+    borderWidth: 0.5,
+  },
+  bookingSummaryCard: {
+    padding: 14,
+    borderRadius: 10,
+    borderWidth: 1,
+    marginBottom: 20,
+  },
+  summaryTitle: {
+    fontSize: 13,
+    fontWeight: '800',
+    textTransform: 'uppercase',
+    letterSpacing: 0.5,
+  },
+  summaryRow: {
+    flexDirection: 'row',
+    justifyContent: 'space-between',
+    alignItems: 'center',
+    paddingVertical: 4,
+  },
+  summaryLabel: {
+    fontSize: 12,
+  },
+  summaryValue: {
+    fontSize: 12,
+    fontWeight: '600',
+    maxWidth: '65%',
+    textAlign: 'right',
   },
 });
