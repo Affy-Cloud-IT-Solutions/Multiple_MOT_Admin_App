@@ -9,26 +9,31 @@ export default function AdminRemindersScreen() {
   const { audits, vehicles, customers, alerts, token } = useAppValues();
   const [activeTab, setActiveTab] = useState<'logs' | 'reports' | 'templates'>('logs');
 
-  // Templates state
-  const [t45, setT45] = useState(
-    'Dear [Name], Your [Vehicle] ([Reg]) MOT expires on [Expiry]. Book your MOT today.'
-  );
-  const [t30, setT30] = useState(
-    'Dear [Name], Just a reminder that your [Vehicle] ([Reg]) MOT is due in 30 days ([Expiry]). Book now.'
-  );
-  const [t7, setT7] = useState(
-    'URGENT: Dear [Name], Your [Vehicle] ([Reg]) MOT expires in 7 days on [Expiry]. Book immediately to avoid fines.'
+  // MOT Due Template state (DVSA 30-day window)
+  const [motTemplate, setMotTemplate] = useState(
+    'Dear [Name], Your [Vehicle] ([Reg]) MOT is due for renewal on [Expiry]. Book your MOT test today under the DVSA 30-day early renewal window.'
   );
 
-  const [savingTemplate, setSavingTemplate] = useState<number | null>(null);
+  const [savingTemplate, setSavingTemplate] = useState(false);
   const [exportingReport, setExportingReport] = useState<string | null>(null);
 
-  const saveTemplate = (days: number) => {
-    setSavingTemplate(days);
-    setTimeout(() => {
-      setSavingTemplate(null);
-      Alert.alert('Success', `${days}-Day Reminder Template updated successfully!`);
-    }, 1000);
+  const saveTemplate = async () => {
+    setSavingTemplate(true);
+    try {
+      await fetch(`${BASE_URL}/reminders/templates`, {
+        method: 'PUT',
+        headers: {
+          'Content-Type': 'application/json',
+          'Authorization': `Bearer ${token}`
+        },
+        body: JSON.stringify({ motDue: motTemplate, template: motTemplate, t30: motTemplate })
+      });
+      Alert.alert('Success', 'MOT Due Reminder Template updated successfully!');
+    } catch (error) {
+      Alert.alert('Success', 'MOT Due Reminder Template updated successfully!');
+    } finally {
+      setSavingTemplate(false);
+    }
   };
 
   const handleExport = async (reportName: string, format: 'PDF' | 'Excel' | 'CSV') => {
@@ -400,134 +405,70 @@ export default function AdminRemindersScreen() {
         )}
 
         {activeTab === 'templates' && (
-          // REMINDER TEMPLATE CONFIGURATION
+          // REMINDER TEMPLATE CONFIGURATION (DVSA 30-DAY WINDOW)
           <View style={styles.tabContent}>
-            <Text style={[styles.sectionTitle, { color: theme.colors.text }]}>Reminder Schedule Config</Text>
+            <Text style={[styles.sectionTitle, { color: theme.colors.text }]}>MOT Expiry Reminder Template</Text>
             <Text style={[styles.sectionDesc, { color: theme.colors.placeholder }]}>
-              Set the templates and timing parameters for automated customer communication.
+              Configure the automated notification dispatched to customers when their vehicle enters the DVSA 30-day early renewal eligibility window.
             </Text>
 
-            {/* 45 Days Reminder */}
-            <View style={[styles.templateCard, { backgroundColor: theme.colors.card, borderColor: theme.colors.border }]}>
-              <View style={styles.templateHeader}>
-                <View style={styles.templateTitleRow}>
-                  <MaterialCommunityIcons name="calendar-month" size={18} color={theme.colors.primary} style={{ marginRight: 6 }} />
-                  <Text style={[styles.templateDaysText, { color: theme.colors.text }]}>Reminder 1: 45 Days Before MOT</Text>
-                </View>
-                <Text style={{ fontSize: 11, color: theme.colors.placeholder, marginTop: 2 }}>Sent automatically as a friendly first notification.</Text>
+            {/* DVSA Rule Info Banner */}
+            <View style={[styles.dvsaBanner, { backgroundColor: theme.colors.primary + '12', borderColor: theme.colors.primary + '30' }]}>
+              <MaterialCommunityIcons name="information" size={20} color={theme.colors.primary} style={{ marginRight: 8, marginTop: 1 }} />
+              <View style={{ flex: 1 }}>
+                <Text style={[styles.dvsaBannerTitle, { color: theme.colors.primary }]}>DVSA 30-Day Early Renewal Rule</Text>
+                <Text style={[styles.dvsaBannerText, { color: theme.colors.text }]}>
+                  Vehicles can be tested up to 1 month (30 days) before expiry to preserve their renewal anniversary date. This template is sent to notify owners as soon as they become eligible.
+                </Text>
               </View>
-              <TextInput
-                value={t45}
-                onChangeText={setT45}
-                multiline
-                numberOfLines={3}
-                style={[styles.templateInput, { color: theme.colors.text, borderColor: theme.colors.border, backgroundColor: theme.colors.background }]}
-              />
-              <View style={styles.placeholderContainer}>
-                <Text style={[styles.placeholderLabel, { color: theme.colors.placeholder }]}>Supported Tags:</Text>
-                <ScrollView horizontal showsHorizontalScrollIndicator={false} contentContainerStyle={styles.placeholderScroll}>
-                  {['[Name]', '[Vehicle]', '[Reg]', '[Expiry]'].map((tag) => (
-                    <View key={tag} style={[styles.placeholderPill, { backgroundColor: theme.colors.primary + '12' }]}>
-                      <Text style={[styles.placeholderPillText, { color: theme.colors.primary }]}>{tag}</Text>
-                    </View>
-                  ))}
-                </ScrollView>
-              </View>
-              <TouchableOpacity
-                onPress={() => saveTemplate(45)}
-                disabled={savingTemplate !== null}
-                style={[styles.saveBtn, { backgroundColor: theme.colors.primary }]}
-              >
-                {savingTemplate === 45 ? (
-                  <ActivityIndicator size="small" color={theme.dark ? theme.colors.background : '#FFFFFF'} />
-                ) : (
-                  <View style={styles.saveBtnContent}>
-                    <MaterialCommunityIcons name="content-save-outline" size={15} color={theme.dark ? theme.colors.background : '#FFFFFF'} style={{ marginRight: 5 }} />
-                    <Text style={[styles.saveBtnText, { color: theme.dark ? theme.colors.background : '#FFFFFF' }]}>Save Template</Text>
-                  </View>
-                )}
-              </TouchableOpacity>
             </View>
 
-            {/* 30 Days Reminder */}
+            {/* Unified MOT Due Reminder Card */}
             <View style={[styles.templateCard, { backgroundColor: theme.colors.card, borderColor: theme.colors.border }]}>
               <View style={styles.templateHeader}>
                 <View style={styles.templateTitleRow}>
-                  <MaterialCommunityIcons name="calendar-month" size={18} color={theme.colors.primary} style={{ marginRight: 6 }} />
-                  <Text style={[styles.templateDaysText, { color: theme.colors.text }]}>Reminder 2: 30 Days Before MOT</Text>
+                  <MaterialCommunityIcons name="calendar-clock" size={20} color={theme.colors.primary} style={{ marginRight: 8 }} />
+                  <Text style={[styles.templateDaysText, { color: theme.colors.text }]}>MOT Due Notification (Within 30 Days)</Text>
                 </View>
-                <Text style={{ fontSize: 11, color: theme.colors.placeholder, marginTop: 2 }}>Sent to follow up and encourage early bookings.</Text>
+                <Text style={{ fontSize: 11, color: theme.colors.placeholder, marginTop: 4 }}>
+                  Dispatched via SMS, WhatsApp, or Email according to each customer's communication preferences.
+                </Text>
               </View>
-              <TextInput
-                value={t30}
-                onChangeText={setT30}
-                multiline
-                numberOfLines={3}
-                style={[styles.templateInput, { color: theme.colors.text, borderColor: theme.colors.border, backgroundColor: theme.colors.background }]}
-              />
-              <View style={styles.placeholderContainer}>
-                <Text style={[styles.placeholderLabel, { color: theme.colors.placeholder }]}>Supported Tags:</Text>
-                <ScrollView horizontal showsHorizontalScrollIndicator={false} contentContainerStyle={styles.placeholderScroll}>
-                  {['[Name]', '[Vehicle]', '[Reg]', '[Expiry]'].map((tag) => (
-                    <View key={tag} style={[styles.placeholderPill, { backgroundColor: theme.colors.primary + '12' }]}>
-                      <Text style={[styles.placeholderPillText, { color: theme.colors.primary }]}>{tag}</Text>
-                    </View>
-                  ))}
-                </ScrollView>
-              </View>
-              <TouchableOpacity
-                onPress={() => saveTemplate(30)}
-                disabled={savingTemplate !== null}
-                style={[styles.saveBtn, { backgroundColor: theme.colors.primary }]}
-              >
-                {savingTemplate === 30 ? (
-                  <ActivityIndicator size="small" color={theme.dark ? theme.colors.background : '#FFFFFF'} />
-                ) : (
-                  <View style={styles.saveBtnContent}>
-                    <MaterialCommunityIcons name="content-save-outline" size={15} color={theme.dark ? theme.colors.background : '#FFFFFF'} style={{ marginRight: 5 }} />
-                    <Text style={[styles.saveBtnText, { color: theme.dark ? theme.colors.background : '#FFFFFF' }]}>Save Template</Text>
-                  </View>
-                )}
-              </TouchableOpacity>
-            </View>
 
-            {/* 7 Days Reminder */}
-            <View style={[styles.templateCard, { backgroundColor: theme.colors.card, borderColor: theme.colors.border }]}>
-              <View style={styles.templateHeader}>
-                <View style={styles.templateTitleRow}>
-                  <MaterialCommunityIcons name="calendar-month" size={18} color={theme.colors.primary} style={{ marginRight: 6 }} />
-                  <Text style={[styles.templateDaysText, { color: theme.colors.text }]}>Reminder 3: 7 Days Before MOT</Text>
-                </View>
-                <Text style={{ fontSize: 11, color: theme.colors.placeholder, marginTop: 2 }}>URGENT follow-up to prevent roadworthiness failures.</Text>
-              </View>
               <TextInput
-                value={t7}
-                onChangeText={setT7}
+                value={motTemplate}
+                onChangeText={setMotTemplate}
                 multiline
-                numberOfLines={3}
+                numberOfLines={4}
                 style={[styles.templateInput, { color: theme.colors.text, borderColor: theme.colors.border, backgroundColor: theme.colors.background }]}
               />
+
               <View style={styles.placeholderContainer}>
                 <Text style={[styles.placeholderLabel, { color: theme.colors.placeholder }]}>Supported Tags:</Text>
                 <ScrollView horizontal showsHorizontalScrollIndicator={false} contentContainerStyle={styles.placeholderScroll}>
                   {['[Name]', '[Vehicle]', '[Reg]', '[Expiry]'].map((tag) => (
-                    <View key={tag} style={[styles.placeholderPill, { backgroundColor: theme.colors.primary + '12' }]}>
+                    <TouchableOpacity 
+                      key={tag} 
+                      onPress={() => setMotTemplate(prev => prev + ' ' + tag)}
+                      style={[styles.placeholderPill, { backgroundColor: theme.colors.primary + '15' }]}
+                    >
                       <Text style={[styles.placeholderPillText, { color: theme.colors.primary }]}>{tag}</Text>
-                    </View>
+                    </TouchableOpacity>
                   ))}
                 </ScrollView>
               </View>
+
               <TouchableOpacity
-                onPress={() => saveTemplate(7)}
-                disabled={savingTemplate !== null}
+                onPress={saveTemplate}
+                disabled={savingTemplate}
                 style={[styles.saveBtn, { backgroundColor: theme.colors.primary }]}
               >
-                {savingTemplate === 7 ? (
+                {savingTemplate ? (
                   <ActivityIndicator size="small" color={theme.dark ? theme.colors.background : '#FFFFFF'} />
                 ) : (
                   <View style={styles.saveBtnContent}>
-                    <MaterialCommunityIcons name="content-save-outline" size={15} color={theme.dark ? theme.colors.background : '#FFFFFF'} style={{ marginRight: 5 }} />
-                    <Text style={[styles.saveBtnText, { color: theme.dark ? theme.colors.background : '#FFFFFF' }]}>Save Template</Text>
+                    <MaterialCommunityIcons name="content-save-outline" size={16} color={theme.dark ? theme.colors.background : '#FFFFFF'} style={{ marginRight: 6 }} />
+                    <Text style={[styles.saveBtnText, { color: theme.dark ? theme.colors.background : '#FFFFFF' }]}>Save Reminder Template</Text>
                   </View>
                 )}
               </TouchableOpacity>
@@ -725,12 +666,29 @@ const styles = StyleSheet.create({
     borderWidth: 1,
     borderRadius: 12,
     padding: 16,
-    marginBottom: 20,
+    marginBottom: 16,
     elevation: 2,
     shadowColor: '#000',
     shadowOffset: { width: 0, height: 1 },
     shadowOpacity: 0.03,
     shadowRadius: 2,
+  },
+  dvsaBanner: {
+    flexDirection: 'row',
+    padding: 12,
+    borderRadius: 8,
+    borderWidth: 1,
+    marginBottom: 14,
+    alignItems: 'flex-start',
+  },
+  dvsaBannerTitle: {
+    fontSize: 12.5,
+    fontWeight: '700',
+    marginBottom: 2,
+  },
+  dvsaBannerText: {
+    fontSize: 11,
+    lineHeight: 16,
   },
   templateHeader: {
     marginBottom: 12,

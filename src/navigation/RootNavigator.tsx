@@ -9,6 +9,7 @@ import StaffListScreen from '../screens/StaffListScreen';
 import CustomerDetailScreen from '../screens/CustomerDetailScreen';
 import AdminBookMotScreen from '../screens/AdminBookMotScreen';
 import AdminAlertsScreen from '../screens/AdminAlertsScreen';
+import GarageVerificationReviewScreen from '../screens/GarageVerificationReviewScreen';
 import MainTabNavigator from './MainTabNavigator';
 import { useAppTheme } from '../context/ThemeContext';
 
@@ -80,6 +81,11 @@ export default function RootNavigator() {
         name="AdminAlerts"
         component={AdminAlertsScreen}
         options={{ title: 'Action Alerts', headerShown: true }}
+      />
+      <Stack.Screen
+        name="GarageVerificationReview"
+        component={GarageVerificationReviewScreen}
+        options={{ headerShown: false }}
       />
     </Stack.Navigator>
   );

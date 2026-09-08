@@ -236,8 +236,10 @@ export default function SuperAdminDashboardScreen({ navigation }: any) {
           </View>
 
           {pendingGarages.map((garage) => (
-            <View
+            <TouchableOpacity
               key={garage.id || garage._id}
+              activeOpacity={0.85}
+              onPress={() => navigation.navigate('GarageVerificationReview', { garageId: garage.id || garage._id, garage })}
               style={[
                 styles.pendingCard,
                 { backgroundColor: theme.colors.card, borderColor: '#F59E0B' }
@@ -248,9 +250,14 @@ export default function SuperAdminDashboardScreen({ navigation }: any) {
                   <MaterialCommunityIcons name="garage-open" size={24} color="#F59E0B" />
                 </View>
                 <View style={{ flex: 1 }}>
-                  <Text style={[styles.pendingGarageName, { color: theme.colors.text }]}>
-                    {garage.name}
-                  </Text>
+                  <View style={{ flexDirection: 'row', alignItems: 'center', justifyContent: 'space-between' }}>
+                    <Text style={[styles.pendingGarageName, { color: theme.colors.text }]}>
+                      {garage.name}
+                    </Text>
+                    <View style={{ backgroundColor: '#F59E0B20', paddingHorizontal: 8, paddingVertical: 2, borderRadius: 6 }}>
+                      <Text style={{ color: '#F59E0B', fontSize: 10.5, fontWeight: 'bold' }}>Pending Review</Text>
+                    </View>
+                  </View>
                   <Text style={[styles.pendingGarageLocation, { color: theme.colors.placeholder }]} numberOfLines={1}>
                     <MaterialCommunityIcons name="map-marker-outline" size={13} color={theme.colors.placeholder} /> {garage.address}
                   </Text>
@@ -264,30 +271,14 @@ export default function SuperAdminDashboardScreen({ navigation }: any) {
 
               <View style={styles.pendingCardActions}>
                 <TouchableOpacity
-                  style={[styles.actionBtn, styles.approveBtn]}
-                  disabled={loadingAction === (garage.id || garage._id)}
-                  onPress={() => handleApproveGarage(garage.id || garage._id || '', garage.name)}
+                  style={[styles.actionBtn, styles.approveBtn, { flex: 1, backgroundColor: theme.colors.primary }]}
+                  onPress={() => navigation.navigate('GarageVerificationReview', { garageId: garage.id || garage._id, garage })}
                 >
-                  {loadingAction === (garage.id || garage._id) ? (
-                    <ActivityIndicator size="small" color="#FFFFFF" />
-                  ) : (
-                    <>
-                      <MaterialCommunityIcons name="check-decagram" size={16} color="#FFFFFF" />
-                      <Text style={styles.actionBtnText}>Approve & Verify</Text>
-                    </>
-                  )}
-                </TouchableOpacity>
-
-                <TouchableOpacity
-                  style={[styles.actionBtn, styles.rejectBtn]}
-                  disabled={loadingAction === (garage.id || garage._id)}
-                  onPress={() => handleRejectGarage(garage.id || garage._id || '', garage.name)}
-                >
-                  <MaterialCommunityIcons name="close-circle-outline" size={16} color="#EF4444" />
-                  <Text style={[styles.actionBtnText, { color: '#EF4444' }]}>Reject</Text>
+                  <MaterialCommunityIcons name="clipboard-check-outline" size={16} color="#FFFFFF" style={{ marginRight: 6 }} />
+                  <Text style={styles.actionBtnText}>Review Application & Audit Docs →</Text>
                 </TouchableOpacity>
               </View>
-            </View>
+            </TouchableOpacity>
           ))}
         </View>
       )}

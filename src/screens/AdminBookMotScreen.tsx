@@ -838,7 +838,7 @@ export default function AdminBookMotScreen({ route, navigation }: any) {
         {selectedDate && selectedTime && (
           <View style={[styles.bookingSummaryCard, { backgroundColor: theme.colors.card, borderColor: theme.colors.border }]}>
             <View style={{ flexDirection: 'row', alignItems: 'center', marginBottom: 10 }}>
-              <MaterialCommunityIcons name="file-document-check-outline" size={18} color={theme.colors.secondary} style={{ marginRight: 6 }} />
+              <MaterialCommunityIcons name="file-document" size={18} color={theme.colors.secondary} style={{ marginRight: 6 }} />
               <Text style={[styles.summaryTitle, { color: theme.colors.text }]}>
                 Booking Confirmation Summary
               </Text>

@@ -29,34 +29,36 @@ export default function AdminDashboardScreen({ navigation }: any) {
   const totalCustomersCount = customers.length;
   const activeVehiclesCount = activeVehicles.length;
   
-  const dueIn7Days = activeVehicles.filter(v => {
+  // Under UK DVSA rules, vehicles are eligible for MOT renewal within 30 days of expiry
+  const dueForMotVehicles = activeVehicles.filter(v => {
     const diff = getDaysDiff(v.motExpiryDate);
-    return diff >= 0 && diff <= 7;
-  });
-  
-  const dueIn30Days = activeVehicles.filter(v => {
-    const diff = getDaysDiff(v.motExpiryDate);
-    return diff > 7 && diff <= 30;
+    return diff >= 0 && diff <= 30;
   });
 
-  const dueIn45Days = activeVehicles.filter(v => {
+  const overdueVehicles = activeVehicles.filter(v => {
     const diff = getDaysDiff(v.motExpiryDate);
-    return diff > 30 && diff <= 45;
+    return diff < 0;
   });
 
   const soldVehiclesCount = vehicles.filter((v) => v.status === 'Sold').length;
   const bookedMotsCount = alerts.filter(a => a.type === 'BOOKED').length;
 
-  const sendManualReminder = (reg: string, customerId: string, days: number) => {
+  const urgentVehiclesList = [...dueForMotVehicles, ...overdueVehicles];
+
+  const sendManualReminder = (reg: string, customerId: string, daysLeft: number) => {
     const customer = customers.find(c => 
       String(c.id).toLowerCase() === String(customerId || '').toLowerCase() ||
       String(c._id).toLowerCase() === String(customerId || '').toLowerCase()
     );
     if (!customer) return;
 
+    const noticeText = daysLeft < 0 
+      ? `MOT Overdue reminder` 
+      : `MOT Due reminder (${daysLeft} days left - DVSA 30-day window)`;
+
     Alert.alert(
       'Send MOT Reminder',
-      `Send ${days}-day MOT reminder to ${customer.firstName} ${customer.lastName} via ${customer.preferredContact}?`,
+      `Send ${noticeText} to ${customer.firstName} ${customer.lastName} via ${customer.preferredContact}?`,
       [
         { text: 'Cancel', style: 'cancel' },
         {
@@ -72,7 +74,7 @@ export default function AdminDashboardScreen({ navigation }: any) {
     );
   };
 
-  // Updated StatCard with border matching icon color
+  // StatCard component
   const StatCard = ({ icon, value, label, color, subtitle, onPress }: any) => (
     <TouchableOpacity 
       disabled={!onPress}
@@ -111,7 +113,7 @@ export default function AdminDashboardScreen({ navigation }: any) {
         <View>
           <Text style={[styles.title, { color: theme.colors.text }]}>Dashboard</Text>
           <Text style={[styles.subtitle, { color: theme.colors.placeholder }]}>
-            MOT Reminder Management
+            MOT Operations & Reminders
           </Text>
         </View>
         <View style={styles.headerActions}>
@@ -156,7 +158,7 @@ export default function AdminDashboardScreen({ navigation }: any) {
         </View>
       </View>
 
-      {/* Stats Grid - Uniform 2-column layout */}
+      {/* Stats Grid - 2-column layout aligned with DVSA 30-day window */}
       <View style={styles.statsGrid}>
         <View style={styles.statsRow}>
           <StatCard 
@@ -176,27 +178,10 @@ export default function AdminDashboardScreen({ navigation }: any) {
         <View style={styles.statsRow}>
           <StatCard 
             icon="clock-alert-outline" 
-            value={dueIn7Days.length} 
-            label="Due in 7 Days" 
-            color="#EF4444"
-            subtitle="Critical"
-          />
-          <StatCard 
-            icon="clock-outline" 
-            value={dueIn30Days.length} 
-            label="Due in 30 Days" 
+            value={dueForMotVehicles.length} 
+            label="Due for MOT" 
             color="#F59E0B"
-            subtitle="Warning"
-          />
-        </View>
-
-        <View style={styles.statsRow}>
-          <StatCard 
-            icon="clock-start" 
-            value={dueIn45Days.length} 
-            label="Due in 45 Days" 
-            color="#10B981"
-            subtitle="Upcoming"
+            subtitle="Within 30 Days"
           />
           <StatCard 
             icon="calendar-check-outline" 
@@ -209,11 +194,21 @@ export default function AdminDashboardScreen({ navigation }: any) {
 
         <View style={styles.statsRow}>
           <StatCard 
+            icon="alert-octagon-outline" 
+            value={overdueVehicles.length} 
+            label="Overdue / Expired" 
+            color="#EF4444"
+            subtitle={overdueVehicles.length > 0 ? "Action Required" : "None"}
+          />
+          <StatCard 
             icon="car-off" 
             value={soldVehiclesCount} 
             label="Sold Vehicles" 
             color="#6B7280"
           />
+        </View>
+
+        <View style={styles.statsRow}>
           <StatCard 
             icon="clipboard-list-outline" 
             value={audits.length} 
@@ -226,26 +221,28 @@ export default function AdminDashboardScreen({ navigation }: any) {
       {/* Urgent Action Section */}
       <View style={styles.section}>
         <View style={styles.sectionHeader}>
-          <Text style={[styles.sectionTitle, { color: theme.colors.text }]}>Urgent Actions</Text>
+          <Text style={[styles.sectionTitle, { color: theme.colors.text }]}>MOT Due & Urgent Actions</Text>
           <Text style={[styles.sectionCount, { color: theme.colors.placeholder }]}>
-            {dueIn7Days.length + dueIn30Days.length} pending
+            {urgentVehiclesList.length} actionable
           </Text>
         </View>
         
-        {dueIn7Days.length === 0 && dueIn30Days.length === 0 ? (
+        {urgentVehiclesList.length === 0 ? (
           <View style={[styles.emptyState, { backgroundColor: theme.colors.card, borderColor: theme.colors.border }]}>
             <MaterialCommunityIcons name="check-circle-outline" size={40} color={theme.colors.placeholder} />
             <Text style={[styles.emptyText, { color: theme.colors.placeholder }]}>All caught up</Text>
-            <Text style={[styles.emptySubtext, { color: theme.colors.placeholder }]}>No vehicles require immediate attention</Text>
+            <Text style={[styles.emptySubtext, { color: theme.colors.placeholder }]}>No vehicles due within 30 days or overdue</Text>
           </View>
         ) : (
-          [...dueIn7Days, ...dueIn30Days].map((v) => {
+          urgentVehiclesList.map((v) => {
             const customer = customers.find(c => 
               String(c.id).toLowerCase() === String(v.customerId || '').toLowerCase() ||
               String(c._id).toLowerCase() === String(v.customerId || '').toLowerCase()
             );
             const daysLeft = getDaysDiff(v.motExpiryDate);
-            const isCritical = daysLeft <= 7;
+            const isOverdue = daysLeft < 0;
+            const badgeColor = isOverdue ? '#EF4444' : '#F59E0B';
+            const badgeText = isOverdue ? `${Math.abs(daysLeft)}d overdue` : `${daysLeft}d left`;
             
             return (
               <View
@@ -254,7 +251,7 @@ export default function AdminDashboardScreen({ navigation }: any) {
                   styles.actionCard,
                   {
                     backgroundColor: theme.colors.card,
-                    borderColor: isCritical ? '#EF4444' : '#F59E0B',
+                    borderColor: badgeColor,
                     borderLeftWidth: 4,
                   },
                 ]}
@@ -269,8 +266,8 @@ export default function AdminDashboardScreen({ navigation }: any) {
                         {v.make} {v.model} {v.year ? `(${v.year})` : ''}
                       </Text>
                     </View>
-                    <View style={[styles.daysBadge, { backgroundColor: isCritical ? '#EF4444' : '#F59E0B' }]}>
-                      <Text style={styles.daysText}>{daysLeft}d</Text>
+                    <View style={[styles.daysBadge, { backgroundColor: badgeColor }]}>
+                      <Text style={styles.daysText}>{badgeText}</Text>
                     </View>
                   </View>
 
@@ -290,12 +287,12 @@ export default function AdminDashboardScreen({ navigation }: any) {
                   </View>
 
                   <TouchableOpacity
-                    onPress={() => sendManualReminder(v.registrationNumber, v.customerId, isCritical ? 7 : 30)}
+                    onPress={() => sendManualReminder(v.registrationNumber, v.customerId, daysLeft)}
                     style={[styles.actionButton, { backgroundColor: theme.colors.secondary + '10' }]}
                   >
                     <MaterialCommunityIcons name="send-outline" size={16} color={theme.colors.secondary} />
                     <Text style={[styles.actionButtonText, { color: theme.colors.secondary }]}>
-                      Send Reminder
+                      Send MOT Reminder
                     </Text>
                   </TouchableOpacity>
                 </View>

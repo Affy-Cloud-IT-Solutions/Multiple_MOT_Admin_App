@@ -63,6 +63,14 @@ export interface Garage {
   logoUrl?: string;
   images?: string[];
   address: string;
+  city?: string;
+  postcode?: string;
+  latitude?: number;
+  longitude?: number;
+  vtsNumber?: string;
+  motAuthorisedExaminerNumber?: string;
+  businessRegistrationNumber?: string;
+  legalDeclaration?: boolean;
   email: string;
   phone: string;
   openingTime?: string;
@@ -71,11 +79,12 @@ export interface Garage {
   services?: any[];
   workingDays?: string[];
   slots?: string[];
-  verificationStatus?: 'Pending' | 'Verified' | 'Rejected';
-  verificationDocuments?: { name: string; fileUrl: string; uploadDate?: string }[];
+  verificationStatus?: 'Pending' | 'Verified' | 'Rejected' | 'Expired';
+  rejectionReason?: string;
+  verificationDocuments?: { id?: string; _id?: string; name: string; fileUrl: string; documentType?: string; status?: 'Pending' | 'Verified' | 'Rejected'; rejectionReason?: string; verifiedAt?: string; uploadDate?: string }[];
   rating?: number;
   distance?: number;
-  status: 'Approved' | 'Pending' | 'Suspended' | 'Rejected';
+  status: 'Approved' | 'Pending' | 'Suspended' | 'Rejected' | 'Blacklisted';
   staffCount?: number;
   bookingsCount?: number;
   customerCount?: number;
@@ -115,7 +124,8 @@ interface DataContextType {
   rescheduleBooking: (alertId: string, date: string, slot: string) => Promise<void>;
   lookupVehicle: (vrn: string) => Promise<any>;
   fetchGarages: () => Promise<Garage[]>;
-  updateGarageStatus: (garageId: string, status: string, verificationStatus?: string) => Promise<void>;
+  updateGarageStatus: (garageId: string, status: string, verificationStatus?: string, rejectionReason?: string) => Promise<void>;
+  updateGarageDocumentStatus: (garageId: string, docId: string, status: 'Verified' | 'Rejected' | 'Pending', rejectionReason?: string) => Promise<any>;
   updateGarageProfile: (garageId: string, updates: Partial<Garage>) => Promise<any>;
 }
 
@@ -558,11 +568,13 @@ export const DataProvider = ({ children }: { children: ReactNode }) => {
 
   const lookupVehicle = async (vrn: string): Promise<any> => {
     try {
+      const headers: Record<string, string> = {};
+      if (token) {
+        headers['Authorization'] = `Bearer ${token}`;
+      }
       const response = await fetch(`${BASE_URL}/vehicles/dvla/${encodeURIComponent(vrn)}`, {
         method: 'GET',
-        headers: { 
-          'Authorization': `Bearer ${token}`
-        }
+        headers
       });
       const data = await response.json();
       if (!response.ok) {
@@ -594,7 +606,7 @@ export const DataProvider = ({ children }: { children: ReactNode }) => {
     }
   };
 
-  const updateGarageStatus = async (garageId: string, status: string, verificationStatus?: string): Promise<void> => {
+  const updateGarageStatus = async (garageId: string, status: string, verificationStatus?: string, rejectionReason?: string): Promise<void> => {
     try {
       const response = await fetch(`${BASE_URL}/garages/${garageId}/status`, {
         method: 'PUT',
@@ -602,7 +614,7 @@ export const DataProvider = ({ children }: { children: ReactNode }) => {
           'Content-Type': 'application/json',
           'Authorization': `Bearer ${token}`
         },
-        body: JSON.stringify({ status, verificationStatus })
+        body: JSON.stringify({ status, verificationStatus, rejectionReason })
       });
       const data = await response.json();
       if (!response.ok) {
@@ -611,6 +623,28 @@ export const DataProvider = ({ children }: { children: ReactNode }) => {
       await refreshData();
     } catch (error) {
       console.error('[DATA CONTEXT] updateGarageStatus error:', error);
+      throw error;
+    }
+  };
+
+  const updateGarageDocumentStatus = async (garageId: string, docId: string, status: 'Verified' | 'Rejected' | 'Pending', rejectionReason?: string): Promise<any> => {
+    try {
+      const response = await fetch(`${BASE_URL}/garages/${garageId}/documents/${docId}/status`, {
+        method: 'PUT',
+        headers: {
+          'Content-Type': 'application/json',
+          'Authorization': `Bearer ${token}`
+        },
+        body: JSON.stringify({ status, rejectionReason })
+      });
+      const data = await response.json();
+      if (!response.ok) {
+        throw new Error(data.error || 'Failed to update document status');
+      }
+      await refreshData();
+      return data;
+    } catch (error) {
+      console.error('[DATA CONTEXT] updateGarageDocumentStatus error:', error);
       throw error;
     }
   };
@@ -665,6 +699,7 @@ export const DataProvider = ({ children }: { children: ReactNode }) => {
         lookupVehicle,
         fetchGarages,
         updateGarageStatus,
+        updateGarageDocumentStatus,
         updateGarageProfile,
       }}
     >

@@ -18,7 +18,7 @@ import { useAppValues, Garage, BASE_URL } from '../context/DataContext';
 
 export default function SuperAdminGaragesScreen({ navigation }: any) {
   const { theme } = useAppTheme();
-  const { garages, refreshData, updateGarageStatus, updateGarageProfile, token } = useAppValues();
+  const { garages, refreshData, updateGarageStatus, updateGarageDocumentStatus, updateGarageProfile, token } = useAppValues();
 
   const [searchQuery, setSearchQuery] = useState('');
   const [selectedFilter, setSelectedFilter] = useState<'ALL' | 'Approved' | 'Pending' | 'Suspended'>('ALL');
@@ -32,6 +32,25 @@ export default function SuperAdminGaragesScreen({ navigation }: any) {
   const [garageImages, setGarageImages] = useState<string[]>([]);
   const [newImageUrl, setNewImageUrl] = useState('');
   const [savingImages, setSavingImages] = useState(false);
+
+  // Document Review & Verification Modal State
+  const [docModalVisible, setDocModalVisible] = useState(false);
+  const [selectedDoc, setSelectedDoc] = useState<any>(null);
+  const [docActionLoading, setDocActionLoading] = useState(false);
+
+  // Garage Application Rejection Modal State
+  const [rejectModalVisible, setRejectModalVisible] = useState(false);
+  const [rejectionReasonInput, setRejectionReasonInput] = useState('');
+  const [selectedPresetReason, setSelectedPresetReason] = useState<string>('');
+
+  const REJECTION_PRESETS = [
+    'DVLA VTS Site Number could not be verified in the DVSA register.',
+    'MOT Authorised Examiner (AE) certificate is invalid or unverified.',
+    'Facility photos do not meet minimum MOT testing bay requirements.',
+    'Public Liability Insurance certificate is missing or expired.',
+    'Companies House / Trade registration credentials do not match.',
+    'Station equipment calibration certificates are incomplete.'
+  ];
 
   const fetchFullGarageDetails = async (garageId: string) => {
     setLoadingDetails(true);
@@ -60,6 +79,61 @@ export default function SuperAdminGaragesScreen({ navigation }: any) {
     setGarageDetails(null);
     setModalVisible(true);
     fetchFullGarageDetails(garage.id || garage._id || '');
+  };
+
+  const handleOpenDocModal = (doc: any) => {
+    setSelectedDoc(doc);
+    setDocModalVisible(true);
+  };
+
+  const handleSetDocStatus = async (newDocStatus: 'Verified' | 'Rejected') => {
+    if (!selectedGarage || !selectedDoc) return;
+    const garageId = selectedGarage.id || selectedGarage._id || '';
+    const docId = selectedDoc.id || selectedDoc._id;
+    if (!docId) {
+      Alert.alert('Notice', 'Document ID not available for individual tracking.');
+      return;
+    }
+    setDocActionLoading(true);
+    try {
+      await updateGarageDocumentStatus(garageId, docId, newDocStatus);
+      setSelectedDoc({ ...selectedDoc, status: newDocStatus });
+      await fetchFullGarageDetails(garageId);
+      Alert.alert('Document Updated', `Certificate marked as "${newDocStatus}".`);
+    } catch (err: any) {
+      Alert.alert('Error', err.message || 'Failed to update certificate status.');
+    } finally {
+      setDocActionLoading(false);
+    }
+  };
+
+  const handleOpenRejectModal = () => {
+    setRejectionReasonInput(selectedGarage?.rejectionReason || '');
+    setSelectedPresetReason('');
+    setRejectModalVisible(true);
+  };
+
+  const handleConfirmRejection = async () => {
+    if (!selectedGarage) return;
+    const finalReason = rejectionReasonInput.trim() || selectedPresetReason.trim() || 'Documentation or regulatory criteria not verified.';
+    const garageId = selectedGarage.id || selectedGarage._id || '';
+    setLoadingAction(true);
+    try {
+      await updateGarageStatus(garageId, 'Rejected', 'Rejected', finalReason);
+      setSelectedGarage({
+        ...selectedGarage,
+        status: 'Rejected',
+        verificationStatus: 'Rejected',
+        rejectionReason: finalReason
+      });
+      setRejectModalVisible(false);
+      await refreshData();
+      Alert.alert('Application Rejected', `Garage status updated to Rejected.\n\nReason: "${finalReason}"`);
+    } catch (err: any) {
+      Alert.alert('Rejection Failed', err.message || 'Could not reject garage application.');
+    } finally {
+      setLoadingAction(false);
+    }
   };
 
   const handleRemoveImage = (indexToRemove: number) => {
@@ -273,7 +347,7 @@ export default function SuperAdminGaragesScreen({ navigation }: any) {
               <TouchableOpacity
                 key={garage.id || garage._id}
                 activeOpacity={0.8}
-                onPress={() => openGarageModal(garage)}
+                onPress={() => navigation.navigate('GarageVerificationReview', { garageId: garage.id || garage._id, garage })}
                 style={[
                   styles.garageCard,
                   { backgroundColor: theme.colors.card, borderColor: theme.colors.border }
@@ -429,12 +503,23 @@ export default function SuperAdminGaragesScreen({ navigation }: any) {
 
                   {/* Location & Contact Info Card */}
                   <View style={[styles.infoSection, { backgroundColor: theme.colors.background, borderColor: theme.colors.border }]}>
-                    <Text style={[styles.infoSectionTitle, { color: theme.colors.text }]}>Location & Contact</Text>
+                    <Text style={[styles.infoSectionTitle, { color: theme.colors.text }]}>Location & Coordinates</Text>
                     
                     <View style={styles.infoRow}>
                       <MaterialCommunityIcons name="map-marker" size={16} color="#EF4444" style={styles.infoIcon} />
-                      <Text style={[styles.infoText, { color: theme.colors.text }]}>{selectedGarage.address}</Text>
+                      <Text style={[styles.infoText, { color: theme.colors.text }]}>
+                        {selectedGarage.address}{selectedGarage.city ? `, ${selectedGarage.city}` : ''} {selectedGarage.postcode || ''}
+                      </Text>
                     </View>
+
+                    {(selectedGarage.latitude !== undefined || selectedGarage.longitude !== undefined) && (
+                      <View style={styles.infoRow}>
+                        <MaterialCommunityIcons name="crosshairs-gps" size={16} color="#0284C7" style={styles.infoIcon} />
+                        <Text style={[styles.infoText, { color: theme.colors.placeholder }]}>
+                          GPS: {selectedGarage.latitude || 51.5074}, {selectedGarage.longitude || -0.1278}
+                        </Text>
+                      </View>
+                    )}
 
                     {selectedGarage.phone ? (
                       <View style={styles.infoRow}>
@@ -449,6 +534,120 @@ export default function SuperAdminGaragesScreen({ navigation }: any) {
                         <Text style={[styles.infoText, { color: theme.colors.text }]}>{selectedGarage.email}</Text>
                       </View>
                     ) : null}
+                  </View>
+
+                  {/* MOT Legal Authorization & Verification Credentials */}
+                  <View style={[styles.infoSection, { backgroundColor: theme.colors.background, borderColor: theme.colors.border }]}>
+                    <View style={{ flexDirection: 'row', alignItems: 'center', justifyContent: 'space-between', marginBottom: 10 }}>
+                      <View style={{ flexDirection: 'row', alignItems: 'center' }}>
+                        <MaterialCommunityIcons name="shield-check" size={18} color="#10B981" style={{ marginRight: 6 }} />
+                        <Text style={[styles.infoSectionTitle, { color: theme.colors.text, marginBottom: 0 }]}>
+                          MOT Legal Authorization
+                        </Text>
+                      </View>
+                      <View style={{ backgroundColor: selectedGarage.verificationStatus === 'Verified' ? '#10B98120' : '#F59E0B20', paddingHorizontal: 8, paddingVertical: 2, borderRadius: 6 }}>
+                        <Text style={{ fontSize: 11, fontWeight: '700', color: selectedGarage.verificationStatus === 'Verified' ? '#10B981' : '#F59E0B' }}>
+                          {selectedGarage.verificationStatus || 'Pending Review'}
+                        </Text>
+                      </View>
+                    </View>
+
+                    <View style={{ flexDirection: 'row', flexWrap: 'wrap', gap: 8, marginBottom: 10 }}>
+                      <View style={{ flex: 1, minWidth: 120, backgroundColor: theme.colors.card, padding: 8, borderRadius: 6, borderWidth: 1, borderColor: theme.colors.border }}>
+                        <Text style={{ fontSize: 10, color: theme.colors.placeholder }}>DVLA VTS Site #</Text>
+                        <Text style={{ fontSize: 13, fontWeight: '700', color: theme.colors.text }}>{selectedGarage.vtsNumber || 'VTS-Pending'}</Text>
+                      </View>
+                      <View style={{ flex: 1, minWidth: 120, backgroundColor: theme.colors.card, padding: 8, borderRadius: 6, borderWidth: 1, borderColor: theme.colors.border }}>
+                        <Text style={{ fontSize: 10, color: theme.colors.placeholder }}>MOT AE #</Text>
+                        <Text style={{ fontSize: 13, fontWeight: '700', color: theme.colors.text }}>{selectedGarage.motAuthorisedExaminerNumber || 'AE-Pending'}</Text>
+                      </View>
+                    </View>
+
+                    {selectedGarage.businessRegistrationNumber ? (
+                      <View style={{ backgroundColor: theme.colors.card, padding: 8, borderRadius: 6, borderWidth: 1, borderColor: theme.colors.border, marginBottom: 10 }}>
+                        <Text style={{ fontSize: 10, color: theme.colors.placeholder }}>Companies House / Business Reg #</Text>
+                        <Text style={{ fontSize: 13, fontWeight: '700', color: theme.colors.text }}>{selectedGarage.businessRegistrationNumber}</Text>
+                      </View>
+                    ) : null}
+
+                    {/* Rejection Alert if Rejected */}
+                    {selectedGarage.status === 'Rejected' && (
+                      <View style={{ backgroundColor: '#EF444415', borderWidth: 1, borderColor: '#EF444440', borderRadius: 8, padding: 10, marginBottom: 10 }}>
+                        <View style={{ flexDirection: 'row', alignItems: 'center', marginBottom: 4 }}>
+                          <MaterialCommunityIcons name="alert-circle" size={16} color="#EF4444" style={{ marginRight: 6 }} />
+                          <Text style={{ fontSize: 12, fontWeight: '700', color: '#EF4444' }}>Application Rejected</Text>
+                        </View>
+                        <Text style={{ fontSize: 11, color: theme.colors.text }}>
+                          Reason: {selectedGarage.rejectionReason || 'Documentation or verification criteria not verified.'}
+                        </Text>
+                      </View>
+                    )}
+
+                    {/* Verification Documents List */}
+                    <View style={{ flexDirection: 'row', justifyContent: 'space-between', alignItems: 'center', marginBottom: 6 }}>
+                      <Text style={{ fontSize: 12, fontWeight: '700', color: theme.colors.text }}>
+                        Submitted Certificates ({selectedGarage.verificationDocuments?.length || 0})
+                      </Text>
+                      <Text style={{ fontSize: 10, color: theme.colors.placeholder }}>Tap to inspect & verify</Text>
+                    </View>
+
+                    {(!selectedGarage.verificationDocuments || selectedGarage.verificationDocuments.length === 0) ? (
+                      <Text style={{ fontSize: 11, color: theme.colors.placeholder, marginVertical: 4 }}>No legal certificates attached.</Text>
+                    ) : (
+                      selectedGarage.verificationDocuments.map((doc: any, dIdx: number) => {
+                        const docStatus = doc.status || 'Pending';
+                        const isDocVerified = docStatus === 'Verified';
+                        const isDocRejected = docStatus === 'Rejected';
+
+                        return (
+                          <TouchableOpacity 
+                            key={dIdx} 
+                            onPress={() => handleOpenDocModal(doc)}
+                            style={{ 
+                              flexDirection: 'row', 
+                              alignItems: 'center', 
+                              backgroundColor: theme.colors.card, 
+                              padding: 10, 
+                              borderRadius: 8, 
+                              borderWidth: 1, 
+                              borderColor: isDocVerified ? '#10B98160' : isDocRejected ? '#EF444460' : theme.colors.border, 
+                              marginBottom: 8 
+                            }}
+                          >
+                            <MaterialCommunityIcons 
+                              name="file-certificate" 
+                              size={24} 
+                              color={isDocVerified ? '#10B981' : isDocRejected ? '#EF4444' : '#6366F1'} 
+                              style={{ marginRight: 10 }} 
+                            />
+                            <View style={{ flex: 1 }}>
+                              <Text style={{ fontSize: 13, fontWeight: '700', color: theme.colors.text }}>{doc.name}</Text>
+                              <Text style={{ fontSize: 10.5, color: theme.colors.placeholder, marginTop: 2 }}>
+                                Uploaded: {doc.uploadDate ? new Date(doc.uploadDate).toLocaleDateString() : 'Recent'}
+                              </Text>
+                            </View>
+
+                            <View style={{
+                              paddingHorizontal: 8,
+                              paddingVertical: 3,
+                              borderRadius: 6,
+                              backgroundColor: isDocVerified ? '#10B98120' : isDocRejected ? '#EF444420' : '#F59E0B20',
+                              marginRight: 6
+                            }}>
+                              <Text style={{
+                                fontSize: 10.5,
+                                fontWeight: '700',
+                                color: isDocVerified ? '#10B981' : isDocRejected ? '#EF4444' : '#F59E0B'
+                              }}>
+                                {docStatus}
+                              </Text>
+                            </View>
+
+                            <MaterialCommunityIcons name="chevron-right" size={18} color={theme.colors.placeholder} />
+                          </TouchableOpacity>
+                        );
+                      })
+                    )}
                   </View>
 
                   {/* Operational Details */}
@@ -727,16 +926,261 @@ export default function SuperAdminGaragesScreen({ navigation }: any) {
                       <TouchableOpacity
                         style={[styles.modalActionBtn, { backgroundColor: '#EF444415', borderWidth: 1, borderColor: '#EF4444' }]}
                         disabled={loadingAction}
-                        onPress={() => handleStatusChange(selectedGarage.id || selectedGarage._id || '', 'Rejected', 'Rejected')}
+                        onPress={handleOpenRejectModal}
                       >
                         <MaterialCommunityIcons name="close-circle" size={18} color="#EF4444" />
-                        <Text style={[styles.modalActionBtnText, { color: '#EF4444' }]}>Reject / Blacklist</Text>
+                        <Text style={[styles.modalActionBtnText, { color: '#EF4444' }]}>Reject Application</Text>
                       </TouchableOpacity>
                     )}
                   </View>
                 </ScrollView>
               </>
             )}
+          </View>
+        </View>
+      </Modal>
+
+      {/* ================= MODAL: DOCUMENT INSPECTOR & VERIFIER ================= */}
+      <Modal
+        visible={docModalVisible}
+        transparent
+        animationType="fade"
+        onRequestClose={() => setDocModalVisible(false)}
+      >
+        <View style={styles.modalOverlay}>
+          <View style={[styles.docModalContent, { backgroundColor: theme.colors.card, borderColor: theme.colors.border }]}>
+            <View style={styles.modalHeader}>
+              <View style={{ flexDirection: 'row', alignItems: 'center' }}>
+                <MaterialCommunityIcons name="file-certificate-outline" size={24} color="#6366F1" style={{ marginRight: 8 }} />
+                <Text style={[styles.modalTitle, { color: theme.colors.text }]}>Certificate Inspector</Text>
+              </View>
+              <TouchableOpacity onPress={() => setDocModalVisible(false)}>
+                <MaterialCommunityIcons name="close" size={24} color={theme.colors.placeholder} />
+              </TouchableOpacity>
+            </View>
+
+            {selectedDoc && (
+              <View style={{ marginTop: 12 }}>
+                <Text style={{ fontSize: 16, fontWeight: '800', color: theme.colors.text }}>{selectedDoc.name}</Text>
+                
+                <View style={{ flexDirection: 'row', gap: 8, marginVertical: 8 }}>
+                  <View style={{ 
+                    backgroundColor: selectedDoc.status === 'Verified' ? '#10B98120' : selectedDoc.status === 'Rejected' ? '#EF444420' : '#F59E0B20', 
+                    paddingHorizontal: 10, 
+                    paddingVertical: 4, 
+                    borderRadius: 6 
+                  }}>
+                    <Text style={{ 
+                      fontSize: 11, 
+                      fontWeight: '700', 
+                      color: selectedDoc.status === 'Verified' ? '#10B981' : selectedDoc.status === 'Rejected' ? '#EF4444' : '#F59E0B' 
+                    }}>
+                      Status: {selectedDoc.status || 'Pending'}
+                    </Text>
+                  </View>
+                </View>
+
+                <View style={{ backgroundColor: theme.colors.background, padding: 10, borderRadius: 8, marginVertical: 8 }}>
+                  <Text style={{ fontSize: 11, color: theme.colors.placeholder }}>Certificate File Link / URL:</Text>
+                  <Text style={{ fontSize: 12, color: theme.colors.text, marginTop: 2 }} numberOfLines={2}>
+                    {selectedDoc.fileUrl}
+                  </Text>
+                </View>
+
+                <TouchableOpacity
+                  onPress={() => Linking.openURL(selectedDoc.fileUrl).catch(() => Alert.alert('Certificate Preview', `Viewing: ${selectedDoc.name}\nURL: ${selectedDoc.fileUrl}`))}
+                  style={{ 
+                    flexDirection: 'row', 
+                    alignItems: 'center', 
+                    justifyContent: 'center', 
+                    backgroundColor: theme.colors.primary, 
+                    paddingVertical: 10, 
+                    borderRadius: 8, 
+                    marginVertical: 8 
+                  }}
+                >
+                  <MaterialCommunityIcons name="open-in-new" size={18} color="#FFFFFF" style={{ marginRight: 6 }} />
+                  <Text style={{ color: '#FFFFFF', fontWeight: '700', fontSize: 13 }}>Open & View Document File</Text>
+                </TouchableOpacity>
+
+                <View style={{ flexDirection: 'row', gap: 10, marginTop: 10 }}>
+                  <TouchableOpacity
+                    disabled={docActionLoading}
+                    onPress={() => handleSetDocStatus('Rejected')}
+                    style={{ 
+                      flex: 1, 
+                      flexDirection: 'row', 
+                      alignItems: 'center', 
+                      justifyContent: 'center', 
+                      backgroundColor: '#EF444415', 
+                      borderWidth: 1, 
+                      borderColor: '#EF4444', 
+                      paddingVertical: 10, 
+                      borderRadius: 8 
+                    }}
+                  >
+                    {docActionLoading ? (
+                      <ActivityIndicator size="small" color="#EF4444" />
+                    ) : (
+                      <>
+                        <MaterialCommunityIcons name="close-circle-outline" size={18} color="#EF4444" style={{ marginRight: 4 }} />
+                        <Text style={{ color: '#EF4444', fontWeight: '700', fontSize: 12.5 }}>Reject Doc</Text>
+                      </>
+                    )}
+                  </TouchableOpacity>
+
+                  <TouchableOpacity
+                    disabled={docActionLoading}
+                    onPress={() => handleSetDocStatus('Verified')}
+                    style={{ 
+                      flex: 1, 
+                      flexDirection: 'row', 
+                      alignItems: 'center', 
+                      justifyContent: 'center', 
+                      backgroundColor: '#10B981', 
+                      paddingVertical: 10, 
+                      borderRadius: 8 
+                    }}
+                  >
+                    {docActionLoading ? (
+                      <ActivityIndicator size="small" color="#FFFFFF" />
+                    ) : (
+                      <>
+                        <MaterialCommunityIcons name="check-circle-outline" size={18} color="#FFFFFF" style={{ marginRight: 4 }} />
+                        <Text style={{ color: '#FFFFFF', fontWeight: '700', fontSize: 12.5 }}>Verify Doc</Text>
+                      </>
+                    )}
+                  </TouchableOpacity>
+                </View>
+              </View>
+            )}
+          </View>
+        </View>
+      </Modal>
+
+      {/* ================= MODAL: GARAGE APPLICATION REJECTION ================= */}
+      <Modal
+        visible={rejectModalVisible}
+        transparent
+        animationType="slide"
+        onRequestClose={() => setRejectModalVisible(false)}
+      >
+        <View style={styles.modalOverlay}>
+          <View style={[styles.rejectModalContent, { backgroundColor: theme.colors.card, borderColor: theme.colors.border }]}>
+            <View style={styles.modalHeader}>
+              <View style={{ flexDirection: 'row', alignItems: 'center' }}>
+                <MaterialCommunityIcons name="alert-octagon" size={24} color="#EF4444" style={{ marginRight: 8 }} />
+                <Text style={[styles.modalTitle, { color: theme.colors.text }]}>Reject Application</Text>
+              </View>
+              <TouchableOpacity onPress={() => setRejectModalVisible(false)}>
+                <MaterialCommunityIcons name="close" size={24} color={theme.colors.placeholder} />
+              </TouchableOpacity>
+            </View>
+
+            <Text style={{ fontSize: 12, color: theme.colors.placeholder, marginVertical: 8 }}>
+              Select or specify the regulatory reason for rejection. This reason will be shown to the garage admin upon login.
+            </Text>
+
+            <Text style={{ fontSize: 11, fontWeight: '700', color: theme.colors.text, marginBottom: 6 }}>
+              Quick Common Reasons:
+            </Text>
+
+            <ScrollView style={{ maxHeight: 150 }} showsVerticalScrollIndicator={false}>
+              {REJECTION_PRESETS.map((preset, pIdx) => {
+                const isSelected = selectedPresetReason === preset;
+                return (
+                  <TouchableOpacity
+                    key={pIdx}
+                    onPress={() => {
+                      setSelectedPresetReason(preset);
+                      setRejectionReasonInput(preset);
+                    }}
+                    style={{
+                      flexDirection: 'row',
+                      alignItems: 'center',
+                      backgroundColor: isSelected ? theme.colors.primary + '15' : theme.colors.background,
+                      borderWidth: 1,
+                      borderColor: isSelected ? theme.colors.primary : theme.colors.border,
+                      borderRadius: 6,
+                      padding: 8,
+                      marginBottom: 6
+                    }}
+                  >
+                    <MaterialCommunityIcons 
+                      name={isSelected ? 'radiobox-marked' : 'radiobox-blank'} 
+                      size={16} 
+                      color={isSelected ? theme.colors.primary : theme.colors.placeholder} 
+                      style={{ marginRight: 6 }} 
+                    />
+                    <Text style={{ fontSize: 11.5, color: isSelected ? theme.colors.primary : theme.colors.text, flex: 1 }}>
+                      {preset}
+                    </Text>
+                  </TouchableOpacity>
+                );
+              })}
+            </ScrollView>
+
+            <Text style={{ fontSize: 11, fontWeight: '700', color: theme.colors.text, marginTop: 8, marginBottom: 4 }}>
+              Custom Rejection Note / Guidance:
+            </Text>
+            <TextInput
+              value={rejectionReasonInput}
+              onChangeText={setRejectionReasonInput}
+              placeholder="Provide specific corrective guidance for the garage owner..."
+              placeholderTextColor={theme.colors.placeholder}
+              multiline
+              numberOfLines={3}
+              style={{
+                backgroundColor: theme.colors.background,
+                borderColor: theme.colors.border,
+                borderWidth: 1,
+                borderRadius: 8,
+                padding: 10,
+                fontSize: 12,
+                color: theme.colors.text,
+                height: 70,
+                textAlignVertical: 'top'
+              }}
+            />
+
+            <View style={{ flexDirection: 'row', gap: 10, marginTop: 14 }}>
+              <TouchableOpacity
+                onPress={() => setRejectModalVisible(false)}
+                style={{
+                  flex: 1,
+                  paddingVertical: 10,
+                  borderRadius: 8,
+                  borderWidth: 1,
+                  borderColor: theme.colors.border,
+                  alignItems: 'center'
+                }}
+              >
+                <Text style={{ fontSize: 13, color: theme.colors.placeholder, fontWeight: '700' }}>Cancel</Text>
+              </TouchableOpacity>
+
+              <TouchableOpacity
+                disabled={loadingAction}
+                onPress={handleConfirmRejection}
+                style={{
+                  flex: 1.5,
+                  backgroundColor: '#EF4444',
+                  paddingVertical: 10,
+                  borderRadius: 8,
+                  alignItems: 'center',
+                  justifyContent: 'center',
+                  flexDirection: 'row'
+                }}
+              >
+                {loadingAction ? (
+                  <ActivityIndicator size="small" color="#FFFFFF" />
+                ) : (
+                  <>
+                    <MaterialCommunityIcons name="close-octagon-outline" size={18} color="#FFFFFF" style={{ marginRight: 6 }} />
+                    <Text style={{ fontSize: 13, color: '#FFFFFF', fontWeight: '800' }}>Confirm Rejection</Text>
+                  </>
+                )}
+              </TouchableOpacity>
+            </View>
           </View>
         </View>
       </Modal>
@@ -1141,5 +1585,27 @@ const styles = StyleSheet.create({
     color: '#FFFFFF',
     fontSize: 12,
     fontWeight: 'bold',
+  },
+  docModalContent: {
+    margin: 20,
+    borderRadius: 16,
+    borderWidth: 1,
+    padding: 20,
+    shadowColor: '#000',
+    shadowOffset: { width: 0, height: 4 },
+    shadowOpacity: 0.3,
+    shadowRadius: 8,
+    elevation: 8,
+  },
+  rejectModalContent: {
+    margin: 16,
+    borderRadius: 16,
+    borderWidth: 1,
+    padding: 20,
+    shadowColor: '#000',
+    shadowOffset: { width: 0, height: 4 },
+    shadowOpacity: 0.3,
+    shadowRadius: 8,
+    elevation: 8,
   },
 });
