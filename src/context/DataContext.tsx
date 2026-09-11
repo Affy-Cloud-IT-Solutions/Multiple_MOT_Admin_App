@@ -12,6 +12,8 @@ export interface Customer {
   preferredContact: 'SMS' | 'Email' | 'WhatsApp';
   address?: string;
   createdDate: string;
+  garageId?: string;
+  garageIds?: string[];
 }
 
 export interface Vehicle {
@@ -36,7 +38,7 @@ export interface AlertNotification {
   registrationNumber: string;
   makeModel: string;
   date: string;
-  status: 'Pending' | 'Approved' | 'Acknowledged' | 'Rejected';
+  status: 'Pending' | 'Approved' | 'Acknowledged' | 'Rejected' | 'Completed';
   rejectionReason?: string;
   garageId?: string;
   serviceName?: string;

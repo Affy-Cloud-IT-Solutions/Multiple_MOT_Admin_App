@@ -759,16 +759,24 @@ export default function AdminCustomersScreen({ navigation }: any) {
                           // If they only have 1 active vehicle
                           if (bookableVehicles.length === 1) {
                             const singleVeh = bookableVehicles[0];
-                            const existingBooking = alerts.find(a => 
-                              a.type === 'BOOKED' && 
-                              a.registrationNumber?.toUpperCase() === singleVeh.registrationNumber?.toUpperCase() && 
-                              (a.status === 'Approved' || a.status === 'Pending')
-                            );
+                            const today = new Date();
+                            today.setHours(0, 0, 0, 0);
+
+                            const existingBooking = alerts.find(a => {
+                              if (a.type !== 'BOOKED') return false;
+                              if (a.registrationNumber?.toUpperCase() !== singleVeh.registrationNumber?.toUpperCase()) return false;
+                              if (a.status !== 'Approved' && a.status !== 'Pending') return false;
+                              if (a.date) {
+                                const bDate = new Date(a.date);
+                                if (!isNaN(bDate.getTime()) && bDate < today) return false;
+                              }
+                              return true;
+                            });
 
                             if (existingBooking) {
                               Alert.alert(
                                 'Vehicle Already Booked',
-                                `${singleVeh.registrationNumber} already has an MOT booking (${existingBooking.status === 'Approved' ? 'Confirmed' : 'Pending'}) for ${new Date(existingBooking.date).toLocaleDateString('en-GB', { day: 'numeric', month: 'short' })} at ${existingBooking.slotTime || 'Slot'}.\n\nWould you like to manage/reschedule this booking?`,
+                                `${singleVeh.registrationNumber} already has an upcoming MOT booking (${existingBooking.status === 'Approved' ? 'Confirmed' : 'Pending'}) for ${new Date(existingBooking.date).toLocaleDateString('en-GB', { day: 'numeric', month: 'short' })} at ${existingBooking.slotTime || 'Slot'}.\n\nWould you like to manage/reschedule this booking?`,
                                 [
                                   { text: 'Cancel', style: 'cancel' },
                                   {
@@ -812,11 +820,20 @@ export default function AdminCustomersScreen({ navigation }: any) {
                           Select Vehicle for MOT Booking:
                         </Text>
                         {customerVehicles.filter(v => v.status === 'Active').map(v => {
-                          const existingBooking = alerts.find(a => 
-                            a.type === 'BOOKED' && 
-                            a.registrationNumber?.toUpperCase() === v.registrationNumber?.toUpperCase() && 
-                            (a.status === 'Approved' || a.status === 'Pending')
-                          );
+                          const today = new Date();
+                          today.setHours(0, 0, 0, 0);
+
+                          const existingBooking = alerts.find(a => {
+                            if (a.type !== 'BOOKED') return false;
+                            if (a.registrationNumber?.toUpperCase() !== v.registrationNumber?.toUpperCase()) return false;
+                            if (a.status !== 'Approved' && a.status !== 'Pending') return false;
+                            if (a.date) {
+                              const bDate = new Date(a.date);
+                              if (!isNaN(bDate.getTime()) && bDate < today) return false;
+                            }
+                            return true;
+                          });
+
                           const isBooked = existingBooking?.status === 'Approved';
                           const isPending = existingBooking?.status === 'Pending';
 

@@ -269,19 +269,24 @@ export default function CustomerDetailScreen({ route, navigation }: any) {
                 const isPending = b.status === 'Pending';
                 const isApproved = b.status === 'Approved';
                 const isRejected = b.status === 'Rejected';
+                const isCompleted = b.status === 'Completed';
 
                 let statusText = 'Acknowledged';
                 let statusColor = theme.colors.placeholder;
                 let statusBg = theme.colors.border + '30';
 
-                if (isPending) {
+                if (isCompleted) {
+                  statusText = 'Completed';
+                  statusColor = '#10B981';
+                  statusBg = '#10B98115';
+                } else if (isPending) {
                   statusText = 'Pending';
                   statusColor = theme.colors.warning;
                   statusBg = theme.colors.warning + '15';
                 } else if (isApproved) {
                   statusText = 'Confirmed';
-                  statusColor = theme.colors.success;
-                  statusBg = theme.colors.success + '15';
+                  statusColor = theme.colors.secondary;
+                  statusBg = theme.colors.secondary + '15';
                 } else if (isRejected) {
                   statusText = 'Rejected';
                   statusColor = theme.colors.error;

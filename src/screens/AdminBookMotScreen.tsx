@@ -84,14 +84,26 @@ export default function AdminBookMotScreen({ route, navigation }: any) {
     initialVehicle || (customerVehicles.length > 0 ? customerVehicles[0] : null)
   );
 
-  // Check if selected vehicle already has an active MOT booking
+  // Check if selected vehicle already has an active upcoming MOT booking
   const existingBooking = React.useMemo(() => {
     if (!selectedVehicle?.registrationNumber) return null;
-    return alerts.find(a => 
-      a.type === 'BOOKED' && 
-      a.registrationNumber?.toUpperCase() === selectedVehicle.registrationNumber.toUpperCase() && 
-      (a.status === 'Approved' || a.status === 'Pending')
-    );
+    const today = new Date();
+    today.setHours(0, 0, 0, 0);
+
+    return alerts.find(a => {
+      if (a.type !== 'BOOKED') return false;
+      if (a.registrationNumber?.toUpperCase() !== selectedVehicle.registrationNumber.toUpperCase()) return false;
+      if (a.status !== 'Approved' && a.status !== 'Pending') return false;
+      
+      // Only treat as an existing booking if the booking date is today or in the future
+      if (a.date) {
+        const bDate = new Date(a.date);
+        if (!isNaN(bDate.getTime()) && bDate < today) {
+          return false; // Past booking has completed, ready for fresh booking cycle
+        }
+      }
+      return true;
+    });
   }, [alerts, selectedVehicle]);
 
   const [selectedDate, setSelectedDate] = useState('');

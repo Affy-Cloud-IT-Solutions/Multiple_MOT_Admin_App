@@ -210,12 +210,17 @@ export default function BookedMotsScreen({ navigation }: any) {
                     const isPending = item.status === 'Pending';
                     const isApproved = item.status === 'Approved';
                     const isRejected = item.status === 'Rejected';
+                    const isCompleted = item.status === 'Completed';
 
                     let statusText = 'Acknowledged';
                     let statusColor = theme.colors.placeholder;
                     let statusBg = theme.colors.border + '30';
 
-                    if (isPending) {
+                    if (isCompleted) {
+                      statusText = 'MOT Completed';
+                      statusColor = '#10B981';
+                      statusBg = '#10B98115';
+                    } else if (isPending) {
                       statusText = 'Pending Confirmation';
                       statusColor = theme.colors.warning;
                       statusBg = theme.colors.warning + '15';

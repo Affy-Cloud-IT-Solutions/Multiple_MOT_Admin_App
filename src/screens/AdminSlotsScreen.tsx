@@ -446,7 +446,7 @@ export default function AdminSlotsScreen({ navigation }: any) {
                 {/* Customer Details */}
                 <View style={styles.customerRow}>
                   <MaterialCommunityIcons
-                    name={b.status === 'Approved' ? 'account' : 'account-clock-outline'}
+                    name={b.status === 'Approved' ? 'account-check' : 'account-clock-outline'}
                     size={16}
                     color={b.status === 'Approved' ? theme.colors.text : '#F59E0B'}
                   />
@@ -455,13 +455,13 @@ export default function AdminSlotsScreen({ navigation }: any) {
                       styles.customerNameText,
                       {
                         color: b.status === 'Approved' ? theme.colors.text : '#F59E0B',
-                        fontStyle: b.status === 'Approved' ? 'normal' : 'italic',
+                        fontWeight: '600',
                       },
                     ]}
                   >
-                    {b.status === 'Approved' ? b.customerName : 'Pending Approval'}
+                    {b.customerName || 'Customer'}
                   </Text>
-                  {b.status === 'Approved' && b.customerMobile ? (
+                  {b.customerMobile ? (
                     <TouchableOpacity
                       style={styles.phoneChip}
                       onPress={() => Linking.openURL(`tel:${b.customerMobile}`)}
@@ -469,13 +469,14 @@ export default function AdminSlotsScreen({ navigation }: any) {
                       <MaterialCommunityIcons name="phone" size={12} color="#10B981" />
                       <Text style={styles.phoneChipText}>{b.customerMobile}</Text>
                     </TouchableOpacity>
-                  ) : b.status !== 'Approved' ? (
-                    <View style={{ backgroundColor: '#F59E0B18', paddingHorizontal: 6, paddingVertical: 2, borderRadius: 4, marginLeft: 8 }}>
+                  ) : null}
+                  {b.status !== 'Approved' && (
+                    <View style={{ backgroundColor: '#F59E0B18', paddingHorizontal: 6, paddingVertical: 2, borderRadius: 4, marginLeft: 6 }}>
                       <Text style={{ color: '#F59E0B', fontSize: 10, fontWeight: '700' }}>
-                        Awaiting Approval
+                        Pending
                       </Text>
                     </View>
-                  ) : null}
+                  )}
                 </View>
 
                 {/* Vehicle Make/Model & Service */}
@@ -708,12 +709,12 @@ export default function AdminSlotsScreen({ navigation }: any) {
                                 styles.gridCustName,
                                 {
                                   color: b.status === 'Approved' ? theme.colors.text : '#F59E0B',
-                                  fontStyle: b.status === 'Approved' ? 'normal' : 'italic',
+                                  fontWeight: '600',
                                 },
                               ]}
                               numberOfLines={1}
                             >
-                              {b.status === 'Approved' ? b.customerName : 'Pending Approval'}
+                              {b.customerName || 'Customer'}{b.status !== 'Approved' ? ' (Pending)' : ''}
                             </Text>
                           </View>
                         ))}
