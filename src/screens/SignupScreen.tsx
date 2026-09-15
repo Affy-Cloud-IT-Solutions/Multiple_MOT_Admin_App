@@ -57,6 +57,9 @@ export default function SignupScreen({ navigation }: any) {
   const [latitude, setLatitude] = useState('51.5074');
   const [longitude, setLongitude] = useState('-0.1278');
   const [fetchingGPS, setFetchingGPS] = useState(false);
+  const [locationLink, setLocationLink] = useState('');
+  const [resolvingLink, setResolvingLink] = useState(false);
+  const [lastAutofilledSource, setLastAutofilledSource] = useState<string | null>(null);
   const [images, setImages] = useState<string[]>([
     DEFAULT_SLOT_PRESETS[0].url,
     DEFAULT_SLOT_PRESETS[1].url,
@@ -344,6 +347,161 @@ export default function SignupScreen({ navigation }: any) {
     }
   };
 
+  // Helper: Reverse Geocode and Auto-fill Address, City, Postcode, Lat, Lon
+  const reverseGeocodeAndAutofill = async (lat: number, lon: number, sourceLabel = 'Live GPS') => {
+    const latStr = lat.toFixed(6);
+    const lonStr = lon.toFixed(6);
+    setLatitude(latStr);
+    setLongitude(lonStr);
+
+    let detectedAddress = '';
+    let detectedCity = '';
+    let detectedPostcode = '';
+
+    // 1. Try UK Postcodes API if within UK territory
+    try {
+      const ukPcRes = await fetch(`https://api.postcodes.io/postcodes?lon=${lon}&lat=${lat}`);
+      if (ukPcRes.ok) {
+        const ukPcData = await ukPcRes.json();
+        if (ukPcData.result && ukPcData.result.length > 0) {
+          const match = ukPcData.result[0];
+          if (match.postcode) detectedPostcode = match.postcode;
+          if (match.admin_district || match.parish) detectedCity = match.admin_district || match.parish;
+        }
+      }
+    } catch (e) {
+      // ignore
+    }
+
+    // 2. OpenStreetMap Nominatim for exact street & road address
+    try {
+      const controller = new AbortController();
+      const timeoutId = setTimeout(() => controller.abort(), 4000);
+      const osmRes = await fetch(
+        `https://nominatim.openstreetmap.org/reverse?format=json&lat=${lat}&lon=${lon}&zoom=18&addressdetails=1`,
+        {
+          headers: { 'User-Agent': 'MultipleMOT-AdminApp/1.0' },
+          signal: controller.signal,
+        }
+      );
+      clearTimeout(timeoutId);
+
+      if (osmRes.ok) {
+        const osmData = await osmRes.json();
+        const addr = osmData.address || {};
+
+        // Construct building & road address
+        const streetParts = [
+          addr.house_number || addr.building,
+          addr.road || addr.street || addr.industrial || addr.commercial,
+          addr.neighbourhood || addr.suburb || addr.quarter,
+        ].filter(Boolean);
+
+        if (streetParts.length > 0) {
+          detectedAddress = streetParts.join(', ');
+        } else if (osmData.display_name) {
+          detectedAddress = osmData.display_name.split(',').slice(0, 3).join(',').trim();
+        }
+
+        if (!detectedCity) {
+          detectedCity = addr.city || addr.town || addr.village || addr.municipality || addr.state_district || addr.county || '';
+        }
+
+        if (!detectedPostcode) {
+          detectedPostcode = addr.postcode || '';
+        }
+      }
+    } catch (e) {
+      // ignore
+    }
+
+    // Apply auto-filled fields
+    if (detectedAddress) setAddress(detectedAddress);
+    if (detectedCity) setCity(detectedCity);
+    if (detectedPostcode) setPostcode(detectedPostcode);
+    setLastAutofilledSource(sourceLabel);
+
+    Alert.alert(
+      'Location Auto-Filled',
+      `Details successfully fetched from ${sourceLabel}:\n\n` +
+      `📍 Address: ${detectedAddress || address || 'Coordinates set'}\n` +
+      `🏙️ City: ${detectedCity || city || 'N/A'}\n` +
+      `📮 Postcode: ${detectedPostcode || postcode || 'N/A'}\n` +
+      `🌐 Coordinates: ${latStr}, ${lonStr}`
+    );
+  };
+
+  // Helper: Extract Coordinates from Google Maps / Apple Maps / Raw Coordinates Link
+  const handleExtractFromLocationLink = async () => {
+    const raw = locationLink.trim();
+    if (!raw) {
+      Alert.alert('Empty Link', 'Please paste a Google Maps link, share URL, or latitude/longitude coordinates.');
+      return;
+    }
+
+    setResolvingLink(true);
+    try {
+      let targetText = raw;
+
+      // If shortened URL (e.g. maps.app.goo.gl or goo.gl/maps), try to fetch redirect location
+      if (raw.includes('maps.app.goo.gl') || raw.includes('goo.gl/maps')) {
+        try {
+          const redirectRes = await fetch(raw, { method: 'HEAD' } as any);
+          if (redirectRes.url) {
+            targetText = redirectRes.url;
+          }
+        } catch (e) {
+          // continue with raw
+        }
+      }
+
+      // Regex 1: /@(-?\d+\.\d+),(-?\d+\.\d+)
+      const atMatch = targetText.match(/@(-?\d+\.\d+),(-?\d+\.\d+)/);
+      if (atMatch) {
+        const lat = parseFloat(atMatch[1]);
+        const lon = parseFloat(atMatch[2]);
+        await reverseGeocodeAndAutofill(lat, lon, 'Google Maps Link');
+        return;
+      }
+
+      // Regex 2: [?&](?:q|ll|destination|center)=(-?\d+\.\d+)[,+](-?\d+\.\d+)
+      const qMatch = targetText.match(/[?&](?:q|ll|destination|center|point)=(-?\d+\.\d+)[,+](-?\d+\.\d+)/);
+      if (qMatch) {
+        const lat = parseFloat(qMatch[1]);
+        const lon = parseFloat(qMatch[2]);
+        await reverseGeocodeAndAutofill(lat, lon, 'Maps Link');
+        return;
+      }
+
+      // Regex 3: geo:(-?\d+\.\d+),(-?\d+\.\d+)
+      const geoMatch = targetText.match(/geo:(-?\d+\.\d+),(-?\d+\.\d+)/);
+      if (geoMatch) {
+        const lat = parseFloat(geoMatch[1]);
+        const lon = parseFloat(geoMatch[2]);
+        await reverseGeocodeAndAutofill(lat, lon, 'Geo URI');
+        return;
+      }
+
+      // Regex 4: Direct pair e.g. "51.5014, -0.0910" or "51.5014 -0.0910"
+      const pairMatch = targetText.match(/(-?\d+\.\d{3,})[\s,]+(-?\d+\.\d{3,})/);
+      if (pairMatch) {
+        const lat = parseFloat(pairMatch[1]);
+        const lon = parseFloat(pairMatch[2]);
+        await reverseGeocodeAndAutofill(lat, lon, 'Coordinate Text');
+        return;
+      }
+
+      Alert.alert(
+        'Could Not Parse Link',
+        'Could not find coordinates in this link. Please ensure it is a Google Maps pin link (e.g. maps.google.com/?q=51.5014,-0.0910) or enter Latitude and Longitude directly.'
+      );
+    } catch (err: any) {
+      Alert.alert('Link Error', err.message || 'Failed to process location link.');
+    } finally {
+      setResolvingLink(false);
+    }
+  };
+
   // Live GPS Location Fetcher (Hardware GPS -> UK Postcode Geocoding -> Live Network fallback)
   const handleUseCurrentGPS = async () => {
     setFetchingGPS(true);
@@ -360,7 +518,7 @@ export default function SignupScreen({ navigation }: any) {
                   message: 'Multiple MOT needs access to your GPS to automatically set your garage location.',
                   buttonNeutral: 'Ask Later',
                   buttonNegative: 'Cancel',
-                  buttonPositive: 'OK',
+                  buttonPositive: 'Allow',
                 }
               );
               if (granted !== PermissionsAndroid.RESULTS.GRANTED) {
@@ -375,8 +533,9 @@ export default function SignupScreen({ navigation }: any) {
           // Try native geolocation if linked
           try {
             const Geo = require('@react-native-community/geolocation');
-            if (Geo && Geo.getCurrentPosition) {
-              Geo.getCurrentPosition(
+            const geoInstance = Geo?.default || Geo;
+            if (geoInstance && geoInstance.getCurrentPosition) {
+              geoInstance.getCurrentPosition(
                 (pos: any) => {
                   if (pos && pos.coords) {
                     resolve({
@@ -387,10 +546,10 @@ export default function SignupScreen({ navigation }: any) {
                     resolve(null);
                   }
                 },
-                (err: any) => {
+                () => {
                   resolve(null);
                 },
-                { enableHighAccuracy: true, timeout: 5000, maximumAge: 10000 }
+                { enableHighAccuracy: true, timeout: 7000, maximumAge: 10000 }
               );
               return;
             }
@@ -413,7 +572,7 @@ export default function SignupScreen({ navigation }: any) {
                 }
               },
               () => resolve(null),
-              { enableHighAccuracy: true, timeout: 5000 }
+              { enableHighAccuracy: true, timeout: 6000 }
             );
             return;
           }
@@ -430,77 +589,42 @@ export default function SignupScreen({ navigation }: any) {
       const coords = await tryDeviceGPS();
 
       if (coords && coords.latitude && coords.longitude) {
-        const latStr = coords.latitude.toFixed(6);
-        const lonStr = coords.longitude.toFixed(6);
-        setLatitude(latStr);
-        setLongitude(lonStr);
-
-        // Attempt reverse geocoding to auto-fill UK postcode/city if blank
-        try {
-          const revRes = await fetch(`https://api.postcodes.io/postcodes?lon=${coords.longitude}&lat=${coords.latitude}`);
-          if (revRes.ok) {
-            const revData = await revRes.json();
-            if (revData.result && revData.result.length > 0) {
-              const matched = revData.result[0];
-              if (matched.postcode && !postcode.trim()) setPostcode(matched.postcode);
-              if (matched.admin_district && (!city.trim() || city === 'London')) setCity(matched.admin_district);
-            }
-          }
-        } catch (revErr) {
-          // ignore reverse geocoding error
-        }
-
-        Alert.alert('Live GPS Detected', `Exact coordinates placed automatically:\nLatitude: ${latStr}\nLongitude: ${lonStr}`);
+        await reverseGeocodeAndAutofill(coords.latitude, coords.longitude, 'Live Device GPS');
         return;
       }
 
-      // 2. Fallback: If user has entered a UK postcode
+      // 2. Fallback: Live IP / Network Geolocation via ipwho.is
+      try {
+        const ipRes = await fetch('https://ipwho.is/');
+        if (ipRes.ok) {
+          const ipData = await ipRes.json();
+          if (ipData.success !== false && ipData.latitude && ipData.longitude) {
+            await reverseGeocodeAndAutofill(Number(ipData.latitude), Number(ipData.longitude), 'Live Network Location');
+            return;
+          }
+        }
+      } catch (ipErr) {
+        // ignore
+      }
+
+      // 3. Fallback: If user has entered a UK postcode
       if (postcode.trim()) {
         const cleanPostcode = postcode.trim().replace(/\s+/g, '');
         const pcRes = await fetch(`https://api.postcodes.io/postcodes/${cleanPostcode}`);
         if (pcRes.ok) {
           const pcData = await pcRes.json();
           if (pcData.result) {
-            const latStr = pcData.result.latitude.toFixed(6);
-            const lonStr = pcData.result.longitude.toFixed(6);
-            setLatitude(latStr);
-            setLongitude(lonStr);
-            if (pcData.result.admin_district && (!city.trim() || city === 'London')) {
-              setCity(pcData.result.admin_district);
-            }
-            Alert.alert('Postcode Location Set', `Exact UK GPS coordinates fetched for ${postcode.toUpperCase()}:\nLatitude: ${latStr}\nLongitude: ${lonStr}`);
+            await reverseGeocodeAndAutofill(pcData.result.latitude, pcData.result.longitude, `UK Postcode (${postcode.toUpperCase()})`);
             return;
           }
         }
       }
 
-      // 3. Fallback: Live IP / Network Geolocation
-      const ipRes = await fetch('https://ipapi.co/json/');
-      if (ipRes.ok) {
-        const ipData = await ipRes.json();
-        if (ipData.latitude && ipData.longitude) {
-          const latStr = Number(ipData.latitude).toFixed(6);
-          const lonStr = Number(ipData.longitude).toFixed(6);
-          setLatitude(latStr);
-          setLongitude(lonStr);
-          if (ipData.city && (!city.trim() || city === 'London')) {
-            setCity(ipData.city);
-          }
-          if (ipData.postal && !postcode.trim()) {
-            setPostcode(ipData.postal);
-          }
-          Alert.alert('Live Network Location Set', `Coordinates fetched from current live connection:\nLatitude: ${latStr}\nLongitude: ${lonStr}`);
-          return;
-        }
-      }
-
       // 4. Default fallback if all offline
-      setLatitude('51.507400');
-      setLongitude('-0.127800');
-      Alert.alert('Default UK Coordinates', 'Could not detect live GPS signal. Default UK coordinates applied.');
+      await reverseGeocodeAndAutofill(51.5074, -0.1278, 'London Default');
     } catch (finalErr: any) {
       console.error('GPS lookup error:', finalErr);
-      Alert.alert('Location Notice', 'Could not retrieve live GPS location. You can enter Latitude and Longitude manually.');
+      Alert.alert('Location Notice', 'Could not retrieve live GPS location. You can paste a Google Maps link or enter address manually.');
     } finally {
       setFetchingGPS(false);
     }
@@ -836,6 +960,85 @@ export default function SignupScreen({ navigation }: any) {
             <View>
               <Text style={[styles.sectionHeading, { color: theme.colors.text }]}>Garage Location & GPS</Text>
               
+              {/* Smart Auto-Fill Location Options Card */}
+              <View style={[styles.autofillCard, { backgroundColor: theme.colors.card, borderColor: theme.colors.border }]}>
+                <View style={styles.autofillHeader}>
+                  <MaterialCommunityIcons name="map-marker-radius" size={20} color={theme.colors.primary} style={{ marginRight: 6 }} />
+                  <Text style={[styles.autofillTitle, { color: theme.colors.text }]}>Smart Location Auto-Fill</Text>
+                </View>
+                <Text style={[styles.autofillSubtitle, { color: theme.colors.placeholder }]}>
+                  Auto-fill street address, city, postcode and exact coordinates from your live GPS or by pasting a Google Maps link.
+                </Text>
+
+                {/* Option 1: Live GPS Button */}
+                <TouchableOpacity
+                  onPress={handleUseCurrentGPS}
+                  disabled={fetchingGPS || resolvingLink}
+                  style={[styles.liveGpsBtn, { backgroundColor: theme.colors.primary, opacity: (fetchingGPS || resolvingLink) ? 0.7 : 1 }]}
+                >
+                  {fetchingGPS ? (
+                    <ActivityIndicator size="small" color="#FFFFFF" style={{ marginRight: 8 }} />
+                  ) : (
+                    <MaterialCommunityIcons name="crosshairs-gps" size={18} color="#FFFFFF" style={{ marginRight: 8 }} />
+                  )}
+                  <Text style={styles.liveGpsBtnText}>
+                    {fetchingGPS ? 'Detecting & Auto-Filling...' : 'Auto-Fill from Live GPS Location'}
+                  </Text>
+                </TouchableOpacity>
+
+                {/* OR Divider */}
+                <View style={styles.orDividerRow}>
+                  <View style={[styles.orDividerLine, { backgroundColor: theme.colors.border }]} />
+                  <Text style={[styles.orDividerText, { color: theme.colors.placeholder }]}>OR PASTE MAPS LINK</Text>
+                  <View style={[styles.orDividerLine, { backgroundColor: theme.colors.border }]} />
+                </View>
+
+                {/* Option 2: Paste Google Maps Link */}
+                <View style={styles.linkInputRow}>
+                  <View style={[styles.linkInputContainer, { borderColor: theme.colors.border, backgroundColor: theme.colors.background }]}>
+                    <MaterialCommunityIcons name="link-variant" size={18} color={theme.colors.placeholder} style={{ marginRight: 6 }} />
+                    <TextInput
+                      value={locationLink}
+                      onChangeText={setLocationLink}
+                      placeholder="Paste Google Maps URL or coordinates..."
+                      placeholderTextColor={theme.colors.placeholder}
+                      style={[styles.linkInput, { color: theme.colors.text }]}
+                      autoCapitalize="none"
+                    />
+                    {locationLink.length > 0 && (
+                      <TouchableOpacity onPress={() => setLocationLink('')} style={{ padding: 4 }}>
+                        <MaterialCommunityIcons name="close-circle" size={16} color={theme.colors.placeholder} />
+                      </TouchableOpacity>
+                    )}
+                  </View>
+
+                  <TouchableOpacity
+                    onPress={handleExtractFromLocationLink}
+                    disabled={fetchingGPS || resolvingLink}
+                    style={[styles.linkFetchBtn, { backgroundColor: theme.colors.secondary, opacity: (fetchingGPS || resolvingLink) ? 0.7 : 1 }]}
+                  >
+                    {resolvingLink ? (
+                      <ActivityIndicator size="small" color="#FFFFFF" />
+                    ) : (
+                      <>
+                        <MaterialCommunityIcons name="cloud-download-outline" size={16} color="#FFFFFF" style={{ marginRight: 4 }} />
+                        <Text style={styles.linkFetchBtnText}>Auto-Fill</Text>
+                      </>
+                    )}
+                  </TouchableOpacity>
+                </View>
+
+                {/* Success pill if auto-filled */}
+                {lastAutofilledSource && (
+                  <View style={[styles.autofillSuccessBanner, { backgroundColor: '#10B98115', borderColor: '#10B98140' }]}>
+                    <MaterialCommunityIcons name="check-circle" size={14} color="#10B981" style={{ marginRight: 6 }} />
+                    <Text style={styles.autofillSuccessText} numberOfLines={1}>
+                      Auto-filled via {lastAutofilledSource}
+                    </Text>
+                  </View>
+                )}
+              </View>
+
               <Text style={[styles.inputLabel, { color: theme.colors.text }]}>Street Address *</Text>
               <View style={[styles.inputContainer, { borderColor: theme.colors.border, backgroundColor: theme.colors.background }]}>
                 <MaterialCommunityIcons name="map-marker-outline" size={20} color={theme.colors.placeholder} style={styles.inputIcon} />
@@ -880,9 +1083,9 @@ export default function SignupScreen({ navigation }: any) {
 
               {/* Coordinates Section */}
               <View style={{ flexDirection: 'row', justifyContent: 'space-between', alignItems: 'center', marginTop: 4 }}>
-                <Text style={[styles.inputLabel, { color: theme.colors.text, marginBottom: 0 }]}>Live GPS Coordinates *</Text>
+                <Text style={[styles.inputLabel, { color: theme.colors.text, marginBottom: 0 }]}>GPS Coordinates *</Text>
                 <Text style={{ fontSize: 10, color: theme.colors.primary, fontWeight: '600' }}>
-                  {fetchingGPS ? 'Locating...' : 'Tap GPS or enter Postcode'}
+                  {fetchingGPS ? 'Locating...' : 'Auto-filled or manual'}
                 </Text>
               </View>
 
@@ -927,6 +1130,7 @@ export default function SignupScreen({ navigation }: any) {
                   )}
                 </TouchableOpacity>
               </View>
+
 
               <View style={styles.divider} />
 
@@ -1685,5 +1889,106 @@ const styles = StyleSheet.create({
   modalInfoValue: {
     fontSize: 12,
     fontWeight: '600',
+  },
+  autofillCard: {
+    borderWidth: 1,
+    borderRadius: 12,
+    padding: 14,
+    marginBottom: 16,
+    elevation: 1,
+    shadowColor: '#000',
+    shadowOffset: { width: 0, height: 1 },
+    shadowOpacity: 0.05,
+    shadowRadius: 2,
+  },
+  autofillHeader: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    marginBottom: 4,
+  },
+  autofillTitle: {
+    fontSize: 14,
+    fontWeight: 'bold',
+  },
+  autofillSubtitle: {
+    fontSize: 11.5,
+    lineHeight: 16,
+    marginBottom: 12,
+  },
+  liveGpsBtn: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    justifyContent: 'center',
+    paddingVertical: 11,
+    borderRadius: 8,
+    elevation: 1,
+  },
+  liveGpsBtnText: {
+    color: '#FFFFFF',
+    fontSize: 13,
+    fontWeight: 'bold',
+  },
+  orDividerRow: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    marginVertical: 12,
+  },
+  orDividerLine: {
+    flex: 1,
+    height: 1,
+  },
+  orDividerText: {
+    fontSize: 10,
+    fontWeight: '700',
+    marginHorizontal: 8,
+    letterSpacing: 0.5,
+  },
+  linkInputRow: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    gap: 8,
+  },
+  linkInputContainer: {
+    flex: 1,
+    flexDirection: 'row',
+    alignItems: 'center',
+    borderWidth: 1,
+    borderRadius: 8,
+    paddingHorizontal: 10,
+    height: 42,
+  },
+  linkInput: {
+    flex: 1,
+    fontSize: 12,
+    height: '100%',
+    paddingVertical: 0,
+  },
+  linkFetchBtn: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    justifyContent: 'center',
+    paddingHorizontal: 14,
+    height: 42,
+    borderRadius: 8,
+  },
+  linkFetchBtnText: {
+    color: '#FFFFFF',
+    fontSize: 12,
+    fontWeight: 'bold',
+  },
+  autofillSuccessBanner: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    marginTop: 10,
+    paddingHorizontal: 10,
+    paddingVertical: 6,
+    borderRadius: 6,
+    borderWidth: 1,
+  },
+  autofillSuccessText: {
+    color: '#10B981',
+    fontSize: 11,
+    fontWeight: '700',
+    flex: 1,
   },
 });
