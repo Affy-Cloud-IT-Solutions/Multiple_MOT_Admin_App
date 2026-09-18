@@ -86,6 +86,10 @@ export default function AdminSlotsScreen({ navigation }: any) {
 
   const garageId = user?.garageId;
 
+  // Current calendar view month/year navigation (unlimited years ahead e.g. 2026, 2027, 2028...)
+  const [currentViewDate, setCurrentViewDate] = useState<Date>(new Date());
+  const [calendarExpanded, setCalendarExpanded] = useState<boolean>(true);
+
   // Selected date in DD-MM-YYYY format (default today)
   const [selectedDate, setSelectedDate] = useState<string>(() =>
     formatToDDMMYYYY(new Date())
@@ -103,8 +107,51 @@ export default function AdminSlotsScreen({ navigation }: any) {
   // Action loading for slot block/unblock
   const [processingSlot, setProcessingSlot] = useState<string | null>(null);
 
-  // Generate next 14 days in DD-MM-YYYY format for the date strip
+  const monthNames = [
+    'January', 'February', 'March', 'April', 'May', 'June',
+    'July', 'August', 'September', 'October', 'November', 'December'
+  ];
+
+  // Month navigation (allows inspecting 2026, 2027, 2028, or historical dates)
+  const handlePrevMonth = () => {
+    setCurrentViewDate((prev) => new Date(prev.getFullYear(), prev.getMonth() - 1, 1));
+  };
+
+  const handleNextMonth = () => {
+    setCurrentViewDate((prev) => new Date(prev.getFullYear(), prev.getMonth() + 1, 1));
+  };
+
+  const handleJumpToToday = () => {
+    const today = new Date();
+    setCurrentViewDate(today);
+    setSelectedDate(formatToDDMMYYYY(today));
+  };
+
+  // Generate days grid for current viewed month
+  const calendarDays = useMemo(() => {
+    const year = currentViewDate.getFullYear();
+    const month = currentViewDate.getMonth();
+    const firstDayIndex = new Date(year, month, 1).getDay(); // 0 = Sun, 1 = Mon...
+    const lastDate = new Date(year, month + 1, 0).getDate();
+
+    const days: (Date | null)[] = [];
+    // Leading empty slots
+    for (let i = 0; i < firstDayIndex; i++) {
+      days.push(null);
+    }
+    // Days of the month
+    for (let d = 1; d <= lastDate; d++) {
+      days.push(new Date(year, month, d));
+    }
+    return days;
+  }, [currentViewDate]);
+
+  // Generate 31 dynamic days for the quick horizontal strip based on the current view month
   const dateOptions = useMemo(() => {
+    const year = currentViewDate.getFullYear();
+    const month = currentViewDate.getMonth();
+    const lastDate = new Date(year, month + 1, 0).getDate();
+
     const dates: {
       dateStr: string;
       dayName: string;
@@ -112,19 +159,17 @@ export default function AdminSlotsScreen({ navigation }: any) {
       month: string;
       year: number;
     }[] = [];
-    const today = new Date();
-    for (let i = 0; i < 14; i++) {
-      const d = new Date(today);
-      d.setDate(today.getDate() + i);
-      const dateStr = formatToDDMMYYYY(d);
-      const dayName = d.toLocaleDateString('en-GB', { weekday: 'short' });
-      const dayNum = d.getDate();
-      const month = d.toLocaleDateString('en-GB', { month: 'short' });
-      const year = d.getFullYear();
-      dates.push({ dateStr, dayName, dayNum, month, year });
+
+    for (let d = 1; d <= lastDate; d++) {
+      const dt = new Date(year, month, d);
+      const dateStr = formatToDDMMYYYY(dt);
+      const dayName = dt.toLocaleDateString('en-GB', { weekday: 'short' });
+      const dayNum = dt.getDate();
+      const monthStr = dt.toLocaleDateString('en-GB', { month: 'short' });
+      dates.push({ dateStr, dayName, dayNum, month: monthStr, year });
     }
     return dates;
-  }, []);
+  }, [currentViewDate]);
 
   const fetchSlots = useCallback(async () => {
     if (!garageId) {
@@ -290,71 +335,200 @@ export default function AdminSlotsScreen({ navigation }: any) {
         </TouchableOpacity>
       </View>
 
-      {/* Date Selector Strip (Day-Month-Year format) */}
-      <View style={styles.dateStripContainer}>
-        <View style={styles.dateStripHeader}>
-          <Text style={[styles.dateStripLabel, { color: theme.colors.text }]}>
-            Select Date (DD-MM-YYYY):
-          </Text>
-          <View style={[styles.currentDateBadge, { backgroundColor: theme.colors.primary + '15' }]}>
-            <MaterialCommunityIcons name="calendar" size={14} color={theme.colors.primary} />
-            <Text style={[styles.currentDateBadgeText, { color: theme.colors.primary }]}>
-              {selectedDate}
+      {/* Interactive Full Calendar & Date Picker Card */}
+      <View style={[styles.calendarCard, { backgroundColor: theme.colors.card, borderColor: theme.colors.border }]}>
+        {/* Calendar Month & Year Controls */}
+        <View style={styles.calendarHeader}>
+          <TouchableOpacity onPress={handlePrevMonth} style={[styles.calNavBtn, { backgroundColor: theme.colors.background, borderColor: theme.colors.border }]}>
+            <MaterialCommunityIcons name="chevron-left" size={24} color={theme.colors.text} />
+          </TouchableOpacity>
+
+          <View style={styles.calTitleBox}>
+            <Text style={[styles.calendarTitle, { color: theme.colors.text }]}>
+              {monthNames[currentViewDate.getMonth()]} {currentViewDate.getFullYear()}
+            </Text>
+            <Text style={[styles.calSubTitle, { color: theme.colors.placeholder }]}>
+              Tap any date to load slots & bookings
             </Text>
           </View>
+
+          <TouchableOpacity onPress={handleNextMonth} style={[styles.calNavBtn, { backgroundColor: theme.colors.background, borderColor: theme.colors.border }]}>
+            <MaterialCommunityIcons name="chevron-right" size={24} color={theme.colors.text} />
+          </TouchableOpacity>
         </View>
 
-        <ScrollView horizontal showsHorizontalScrollIndicator={false} contentContainerStyle={styles.dateStrip}>
-          {dateOptions.map((item) => {
-            const isSelected = item.dateStr === selectedDate;
-            return (
-              <TouchableOpacity
-                key={item.dateStr}
-                style={[
-                  styles.datePill,
-                  {
-                    backgroundColor: isSelected ? theme.colors.primary : theme.colors.card,
-                    borderColor: isSelected ? theme.colors.primary : theme.colors.border,
-                  },
-                ]}
-                onPress={() => setSelectedDate(item.dateStr)}
-              >
+        {/* Quick Toolbar: Today & Toggle */}
+        <View style={styles.calToolbarRow}>
+          <TouchableOpacity
+            style={[styles.todayQuickBtn, { backgroundColor: theme.colors.primary + '18', borderColor: theme.colors.primary + '40' }]}
+            onPress={handleJumpToToday}
+          >
+            <MaterialCommunityIcons name="calendar-today" size={14} color={theme.colors.primary} />
+            <Text style={[styles.todayQuickBtnText, { color: theme.colors.primary }]}>Jump to Today</Text>
+          </TouchableOpacity>
+
+          <View style={[styles.activeDateTag, { backgroundColor: theme.colors.background, borderColor: theme.colors.border }]}>
+            <MaterialCommunityIcons name="calendar-check" size={14} color="#10B981" />
+            <Text style={[styles.activeDateTagText, { color: theme.colors.text }]}>
+              Active: <Text style={{ fontWeight: '800', color: theme.colors.primary }}>{selectedDate}</Text>
+            </Text>
+          </View>
+
+          <TouchableOpacity
+            style={[styles.expandToggleBtn, { backgroundColor: theme.colors.background, borderColor: theme.colors.border }]}
+            onPress={() => setCalendarExpanded(!calendarExpanded)}
+          >
+            <MaterialCommunityIcons
+              name={calendarExpanded ? 'chevron-up' : 'calendar-month'}
+              size={16}
+              color={theme.colors.text}
+            />
+            <Text style={[styles.expandToggleText, { color: theme.colors.text }]}>
+              {calendarExpanded ? 'Hide' : 'Grid'}
+            </Text>
+          </TouchableOpacity>
+        </View>
+
+        {/* Month Calendar Grid (7 columns: Sun - Sat) */}
+        {calendarExpanded && (
+          <View style={styles.calGridContainer}>
+            {/* Weekday labels */}
+            <View style={styles.weekdayRow}>
+              {['Sun', 'Mon', 'Tue', 'Wed', 'Thu', 'Fri', 'Sat'].map((d, index) => (
                 <Text
+                  key={d}
                   style={[
-                    styles.datePillDay,
-                    { color: isSelected ? '#FFFFFF' : theme.colors.placeholder },
+                    styles.weekdayText,
+                    { color: index === 0 ? '#EF4444' : theme.colors.placeholder }
                   ]}
                 >
-                  {item.dayName}
+                  {d}
                 </Text>
-                <Text
+              ))}
+            </View>
+
+            {/* Days Grid */}
+            <View style={styles.daysGrid}>
+              {calendarDays.map((day, idx) => {
+                if (!day) {
+                  return <View key={`empty-${idx}`} style={styles.dayCell} />;
+                }
+
+                const dateStr = formatToDDMMYYYY(day);
+                const isSelected = selectedDate === dateStr;
+                const todayObj = new Date();
+                const isToday =
+                  day.getDate() === todayObj.getDate() &&
+                  day.getMonth() === todayObj.getMonth() &&
+                  day.getFullYear() === todayObj.getFullYear();
+                const isSunday = day.getDay() === 0;
+
+                return (
+                  <View key={dateStr} style={styles.dayCell}>
+                    <TouchableOpacity
+                      onPress={() => setSelectedDate(dateStr)}
+                      style={[
+                        styles.dayBtn,
+                        {
+                          backgroundColor: isSelected
+                            ? theme.colors.primary
+                            : isToday
+                            ? theme.colors.primary + '18'
+                            : 'transparent',
+                          borderColor: isSelected
+                            ? theme.colors.primary
+                            : isToday
+                            ? theme.colors.primary
+                            : theme.colors.border + '60',
+                          borderWidth: isSelected || isToday ? 1.5 : 1,
+                        }
+                      ]}
+                    >
+                      <Text
+                        style={[
+                          styles.dayText,
+                          {
+                            color: isSelected
+                              ? '#FFFFFF'
+                              : isSunday
+                              ? '#EF4444'
+                              : isToday
+                              ? theme.colors.primary
+                              : theme.colors.text,
+                            fontWeight: isSelected || isToday ? '800' : '600',
+                          }
+                        ]}
+                      >
+                        {day.getDate()}
+                      </Text>
+                      {isToday && !isSelected && (
+                        <View style={[styles.todayDot, { backgroundColor: theme.colors.primary }]} />
+                      )}
+                    </TouchableOpacity>
+                  </View>
+                );
+              })}
+            </View>
+          </View>
+        )}
+
+        {/* Quick Horizontal Date Strip for rapid 1-tap swiping */}
+        <View style={styles.monthStripWrapper}>
+          <Text style={[styles.monthStripLabel, { color: theme.colors.placeholder }]}>
+            {monthNames[currentViewDate.getMonth()]} Days:
+          </Text>
+          <ScrollView horizontal showsHorizontalScrollIndicator={false} contentContainerStyle={styles.dateStrip}>
+            {dateOptions.map((item) => {
+              const isSelected = item.dateStr === selectedDate;
+              return (
+                <TouchableOpacity
+                  key={item.dateStr}
                   style={[
-                    styles.datePillNum,
-                    { color: isSelected ? '#FFFFFF' : theme.colors.text },
+                    styles.datePill,
+                    {
+                      backgroundColor: isSelected ? theme.colors.primary : theme.colors.background,
+                      borderColor: isSelected ? theme.colors.primary : theme.colors.border,
+                    },
                   ]}
+                  onPress={() => setSelectedDate(item.dateStr)}
                 >
-                  {item.dayNum}
-                </Text>
-                <Text
-                  style={[
-                    styles.datePillMonth,
-                    { color: isSelected ? '#FFFFFF' : theme.colors.placeholder },
-                  ]}
-                >
-                  {item.month}
-                </Text>
-                <Text
-                  style={[
-                    styles.datePillYear,
-                    { color: isSelected ? '#FFFFFFcc' : theme.colors.placeholder },
-                  ]}
-                >
-                  {item.year}
-                </Text>
-              </TouchableOpacity>
-            );
-          })}
-        </ScrollView>
+                  <Text
+                    style={[
+                      styles.datePillDay,
+                      { color: isSelected ? '#FFFFFF' : theme.colors.placeholder },
+                    ]}
+                  >
+                    {item.dayName}
+                  </Text>
+                  <Text
+                    style={[
+                      styles.datePillNum,
+                      { color: isSelected ? '#FFFFFF' : theme.colors.text },
+                    ]}
+                  >
+                    {item.dayNum}
+                  </Text>
+                  <Text
+                    style={[
+                      styles.datePillMonth,
+                      { color: isSelected ? '#FFFFFF' : theme.colors.placeholder },
+                    ]}
+                  >
+                    {item.month}
+                  </Text>
+                  <Text
+                    style={[
+                      styles.datePillYear,
+                      { color: isSelected ? '#FFFFFFcc' : theme.colors.placeholder },
+                    ]}
+                  >
+                    {item.year}
+                  </Text>
+                </TouchableOpacity>
+              );
+            })}
+          </ScrollView>
+        </View>
       </View>
 
       {/* SECTION 1: TODAY'S BOOKINGS & WHOSE VEHICLES (Summary Banner) */}
@@ -910,61 +1084,171 @@ const styles = StyleSheet.create({
     alignItems: 'center',
     justifyContent: 'center',
   },
-  dateStripContainer: {
+  calendarCard: {
+    marginHorizontal: 20,
+    borderRadius: 16,
+    borderWidth: 1,
+    padding: 16,
     marginBottom: 16,
   },
-  dateStripHeader: {
+  calendarHeader: {
     flexDirection: 'row',
     justifyContent: 'space-between',
     alignItems: 'center',
-    paddingHorizontal: 20,
-    marginBottom: 8,
+    marginBottom: 12,
   },
-  dateStripLabel: {
-    fontSize: 13,
-    fontWeight: '600',
-  },
-  currentDateBadge: {
-    flexDirection: 'row',
-    alignItems: 'center',
-    gap: 4,
-    paddingHorizontal: 8,
-    paddingVertical: 3,
-    borderRadius: 6,
-  },
-  currentDateBadgeText: {
-    fontSize: 12,
-    fontWeight: '700',
-  },
-  dateStrip: {
-    paddingHorizontal: 20,
-    gap: 10,
-  },
-  datePill: {
-    width: 66,
-    height: 82,
-    borderRadius: 14,
+  calNavBtn: {
+    width: 38,
+    height: 38,
+    borderRadius: 10,
     borderWidth: 1,
     alignItems: 'center',
     justifyContent: 'center',
-    paddingVertical: 5,
+  },
+  calTitleBox: {
+    alignItems: 'center',
+  },
+  calendarTitle: {
+    fontSize: 17,
+    fontWeight: '800',
+    letterSpacing: -0.2,
+  },
+  calSubTitle: {
+    fontSize: 11,
+    marginTop: 1,
+  },
+  calToolbarRow: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    justifyContent: 'space-between',
+    gap: 8,
+    marginBottom: 12,
+    flexWrap: 'wrap',
+  },
+  todayQuickBtn: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    gap: 4,
+    paddingHorizontal: 10,
+    paddingVertical: 6,
+    borderRadius: 8,
+    borderWidth: 1,
+  },
+  todayQuickBtnText: {
+    fontSize: 12,
+    fontWeight: '700',
+  },
+  activeDateTag: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    gap: 5,
+    paddingHorizontal: 10,
+    paddingVertical: 6,
+    borderRadius: 8,
+    borderWidth: 1,
+  },
+  activeDateTagText: {
+    fontSize: 12,
+  },
+  expandToggleBtn: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    gap: 3,
+    paddingHorizontal: 8,
+    paddingVertical: 6,
+    borderRadius: 8,
+    borderWidth: 1,
+  },
+  expandToggleText: {
+    fontSize: 11.5,
+    fontWeight: '600',
+  },
+  calGridContainer: {
+    marginBottom: 12,
+  },
+  weekdayRow: {
+    flexDirection: 'row',
+    justifyContent: 'space-between',
+    paddingBottom: 6,
+    borderBottomWidth: 1,
+    borderBottomColor: '#E5E7EB20',
+    marginBottom: 8,
+  },
+  weekdayText: {
+    width: '14.28%',
+    textAlign: 'center',
+    fontSize: 12,
+    fontWeight: '700',
+    textTransform: 'uppercase',
+  },
+  daysGrid: {
+    flexDirection: 'row',
+    flexWrap: 'wrap',
+  },
+  dayCell: {
+    width: '14.28%',
+    aspectRatio: 1,
+    alignItems: 'center',
+    justifyContent: 'center',
+    marginVertical: 2,
+  },
+  dayBtn: {
+    width: 36,
+    height: 36,
+    borderRadius: 18,
+    alignItems: 'center',
+    justifyContent: 'center',
+  },
+  dayText: {
+    fontSize: 13,
+  },
+  todayDot: {
+    width: 4,
+    height: 4,
+    borderRadius: 2,
+    position: 'absolute',
+    bottom: 3,
+  },
+  monthStripWrapper: {
+    borderTopWidth: 1,
+    borderTopColor: '#E5E7EB20',
+    paddingTop: 10,
+  },
+  monthStripLabel: {
+    fontSize: 11,
+    fontWeight: '700',
+    textTransform: 'uppercase',
+    letterSpacing: 0.5,
+    marginBottom: 8,
+  },
+  dateStrip: {
+    gap: 8,
+  },
+  datePill: {
+    width: 60,
+    height: 74,
+    borderRadius: 12,
+    borderWidth: 1,
+    alignItems: 'center',
+    justifyContent: 'center',
+    paddingVertical: 4,
   },
   datePillDay: {
-    fontSize: 11,
+    fontSize: 10.5,
     fontWeight: '600',
     textTransform: 'uppercase',
   },
   datePillNum: {
-    fontSize: 18,
-    fontWeight: '700',
+    fontSize: 16,
+    fontWeight: '800',
     marginVertical: 1,
   },
   datePillMonth: {
-    fontSize: 10.5,
+    fontSize: 10,
     fontWeight: '600',
   },
   datePillYear: {
-    fontSize: 9.5,
+    fontSize: 9,
     marginTop: 1,
   },
   bookingSummaryCard: {

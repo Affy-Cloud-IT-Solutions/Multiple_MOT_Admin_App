@@ -74,15 +74,9 @@ export default function SignupScreen({ navigation }: any) {
   const [vtsNumber, setVtsNumber] = useState(''); // e.g. VTS-104928
   const [motAuthorisedExaminerNumber, setMotAuthorisedExaminerNumber] = useState(''); // e.g. AE-884920
   const [businessRegistrationNumber, setBusinessRegistrationNumber] = useState(''); // e.g. GB-9928174
-  const [verificationDocuments, setVerificationDocuments] = useState<any[]>([
-    { name: 'DVLA MOT Authorisation Certificate', fileUrl: 'https://mot-reminders.co.uk/docs/sample_mot_cert.pdf', documentType: 'MOT Certificate', status: 'Pending' },
-    { name: 'Public Liability Insurance Certificate', fileUrl: 'https://mot-reminders.co.uk/docs/sample_liability_insurance.pdf', documentType: 'Public Liability Insurance', status: 'Pending' },
-    { name: 'Local Council Trade License', fileUrl: 'https://mot-reminders.co.uk/docs/sample_trade_license.pdf', documentType: 'Trade Licence', status: 'Pending' }
-  ]);
-  const [newDocName, setNewDocName] = useState('');
-  const [newDocUrl, setNewDocUrl] = useState('');
-  const [selectedDocType, setSelectedDocType] = useState('MOT Certificate');
-  const [uploadingDoc, setUploadingDoc] = useState(false);
+  const [verificationDocuments, setVerificationDocuments] = useState<any[]>([]);
+  const [additionalDocName, setAdditionalDocName] = useState('');
+  const [uploadingDocType, setUploadingDocType] = useState<string | null>(null);
   const [legalDeclaration, setLegalDeclaration] = useState(false);
 
   // Status & Navigation states
@@ -189,16 +183,15 @@ export default function SignupScreen({ navigation }: any) {
     }
   };
 
-  // Device Document Picker (PDF / DOC / Image certificates)
-  const handlePickDocumentFromDevice = async () => {
+  // Dedicated Document Upload Handler for specific license / certificate slot
+  const handleUploadSlotDocument = async (docType: string, defaultTitle: string) => {
     try {
       const results = await pick({
         type: [
           types.pdf,
           types.images,
           types.doc,
-          types.docx,
-          types.plainText
+          types.docx
         ],
         allowMultiSelection: false
       });
@@ -207,51 +200,89 @@ export default function SignupScreen({ navigation }: any) {
       const result = results[0];
       if (!result.uri) return;
 
-      setUploadingDoc(true);
-      const title = newDocName.trim() || result.name || `${selectedDocType} Document`;
+      setUploadingDocType(docType);
+      const fileName = result.name || `${defaultTitle}.pdf`;
+      const title = `${defaultTitle} (${fileName})`;
+
       try {
         const uploadedUrl = await uploadToBackend(
           result.uri,
-          result.name || 'verification_cert.pdf',
+          fileName,
           result.type || 'application/pdf',
           'document'
         );
 
-        setVerificationDocuments([
-          ...verificationDocuments,
-          {
-            name: title,
-            fileUrl: uploadedUrl,
-            documentType: selectedDocType,
-            status: 'Pending',
-            uploadDate: new Date().toISOString()
+        setVerificationDocuments(prev => {
+          if (docType === 'Additional Document') {
+            return [
+              ...prev,
+              {
+                name: title,
+                fileUrl: uploadedUrl,
+                documentType: docType,
+                status: 'Pending',
+                uploadDate: new Date().toISOString()
+              }
+            ];
           }
-        ]);
-        setNewDocName('');
-        Alert.alert('Document Uploaded', `"${title}" successfully uploaded and attached.`);
+          const filtered = prev.filter(d => d.documentType !== docType);
+          return [
+            ...filtered,
+            {
+              name: title,
+              fileUrl: uploadedUrl,
+              documentType: docType,
+              status: 'Pending',
+              uploadDate: new Date().toISOString()
+            }
+          ];
+        });
+        Alert.alert('Upload Successful', `"${fileName}" attached for ${defaultTitle}.`);
       } catch (uploadErr: any) {
-        setVerificationDocuments([
-          ...verificationDocuments,
-          {
-            name: title,
-            fileUrl: result.uri,
-            documentType: selectedDocType,
-            status: 'Pending',
-            uploadDate: new Date().toISOString()
+        setVerificationDocuments(prev => {
+          if (docType === 'Additional Document') {
+            return [
+              ...prev,
+              {
+                name: title,
+                fileUrl: result.uri,
+                documentType: docType,
+                status: 'Pending',
+                uploadDate: new Date().toISOString()
+              }
+            ];
           }
-        ]);
-        setNewDocName('');
-        Alert.alert('Document Added', `"${title}" selected from device.`);
+          const filtered = prev.filter(d => d.documentType !== docType);
+          return [
+            ...filtered,
+            {
+              name: title,
+              fileUrl: result.uri,
+              documentType: docType,
+              status: 'Pending',
+              uploadDate: new Date().toISOString()
+            }
+          ];
+        });
+        Alert.alert('File Attached', `"${fileName}" selected from local device.`);
       }
     } catch (err: any) {
       if (isErrorWithCode(err) && err.code === errorCodes.OPERATION_CANCELED) {
         return;
       }
       console.error('Document picker error:', err);
-      Alert.alert('Picker Notice', 'Could not open document picker. You can also paste document links directly.');
+      Alert.alert('Document Error', err.message || 'Could not open device document picker.');
     } finally {
-      setUploadingDoc(false);
+      setUploadingDocType(null);
     }
+  };
+
+  const handleRemoveDocByType = (docType: string) => {
+    setVerificationDocuments(prev => prev.filter(d => d.documentType !== docType));
+  };
+
+  const handleRemoveDocByIndex = (index: number) => {
+    setVerificationDocuments(prev => prev.filter((_, i) => i !== index));
   };
 
   // Validate Step 1
@@ -628,24 +659,6 @@ export default function SignupScreen({ navigation }: any) {
     } finally {
       setFetchingGPS(false);
     }
-  };
-
-  // Add custom doc
-  const handleAddDocument = () => {
-    if (!newDocName.trim() || !newDocUrl.trim()) {
-      Alert.alert('Incomplete Document', 'Please enter both the document title and certificate link/URL.');
-      return;
-    }
-    setVerificationDocuments([
-      ...verificationDocuments,
-      { name: newDocName.trim(), fileUrl: newDocUrl.trim(), documentType: selectedDocType, status: 'Pending' }
-    ]);
-    setNewDocName('');
-    setNewDocUrl('');
-  };
-
-  const handleRemoveDoc = (index: number) => {
-    setVerificationDocuments(verificationDocuments.filter((_, i) => i !== index));
   };
 
   // Submit complete 3-Step Garage Admin Registration
@@ -1264,138 +1277,392 @@ export default function SignupScreen({ navigation }: any) {
           {/* ================= STEP 3: LEGAL & MOT AUTHORIZATION VERIFICATION ================= */}
           {currentStep === 3 && (
             <View>
-              <Text style={[styles.sectionHeading, { color: theme.colors.text }]}>DVLA MOT Authorization</Text>
-              
-              <Text style={[styles.inputLabel, { color: theme.colors.text }]}>
-                DVLA Vehicle Testing Station (VTS) Number *
-              </Text>
-              <View style={[styles.inputContainer, { borderColor: theme.colors.border, backgroundColor: theme.colors.background }]}>
-                <MaterialCommunityIcons name="card-account-details-outline" size={20} color={theme.colors.placeholder} style={styles.inputIcon} />
-                <TextInput
-                  value={vtsNumber}
-                  onChangeText={setVtsNumber}
-                  placeholder="E.g. VTS-104928"
-                  placeholderTextColor={theme.colors.placeholder}
-                  autoCapitalize="characters"
-                  style={[styles.input, { color: theme.colors.text }]}
-                />
-              </View>
-
-              <Text style={[styles.inputLabel, { color: theme.colors.text }]}>
-                MOT Authorised Examiner (AE) Number *
-              </Text>
-              <View style={[styles.inputContainer, { borderColor: theme.colors.border, backgroundColor: theme.colors.background }]}>
-                <MaterialCommunityIcons name="shield-check-outline" size={20} color={theme.colors.placeholder} style={styles.inputIcon} />
-                <TextInput
-                  value={motAuthorisedExaminerNumber}
-                  onChangeText={setMotAuthorisedExaminerNumber}
-                  placeholder="E.g. AE-884920"
-                  placeholderTextColor={theme.colors.placeholder}
-                  autoCapitalize="characters"
-                  style={[styles.input, { color: theme.colors.text }]}
-                />
-              </View>
-
-              <Text style={[styles.inputLabel, { color: theme.colors.text }]}>
-                Companies House / Business Registration Number
-              </Text>
-              <View style={[styles.inputContainer, { borderColor: theme.colors.border, backgroundColor: theme.colors.background }]}>
-                <MaterialCommunityIcons name="office-building-outline" size={20} color={theme.colors.placeholder} style={styles.inputIcon} />
-                <TextInput
-                  value={businessRegistrationNumber}
-                  onChangeText={setBusinessRegistrationNumber}
-                  placeholder="E.g. GB-9928174"
-                  placeholderTextColor={theme.colors.placeholder}
-                  autoCapitalize="characters"
-                  style={[styles.input, { color: theme.colors.text }]}
-                />
-              </View>
-
-              <View style={styles.divider} />
-              
-              {/* Verification Documents List */}
-              <Text style={[styles.sectionHeading, { color: theme.colors.text }]}>Verification Certificates ({verificationDocuments.length})</Text>
-              <Text style={[styles.helperText, { color: theme.colors.placeholder }]}>
-                Super Admin will examine these documents before granting platform authorization.
+              <Text style={[styles.sectionHeading, { color: theme.colors.text }]}>UK MOT Testing & Legal Authorisation</Text>
+              <Text style={[styles.stepDesc, { color: theme.colors.placeholder }]}>
+                Provide your official DVLA license numbers and upload authentic certification documents (PDF, DOC, DOCX, or Image) directly from your device.
               </Text>
 
-              {verificationDocuments.map((doc, dIdx) => (
-                <View key={dIdx} style={[styles.docItemCard, { backgroundColor: theme.colors.background, borderColor: theme.colors.border }]}>
-                  <View style={[styles.docIconWrapper, { backgroundColor: theme.colors.primary + '15' }]}>
-                    <MaterialCommunityIcons 
-                      name={doc.fileUrl?.endsWith('.pdf') ? 'file-pdf-box' : 'file-certificate-outline'} 
-                      size={22} 
-                      color={theme.colors.primary} 
-                    />
-                  </View>
-                  <View style={{ flex: 1, paddingRight: 8 }}>
-                    <Text style={[styles.docNameText, { color: theme.colors.text }]} numberOfLines={1}>{doc.name}</Text>
-                    <Text style={[styles.docUrlText, { color: theme.colors.placeholder }]} numberOfLines={1}>{doc.fileUrl}</Text>
-                  </View>
-                  <TouchableOpacity onPress={() => handleRemoveDoc(dIdx)} style={styles.docRemoveBtn} hitSlop={{ top: 8, bottom: 8, left: 8, right: 8 }}>
-                    <MaterialCommunityIcons name="close-circle" size={20} color={theme.colors.error} />
-                  </TouchableOpacity>
-                </View>
-              ))}
-
-              {/* Upload Document from Device Box */}
-              <View style={[styles.deviceUploadCard, { backgroundColor: theme.colors.card, borderColor: theme.colors.primary }]}>
-                <View style={{ flexDirection: 'row', alignItems: 'center', marginBottom: 10 }}>
-                  <MaterialCommunityIcons name="cloud-upload" size={20} color={theme.colors.primary} style={{ marginRight: 6 }} />
-                  <Text style={[styles.deviceCardTitle, { color: theme.colors.text }]}>Upload Document from Device</Text>
+              {/* 1. DVLA VTS Section */}
+              <View style={[styles.licenseSectionCard, { backgroundColor: theme.colors.card, borderColor: theme.colors.border }]}>
+                <View style={styles.licenseCardHeader}>
+                  <MaterialCommunityIcons name="card-account-details-outline" size={20} color={theme.colors.primary} />
+                  <Text style={[styles.licenseCardTitle, { color: theme.colors.text }]}>
+                    1. DVLA Vehicle Testing Station (VTS) *
+                  </Text>
                 </View>
 
-                <TextInput
-                  value={newDocName}
-                  onChangeText={setNewDocName}
-                  placeholder="Document Name / Title (Optional)"
-                  placeholderTextColor={theme.colors.placeholder}
-                  style={[styles.smallInput, { color: theme.colors.text, borderColor: theme.colors.border, backgroundColor: theme.colors.background, marginBottom: 10 }]}
-                />
+                <Text style={[styles.inputLabel, { color: theme.colors.text, marginTop: 8 }]}>
+                  VTS Site Number *
+                </Text>
+                <View style={[styles.inputContainer, { borderColor: theme.colors.border, backgroundColor: theme.colors.background }]}>
+                  <MaterialCommunityIcons name="numeric" size={20} color={theme.colors.placeholder} style={styles.inputIcon} />
+                  <TextInput
+                    value={vtsNumber}
+                    onChangeText={setVtsNumber}
+                    placeholder="E.g. VTS-104928"
+                    placeholderTextColor={theme.colors.placeholder}
+                    autoCapitalize="characters"
+                    style={[styles.input, { color: theme.colors.text }]}
+                  />
+                </View>
+
+                {/* VTS Document Upload Slot */}
+                {(() => {
+                  const doc = verificationDocuments.find(d => d.documentType === 'VTS Certificate');
+                  const isUploading = uploadingDocType === 'VTS Certificate';
+                  return (
+                    <View style={styles.slotUploadContainer}>
+                      <Text style={[styles.slotDocLabel, { color: theme.colors.text }]}>
+                        DVLA VTS Authorisation Certificate (PDF / Image) *
+                      </Text>
+                      {doc ? (
+                        <View style={[styles.uploadedDocRow, { backgroundColor: theme.colors.background, borderColor: '#10B981' }]}>
+                          <View style={[styles.docIconWrapper, { backgroundColor: '#10B98115' }]}>
+                            <MaterialCommunityIcons name={doc.fileUrl?.endsWith('.pdf') ? 'file-pdf-box' : 'file-check-outline'} size={22} color="#10B981" />
+                          </View>
+                          <View style={{ flex: 1, paddingRight: 6 }}>
+                            <Text style={[styles.uploadedDocName, { color: theme.colors.text }]} numberOfLines={1}>
+                              {doc.name}
+                            </Text>
+                            <Text style={[styles.uploadedDocMeta, { color: '#10B981' }]}>✓ Certificate Attached</Text>
+                          </View>
+                          <TouchableOpacity
+                            onPress={() => handleUploadSlotDocument('VTS Certificate', 'DVLA MOT Authorisation Certificate')}
+                            style={[styles.docSlotActionBtn, { backgroundColor: theme.colors.primary + '15' }]}
+                          >
+                            <Text style={{ color: theme.colors.primary, fontSize: 11, fontWeight: '700' }}>Replace</Text>
+                          </TouchableOpacity>
+                          <TouchableOpacity
+                            onPress={() => handleRemoveDocByType('VTS Certificate')}
+                            style={styles.docSlotRemoveBtn}
+                            hitSlop={{ top: 8, bottom: 8, left: 8, right: 8 }}
+                          >
+                            <MaterialCommunityIcons name="close-circle" size={20} color={theme.colors.error} />
+                          </TouchableOpacity>
+                        </View>
+                      ) : (
+                        <TouchableOpacity
+                          onPress={() => handleUploadSlotDocument('VTS Certificate', 'DVLA MOT Authorisation Certificate')}
+                          disabled={isUploading}
+                          style={[styles.slotUploadButton, { borderColor: theme.colors.primary, backgroundColor: theme.colors.primary + '0D' }]}
+                        >
+                          {isUploading ? (
+                            <ActivityIndicator size="small" color={theme.colors.primary} />
+                          ) : (
+                            <>
+                              <MaterialCommunityIcons name="cloud-upload-outline" size={20} color={theme.colors.primary} style={{ marginRight: 8 }} />
+                              <Text style={[styles.slotUploadButtonText, { color: theme.colors.primary }]}>
+                                Upload VTS Certificate
+                              </Text>
+                            </>
+                          )}
+                        </TouchableOpacity>
+                      )}
+                    </View>
+                  );
+                })()}
+              </View>
+
+              {/* 2. MOT Authorised Examiner (AE) Section */}
+              <View style={[styles.licenseSectionCard, { backgroundColor: theme.colors.card, borderColor: theme.colors.border }]}>
+                <View style={styles.licenseCardHeader}>
+                  <MaterialCommunityIcons name="shield-check-outline" size={20} color={theme.colors.primary} />
+                  <Text style={[styles.licenseCardTitle, { color: theme.colors.text }]}>
+                    2. MOT Authorised Examiner (AE) *
+                  </Text>
+                </View>
+
+                <Text style={[styles.inputLabel, { color: theme.colors.text, marginTop: 8 }]}>
+                  AE Designation Number *
+                </Text>
+                <View style={[styles.inputContainer, { borderColor: theme.colors.border, backgroundColor: theme.colors.background }]}>
+                  <MaterialCommunityIcons name="badge-account-horizontal-outline" size={20} color={theme.colors.placeholder} style={styles.inputIcon} />
+                  <TextInput
+                    value={motAuthorisedExaminerNumber}
+                    onChangeText={setMotAuthorisedExaminerNumber}
+                    placeholder="E.g. AE-884920"
+                    placeholderTextColor={theme.colors.placeholder}
+                    autoCapitalize="characters"
+                    style={[styles.input, { color: theme.colors.text }]}
+                  />
+                </View>
+
+                {/* AE Document Upload Slot */}
+                {(() => {
+                  const doc = verificationDocuments.find(d => d.documentType === 'AE Certificate');
+                  const isUploading = uploadingDocType === 'AE Certificate';
+                  return (
+                    <View style={styles.slotUploadContainer}>
+                      <Text style={[styles.slotDocLabel, { color: theme.colors.text }]}>
+                        MOT Authorised Examiner (AE) Certificate *
+                      </Text>
+                      {doc ? (
+                        <View style={[styles.uploadedDocRow, { backgroundColor: theme.colors.background, borderColor: '#10B981' }]}>
+                          <View style={[styles.docIconWrapper, { backgroundColor: '#10B98115' }]}>
+                            <MaterialCommunityIcons name={doc.fileUrl?.endsWith('.pdf') ? 'file-pdf-box' : 'file-check-outline'} size={22} color="#10B981" />
+                          </View>
+                          <View style={{ flex: 1, paddingRight: 6 }}>
+                            <Text style={[styles.uploadedDocName, { color: theme.colors.text }]} numberOfLines={1}>
+                              {doc.name}
+                            </Text>
+                            <Text style={[styles.uploadedDocMeta, { color: '#10B981' }]}>✓ Certificate Attached</Text>
+                          </View>
+                          <TouchableOpacity
+                            onPress={() => handleUploadSlotDocument('AE Certificate', 'MOT Authorised Examiner (AE) Certificate')}
+                            style={[styles.docSlotActionBtn, { backgroundColor: theme.colors.primary + '15' }]}
+                          >
+                            <Text style={{ color: theme.colors.primary, fontSize: 11, fontWeight: '700' }}>Replace</Text>
+                          </TouchableOpacity>
+                          <TouchableOpacity
+                            onPress={() => handleRemoveDocByType('AE Certificate')}
+                            style={styles.docSlotRemoveBtn}
+                            hitSlop={{ top: 8, bottom: 8, left: 8, right: 8 }}
+                          >
+                            <MaterialCommunityIcons name="close-circle" size={20} color={theme.colors.error} />
+                          </TouchableOpacity>
+                        </View>
+                      ) : (
+                        <TouchableOpacity
+                          onPress={() => handleUploadSlotDocument('AE Certificate', 'MOT Authorised Examiner (AE) Certificate')}
+                          disabled={isUploading}
+                          style={[styles.slotUploadButton, { borderColor: theme.colors.primary, backgroundColor: theme.colors.primary + '0D' }]}
+                        >
+                          {isUploading ? (
+                            <ActivityIndicator size="small" color={theme.colors.primary} />
+                          ) : (
+                            <>
+                              <MaterialCommunityIcons name="cloud-upload-outline" size={20} color={theme.colors.primary} style={{ marginRight: 8 }} />
+                              <Text style={[styles.slotUploadButtonText, { color: theme.colors.primary }]}>
+                                Upload AE Certificate
+                              </Text>
+                            </>
+                          )}
+                        </TouchableOpacity>
+                      )}
+                    </View>
+                  );
+                })()}
+              </View>
+
+              {/* 3. Companies House / Business Registration */}
+              <View style={[styles.licenseSectionCard, { backgroundColor: theme.colors.card, borderColor: theme.colors.border }]}>
+                <View style={styles.licenseCardHeader}>
+                  <MaterialCommunityIcons name="office-building-outline" size={20} color={theme.colors.primary} />
+                  <Text style={[styles.licenseCardTitle, { color: theme.colors.text }]}>
+                    3. Companies House / Business Registration
+                  </Text>
+                </View>
+
+                <Text style={[styles.inputLabel, { color: theme.colors.text, marginTop: 8 }]}>
+                  Company / Registration Number (CRN)
+                </Text>
+                <View style={[styles.inputContainer, { borderColor: theme.colors.border, backgroundColor: theme.colors.background }]}>
+                  <MaterialCommunityIcons name="briefcase-outline" size={20} color={theme.colors.placeholder} style={styles.inputIcon} />
+                  <TextInput
+                    value={businessRegistrationNumber}
+                    onChangeText={setBusinessRegistrationNumber}
+                    placeholder="E.g. GB-9928174 or 12345678"
+                    placeholderTextColor={theme.colors.placeholder}
+                    autoCapitalize="characters"
+                    style={[styles.input, { color: theme.colors.text }]}
+                  />
+                </View>
+
+                {/* Business Registration Upload Slot */}
+                {(() => {
+                  const doc = verificationDocuments.find(d => d.documentType === 'Business Registration');
+                  const isUploading = uploadingDocType === 'Business Registration';
+                  return (
+                    <View style={styles.slotUploadContainer}>
+                      <Text style={[styles.slotDocLabel, { color: theme.colors.text }]}>
+                        Certificate of Incorporation / Business Proof (Optional)
+                      </Text>
+                      {doc ? (
+                        <View style={[styles.uploadedDocRow, { backgroundColor: theme.colors.background, borderColor: '#10B981' }]}>
+                          <View style={[styles.docIconWrapper, { backgroundColor: '#10B98115' }]}>
+                            <MaterialCommunityIcons name={doc.fileUrl?.endsWith('.pdf') ? 'file-pdf-box' : 'file-check-outline'} size={22} color="#10B981" />
+                          </View>
+                          <View style={{ flex: 1, paddingRight: 6 }}>
+                            <Text style={[styles.uploadedDocName, { color: theme.colors.text }]} numberOfLines={1}>
+                              {doc.name}
+                            </Text>
+                            <Text style={[styles.uploadedDocMeta, { color: '#10B981' }]}>✓ Certificate Attached</Text>
+                          </View>
+                          <TouchableOpacity
+                            onPress={() => handleUploadSlotDocument('Business Registration', 'Companies House Certificate')}
+                            style={[styles.docSlotActionBtn, { backgroundColor: theme.colors.primary + '15' }]}
+                          >
+                            <Text style={{ color: theme.colors.primary, fontSize: 11, fontWeight: '700' }}>Replace</Text>
+                          </TouchableOpacity>
+                          <TouchableOpacity
+                            onPress={() => handleRemoveDocByType('Business Registration')}
+                            style={styles.docSlotRemoveBtn}
+                            hitSlop={{ top: 8, bottom: 8, left: 8, right: 8 }}
+                          >
+                            <MaterialCommunityIcons name="close-circle" size={20} color={theme.colors.error} />
+                          </TouchableOpacity>
+                        </View>
+                      ) : (
+                        <TouchableOpacity
+                          onPress={() => handleUploadSlotDocument('Business Registration', 'Companies House Certificate')}
+                          disabled={isUploading}
+                          style={[styles.slotUploadButton, { borderColor: theme.colors.border, backgroundColor: theme.colors.background }]}
+                        >
+                          {isUploading ? (
+                            <ActivityIndicator size="small" color={theme.colors.primary} />
+                          ) : (
+                            <>
+                              <MaterialCommunityIcons name="cloud-upload-outline" size={20} color={theme.colors.text} style={{ marginRight: 8 }} />
+                              <Text style={[styles.slotUploadButtonText, { color: theme.colors.text }]}>
+                                Upload Business Certificate
+                              </Text>
+                            </>
+                          )}
+                        </TouchableOpacity>
+                      )}
+                    </View>
+                  );
+                })()}
+              </View>
+
+              {/* 4. Public Liability Insurance Certificate */}
+              <View style={[styles.licenseSectionCard, { backgroundColor: theme.colors.card, borderColor: theme.colors.border }]}>
+                <View style={styles.licenseCardHeader}>
+                  <MaterialCommunityIcons name="shield-account-outline" size={20} color={theme.colors.primary} />
+                  <Text style={[styles.licenseCardTitle, { color: theme.colors.text }]}>
+                    4. Public Liability & Garage Insurance *
+                  </Text>
+                </View>
+
+                {(() => {
+                  const doc = verificationDocuments.find(d => d.documentType === 'Public Liability Insurance');
+                  const isUploading = uploadingDocType === 'Public Liability Insurance';
+                  return (
+                    <View style={styles.slotUploadContainer}>
+                      <Text style={[styles.slotDocLabel, { color: theme.colors.text }]}>
+                        Public Liability Insurance Certificate (Min. £2m - £5m cover) *
+                      </Text>
+                      {doc ? (
+                        <View style={[styles.uploadedDocRow, { backgroundColor: theme.colors.background, borderColor: '#10B981' }]}>
+                          <View style={[styles.docIconWrapper, { backgroundColor: '#10B98115' }]}>
+                            <MaterialCommunityIcons name={doc.fileUrl?.endsWith('.pdf') ? 'file-pdf-box' : 'file-check-outline'} size={22} color="#10B981" />
+                          </View>
+                          <View style={{ flex: 1, paddingRight: 6 }}>
+                            <Text style={[styles.uploadedDocName, { color: theme.colors.text }]} numberOfLines={1}>
+                              {doc.name}
+                            </Text>
+                            <Text style={[styles.uploadedDocMeta, { color: '#10B981' }]}>✓ Insurance Attached</Text>
+                          </View>
+                          <TouchableOpacity
+                            onPress={() => handleUploadSlotDocument('Public Liability Insurance', 'Public Liability Insurance Certificate')}
+                            style={[styles.docSlotActionBtn, { backgroundColor: theme.colors.primary + '15' }]}
+                          >
+                            <Text style={{ color: theme.colors.primary, fontSize: 11, fontWeight: '700' }}>Replace</Text>
+                          </TouchableOpacity>
+                          <TouchableOpacity
+                            onPress={() => handleRemoveDocByType('Public Liability Insurance')}
+                            style={styles.docSlotRemoveBtn}
+                            hitSlop={{ top: 8, bottom: 8, left: 8, right: 8 }}
+                          >
+                            <MaterialCommunityIcons name="close-circle" size={20} color={theme.colors.error} />
+                          </TouchableOpacity>
+                        </View>
+                      ) : (
+                        <TouchableOpacity
+                          onPress={() => handleUploadSlotDocument('Public Liability Insurance', 'Public Liability Insurance Certificate')}
+                          disabled={isUploading}
+                          style={[styles.slotUploadButton, { borderColor: theme.colors.primary, backgroundColor: theme.colors.primary + '0D' }]}
+                        >
+                          {isUploading ? (
+                            <ActivityIndicator size="small" color={theme.colors.primary} />
+                          ) : (
+                            <>
+                              <MaterialCommunityIcons name="cloud-upload-outline" size={20} color={theme.colors.primary} style={{ marginRight: 8 }} />
+                              <Text style={[styles.slotUploadButtonText, { color: theme.colors.primary }]}>
+                                Upload Public Liability Insurance
+                              </Text>
+                            </>
+                          )}
+                        </TouchableOpacity>
+                      )}
+                    </View>
+                  );
+                })()}
+              </View>
+
+              {/* 5. Additional Supporting Documents */}
+              <View style={[styles.licenseSectionCard, { backgroundColor: theme.colors.card, borderColor: theme.colors.border }]}>
+                <View style={styles.licenseCardHeader}>
+                  <MaterialCommunityIcons name="file-document" size={20} color={theme.colors.secondary} />
+                  <Text style={[styles.licenseCardTitle, { color: theme.colors.text }]}>
+                    5. Additional Supporting Documents (Optional)
+                  </Text>
+                </View>
+                <Text style={[styles.helperText, { color: theme.colors.placeholder, marginBottom: 8 }]}>
+                  E.g. Tester Qualifications (AEDM / Level 3 MOT Award), Planning Permission, or Local Council Motor Trade License.
+                </Text>
+
+                {verificationDocuments
+                  .filter(d => !['VTS Certificate', 'AE Certificate', 'Business Registration', 'Public Liability Insurance'].includes(d.documentType))
+                  .map((doc, idx) => (
+                    <View key={idx} style={[styles.uploadedDocRow, { backgroundColor: theme.colors.background, borderColor: theme.colors.border, marginBottom: 8 }]}>
+                      <View style={[styles.docIconWrapper, { backgroundColor: theme.colors.secondary + '15' }]}>
+                        <MaterialCommunityIcons name={doc.fileUrl?.endsWith('.pdf') ? 'file-pdf-box' : 'file-document-outline'} size={22} color={theme.colors.secondary} />
+                      </View>
+                      <View style={{ flex: 1, paddingRight: 6 }}>
+                        <Text style={[styles.uploadedDocName, { color: theme.colors.text }]} numberOfLines={1}>
+                          {doc.name}
+                        </Text>
+                        <Text style={[styles.uploadedDocMeta, { color: theme.colors.placeholder }]}>Supporting Document</Text>
+                      </View>
+                      <TouchableOpacity
+                        onPress={() => {
+                          const realIndex = verificationDocuments.indexOf(doc);
+                          if (realIndex >= 0) handleRemoveDocByIndex(realIndex);
+                        }}
+                        style={styles.docSlotRemoveBtn}
+                        hitSlop={{ top: 8, bottom: 8, left: 8, right: 8 }}
+                      >
+                        <MaterialCommunityIcons name="close-circle" size={20} color={theme.colors.error} />
+                      </TouchableOpacity>
+                    </View>
+                  ))}
+
+                <Text style={[styles.inputLabel, { color: theme.colors.text, marginTop: 8 }]}>
+                  Document Title / Name
+                </Text>
+                <View style={[styles.inputContainer, { borderColor: theme.colors.border, backgroundColor: theme.colors.background, marginBottom: 8 }]}>
+                  <MaterialCommunityIcons name="format-title" size={20} color={theme.colors.placeholder} style={styles.inputIcon} />
+                  <TextInput
+                    value={additionalDocName}
+                    onChangeText={setAdditionalDocName}
+                    placeholder="E.g. Tester Level 3 MOT Award / Planning Permission"
+                    placeholderTextColor={theme.colors.placeholder}
+                    style={[styles.input, { color: theme.colors.text }]}
+                  />
+                </View>
 
                 <TouchableOpacity
-                  onPress={handlePickDocumentFromDevice}
-                  disabled={uploadingDoc}
-                  style={[styles.primaryButton, { backgroundColor: theme.colors.primary, opacity: uploadingDoc ? 0.6 : 1, flexDirection: 'row' }]}
+                  onPress={async () => {
+                    const titleToUse = additionalDocName.trim() || 'Supporting Certificate';
+                    await handleUploadSlotDocument('Additional Document', titleToUse);
+                    setAdditionalDocName('');
+                  }}
+                  disabled={uploadingDocType === 'Additional Document'}
+                  style={[styles.addExtraDocBtn, { borderColor: theme.colors.secondary, backgroundColor: theme.colors.secondary + '0D' }]}
                 >
-                  {uploadingDoc ? (
-                    <>
-                      <ActivityIndicator size="small" color="#FFFFFF" style={{ marginRight: 8 }} />
-                      <Text style={styles.primaryButtonText}>Uploading from Device...</Text>
-                    </>
+                  {uploadingDocType === 'Additional Document' ? (
+                    <ActivityIndicator size="small" color={theme.colors.secondary} />
                   ) : (
                     <>
-                      <MaterialCommunityIcons name="upload" size={20} color="#FFFFFF" style={{ marginRight: 8 }} />
-                      <Text style={styles.primaryButtonText}>Browse & Upload File</Text>
+                      <MaterialCommunityIcons name="cloud-upload-outline" size={18} color={theme.colors.secondary} style={{ marginRight: 6 }} />
+                      <Text style={[styles.addExtraDocBtnText, { color: theme.colors.secondary }]}>
+                        {additionalDocName.trim() ? `Upload "${additionalDocName.trim()}" (PDF / Image)` : 'Browse & Upload Document (PDF / Image)'}
+                      </Text>
                     </>
                   )}
                 </TouchableOpacity>
               </View>
-
-              {/* Add Custom Document Link Box */}
-              <View style={[styles.addDocBox, { borderColor: theme.colors.border }]}>
-                <Text style={[styles.subLabel, { color: theme.colors.text, fontWeight: 'bold' }]}>Or Attach Direct Document Link / URL:</Text>
-                <TextInput
-                  value={newDocName}
-                  onChangeText={setNewDocName}
-                  placeholder="Document Title (e.g. Health & Safety Certificate)"
-                  placeholderTextColor={theme.colors.placeholder}
-                  style={[styles.smallInput, { color: theme.colors.text, borderColor: theme.colors.border, backgroundColor: theme.colors.background }]}
-                />
-                <TextInput
-                  value={newDocUrl}
-                  onChangeText={setNewDocUrl}
-                  placeholder="Certificate Link / URL (PDF/Image)"
-                  placeholderTextColor={theme.colors.placeholder}
-                  style={[styles.smallInput, { color: theme.colors.text, borderColor: theme.colors.border, backgroundColor: theme.colors.background }]}
-                />
-                <TouchableOpacity onPress={handleAddDocument} style={[styles.addDocBtn, { backgroundColor: theme.colors.primary + '15' }]}>
-                  <MaterialCommunityIcons name="plus" size={16} color={theme.colors.primary} style={{ marginRight: 4 }} />
-                  <Text style={{ color: theme.colors.primary, fontWeight: 'bold', fontSize: 13 }}>Add Link Document</Text>
-                </TouchableOpacity>
-              </View>
-
-              <View style={styles.divider} />
 
               {/* Legal Declaration Checkbox */}
               <TouchableOpacity
@@ -1582,6 +1849,11 @@ const styles = StyleSheet.create({
     fontSize: 16,
     fontWeight: 'bold',
     marginBottom: 12,
+  },
+  stepDesc: {
+    fontSize: 12.5,
+    lineHeight: 18,
+    marginBottom: 14,
   },
   inputLabel: {
     fontSize: 12,
@@ -1990,5 +2262,87 @@ const styles = StyleSheet.create({
     fontSize: 11,
     fontWeight: '700',
     flex: 1,
+  },
+  licenseSectionCard: {
+    borderWidth: 1,
+    borderRadius: 12,
+    padding: 14,
+    marginBottom: 14,
+    elevation: 1,
+    shadowColor: '#000',
+    shadowOffset: { width: 0, height: 1 },
+    shadowOpacity: 0.05,
+    shadowRadius: 2,
+  },
+  licenseCardHeader: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    gap: 8,
+    marginBottom: 4,
+  },
+  licenseCardTitle: {
+    fontSize: 14.5,
+    fontWeight: 'bold',
+  },
+  slotUploadContainer: {
+    marginTop: 10,
+  },
+  slotDocLabel: {
+    fontSize: 12,
+    fontWeight: '600',
+    marginBottom: 6,
+  },
+  slotUploadButton: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    justifyContent: 'center',
+    borderWidth: 1.5,
+    borderStyle: 'dashed',
+    borderRadius: 8,
+    paddingVertical: 11,
+    paddingHorizontal: 12,
+  },
+  slotUploadButtonText: {
+    fontSize: 12.5,
+    fontWeight: '700',
+  },
+  uploadedDocRow: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    borderWidth: 1,
+    borderRadius: 8,
+    padding: 10,
+  },
+  uploadedDocName: {
+    fontSize: 13,
+    fontWeight: '700',
+  },
+  uploadedDocMeta: {
+    fontSize: 11,
+    fontWeight: '600',
+    marginTop: 2,
+  },
+  docSlotActionBtn: {
+    paddingHorizontal: 10,
+    paddingVertical: 5,
+    borderRadius: 6,
+    marginRight: 6,
+  },
+  docSlotRemoveBtn: {
+    padding: 4,
+  },
+  addExtraDocBtn: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    justifyContent: 'center',
+    borderWidth: 1,
+    borderStyle: 'dashed',
+    borderRadius: 8,
+    paddingVertical: 10,
+    marginTop: 6,
+  },
+  addExtraDocBtnText: {
+    fontSize: 12.5,
+    fontWeight: '700',
   },
 });

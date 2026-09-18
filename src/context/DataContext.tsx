@@ -14,6 +14,8 @@ export interface Customer {
   createdDate: string;
   garageId?: string;
   garageIds?: string[];
+  garageConsent?: boolean;
+  garageConsentDate?: string;
 }
 
 export interface Vehicle {
@@ -133,7 +135,8 @@ interface DataContextType {
 
 const DataContext = createContext<DataContextType | undefined>(undefined);
 
-export const BASE_URL = 'http://localhost:5000/api';
+// export const BASE_URL = 'http://localhost:5000/api';
+export const BASE_URL = 'https://api-mot.affyclouditsolutions.com/api';
 
 const decodeToken = (tokenStr: string | null) => {
   if (!tokenStr) return null;

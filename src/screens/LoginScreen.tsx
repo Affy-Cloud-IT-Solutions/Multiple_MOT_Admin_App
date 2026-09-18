@@ -18,6 +18,13 @@ import { useAppTheme } from '../context/ThemeContext';
 import { useAppValues, BASE_URL } from '../context/DataContext';
 import { validateEmail, validatePassword } from '../utils/validationUtils';
 import AsyncStorage from '@react-native-async-storage/async-storage';
+import {
+  AdminHeroLogo,
+  EmailIcon,
+  LockIcon,
+  EyeIcon,
+  EyeOffIcon,
+} from '../components/SvgIcons';
 
 export default function LoginScreen({ navigation }: any) {
   const { theme } = useAppTheme();
@@ -254,14 +261,17 @@ export default function LoginScreen({ navigation }: any) {
       <ScrollView contentContainerStyle={styles.scrollContent} keyboardShouldPersistTaps="handled">
         {/* Logo and Brand */}
         <View style={styles.headerContainer}>
-          <View style={[styles.iconContainer, { backgroundColor: theme.colors.primaryContainer }]}>
-            <MaterialCommunityIcons name="bell-ring" size={50} color={theme.colors.primary} />
-          </View>
+          <AdminHeroLogo
+            size={92}
+            primary={theme.colors.primary}
+            secondary={theme.colors.secondary || '#1677FF'}
+            dark={theme.dark}
+          />
           <Text style={[styles.title, { color: theme.colors.text }]}>
-            MOT Reminders
+            MOT Admin Hub
           </Text>
           <Text style={[styles.subtitle, { color: theme.colors.placeholder }]}>
-            Garage MOT Reminder Management System
+            Garage Testing Station & Reminder Terminal
           </Text>
         </View>
 
@@ -279,7 +289,9 @@ export default function LoginScreen({ navigation }: any) {
             
             <Text style={[styles.inputLabel, { color: theme.colors.text }]}>Email Address</Text>
             <View style={[styles.inputContainer, { borderColor: emailError ? theme.colors.error : theme.colors.border, backgroundColor: theme.colors.background }]}>
-              <MaterialCommunityIcons name="email-outline" size={20} color={theme.colors.placeholder} style={styles.inputIcon} />
+              <View style={styles.inputIcon}>
+                <EmailIcon size={20} color={theme.colors.placeholder} />
+              </View>
               <TextInput
                 value={email}
                 onChangeText={(text) => {
@@ -287,7 +299,7 @@ export default function LoginScreen({ navigation }: any) {
                   setEmailError(false);
                   setErrorMessage(null);
                 }}
-                placeholder="E.g. user@example.com"
+                placeholder="E.g. manager@garage.co.uk"
                 placeholderTextColor={theme.colors.placeholder}
                 keyboardType="email-address"
                 autoCapitalize="none"
@@ -297,7 +309,9 @@ export default function LoginScreen({ navigation }: any) {
 
             <Text style={[styles.inputLabel, { color: theme.colors.text }]}>Password</Text>
             <View style={[styles.inputContainer, { borderColor: passwordError ? theme.colors.error : theme.colors.border, backgroundColor: theme.colors.background }]}>
-              <MaterialCommunityIcons name="lock-outline" size={20} color={theme.colors.placeholder} style={styles.inputIcon} />
+              <View style={styles.inputIcon}>
+                <LockIcon size={20} color={theme.colors.placeholder} />
+              </View>
               <TextInput
                 value={password}
                 onChangeText={(text) => {
@@ -312,11 +326,11 @@ export default function LoginScreen({ navigation }: any) {
                 style={[styles.input, { color: theme.colors.text }]}
               />
               <TouchableOpacity onPress={() => setShowPassword(!showPassword)} style={styles.eyeIcon}>
-                <MaterialCommunityIcons
-                  name={showPassword ? 'eye-off-outline' : 'eye-outline'}
-                  size={20}
-                  color={theme.colors.placeholder}
-                />
+                {showPassword ? (
+                  <EyeOffIcon size={20} color={theme.colors.placeholder} />
+                ) : (
+                  <EyeIcon size={20} color={theme.colors.placeholder} />
+                )}
               </TouchableOpacity>
             </View>
 
@@ -328,7 +342,7 @@ export default function LoginScreen({ navigation }: any) {
               {loading ? (
                 <ActivityIndicator color="#FFFFFF" size="small" />
               ) : (
-                <Text style={styles.buttonText}>Sign In</Text>
+                <Text style={styles.buttonText}>Sign In to Dashboard</Text>
               )}
             </TouchableOpacity>
 
