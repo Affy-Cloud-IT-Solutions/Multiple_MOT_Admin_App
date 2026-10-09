@@ -4,10 +4,8 @@ import MaterialCommunityIcons from 'react-native-vector-icons/MaterialCommunityI
 import AdminDashboardScreen from '../screens/AdminDashboardScreen';
 import SuperAdminDashboardScreen from '../screens/SuperAdminDashboardScreen';
 import SuperAdminGaragesScreen from '../screens/SuperAdminGaragesScreen';
-import SuperAdminAuditsScreen from '../screens/SuperAdminAuditsScreen';
 import AdminCustomersScreen from '../screens/AdminCustomersScreen';
-import AdminRemindersScreen from '../screens/AdminRemindersScreen';
-import AdminAlertsScreen from '../screens/AdminAlertsScreen';
+import AdminServicesScreen from '../screens/AdminServicesScreen';
 import AdminSlotsScreen from '../screens/AdminSlotsScreen';
 import ProfileScreen from '../screens/ProfileScreen';
 import { useAppTheme } from '../context/ThemeContext';
@@ -21,11 +19,6 @@ export default function MainTabNavigator() {
 
   const isSuperAdmin = user?.role === 'admin';
 
-  // Calculate pending alerts to show badge count only for garage staff/admin
-  const pendingAlertsCount = !isSuperAdmin
-    ? alerts.filter((a) => a.status === 'Pending').length
-    : 0;
-
   return (
     <Tab.Navigator
       screenOptions={({ route }) => ({
@@ -36,16 +29,12 @@ export default function MainTabNavigator() {
             iconName = focused ? 'view-dashboard' : 'view-dashboard-outline';
           } else if (route.name === 'Garages') {
             iconName = focused ? 'garage' : 'garage-open-variant';
+          } else if (route.name === 'Services') {
+            iconName = focused ? 'car-wrench' : 'wrench-outline';
           } else if (route.name === 'Customers') {
             iconName = focused ? 'account-multiple' : 'account-multiple-outline';
-          } else if (route.name === 'Audits') {
-            iconName = focused ? 'clipboard-text-clock' : 'clipboard-text-clock-outline';
-          } else if (route.name === 'Reminders') {
-            iconName = focused ? 'bell-ring' : 'bell-ring-outline';
           } else if (route.name === 'Slots') {
             iconName = focused ? 'calendar-clock' : 'calendar-clock-outline';
-          } else if (route.name === 'Alerts') {
-            iconName = focused ? 'bell-badge' : 'bell-badge-outline';
           } else if (route.name === 'Profile') {
             iconName = focused ? 'account-circle' : 'account-circle-outline';
           }
@@ -81,7 +70,7 @@ export default function MainTabNavigator() {
       })}
     >
       {isSuperAdmin ? (
-        // Super Admin Experience: Platform Management (NO Reminders & NO Alerts)
+        // Super Admin Experience: Platform Management (Services, Garages, Customers, Profile)
         <>
           <Tab.Screen 
             name="Dashboard" 
@@ -94,14 +83,14 @@ export default function MainTabNavigator() {
             options={{ title: 'Garages' }} 
           />
           <Tab.Screen 
+            name="Services" 
+            component={AdminServicesScreen} 
+            options={{ title: 'Services' }} 
+          />
+          <Tab.Screen 
             name="Customers" 
             component={AdminCustomersScreen} 
             options={{ title: 'Customers' }} 
-          />
-          <Tab.Screen 
-            name="Audits" 
-            component={SuperAdminAuditsScreen} 
-            options={{ title: 'Logs' }} 
           />
           <Tab.Screen 
             name="Profile" 
@@ -110,7 +99,7 @@ export default function MainTabNavigator() {
           />
         </>
       ) : (
-        // Garage Admin & Staff Experience: Garage-specific operations & alerts
+        // Garage Admin & Staff Experience: Services & Pricing, Bookings, Customers, Slots, Profile
         <>
           <Tab.Screen 
             name="Dashboard" 
@@ -118,14 +107,14 @@ export default function MainTabNavigator() {
             options={{ title: 'Dashboard' }} 
           />
           <Tab.Screen 
+            name="Services" 
+            component={AdminServicesScreen} 
+            options={{ title: 'Services' }} 
+          />
+          <Tab.Screen 
             name="Customers" 
             component={AdminCustomersScreen} 
             options={{ title: 'Customers' }} 
-          />
-          <Tab.Screen 
-            name="Reminders" 
-            component={AdminRemindersScreen} 
-            options={{ title: 'Reminders' }} 
           />
           <Tab.Screen 
             name="Slots" 

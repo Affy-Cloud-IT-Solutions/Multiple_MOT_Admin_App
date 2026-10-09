@@ -351,6 +351,48 @@ export default function ProfileScreen({ navigation }: any) {
         </Section>
       )}
 
+      {/* Garage Operations & Tools Hub (For Garage Admin, Staff, Super Admin) */}
+      {user && user.role !== 'customer' && (
+        <Section title="Garage Operations & Tools" theme={theme}>
+          <MenuRow
+            icon="car-wrench"
+            iconColor="#0284C7"
+            title="Services & Pricing"
+            subtitle="Manage MOT, Servicing, Brakes, Tyres & custom rates"
+            onPress={() => navigation.navigate('AdminServices')}
+            theme={theme}
+          />
+          <MenuRow
+            icon="bell-ring"
+            iconColor="#D97706"
+            title="MOT Reminders Hub"
+            subtitle="View scheduled MOT renewal notifications & campaigns"
+            onPress={() => navigation.navigate('AdminReminders')}
+            theme={theme}
+          />
+          <MenuRow
+            icon="clipboard-text-clock"
+            iconColor="#7C3AED"
+            title="System Audit Logs"
+            subtitle="Review platform activity, logs & security events"
+            onPress={() => navigation.navigate('SuperAdminAudits')}
+            theme={theme}
+            isLast={user.role !== 'garage_admin'}
+          />
+          {user.role === 'garage_admin' && (
+            <MenuRow
+              icon="account-group"
+              iconColor="#059669"
+              title="Staff Directory"
+              subtitle="View all authorized garage technicians"
+              onPress={() => navigation.navigate('StaffList')}
+              theme={theme}
+              isLast
+            />
+          )}
+        </Section>
+      )}
+
       {/* App Settings */}
       <Section title="App Settings" theme={theme}>
         <SettingRow
@@ -619,6 +661,70 @@ const InfoRow = ({ icon, label, value, iconColor, theme }: InfoRowProps) => (
       </Text>
     </View>
   </View>
+);
+
+interface MenuRowProps {
+  icon: string;
+  iconColor: string;
+  title: string;
+  subtitle: string;
+  onPress: () => void;
+  theme: any;
+  isLast?: boolean;
+}
+
+const MenuRow = ({
+  icon,
+  iconColor,
+  title,
+  subtitle,
+  onPress,
+  theme,
+  isLast,
+}: MenuRowProps) => (
+  <>
+    <TouchableOpacity
+      onPress={onPress}
+      activeOpacity={0.7}
+      style={styles.settingRow}
+    >
+      <View style={styles.settingLeft}>
+        <View
+          style={[
+            styles.settingIconWrapper,
+            { backgroundColor: iconColor + '18' },
+          ]}
+        >
+          <MaterialCommunityIcons
+            name={icon}
+            size={20}
+            color={iconColor}
+          />
+        </View>
+        <View style={{ flex: 1 }}>
+          <Text style={[styles.settingTitle, { color: theme.colors.text }]}>
+            {title}
+          </Text>
+          <Text
+            style={[styles.settingSubtitle, { color: theme.colors.placeholder }]}
+            numberOfLines={1}
+          >
+            {subtitle}
+          </Text>
+        </View>
+      </View>
+      <MaterialCommunityIcons
+        name="chevron-right"
+        size={20}
+        color={theme.colors.placeholder}
+      />
+    </TouchableOpacity>
+    {!isLast && (
+      <View
+        style={[styles.settingDivider, { backgroundColor: theme.colors.border }]}
+      />
+    )}
+  </>
 );
 
 interface SettingRowProps {

@@ -10,6 +10,9 @@ import CustomerDetailScreen from '../screens/CustomerDetailScreen';
 import AdminBookMotScreen from '../screens/AdminBookMotScreen';
 import AdminAlertsScreen from '../screens/AdminAlertsScreen';
 import GarageVerificationReviewScreen from '../screens/GarageVerificationReviewScreen';
+import AdminRemindersScreen from '../screens/AdminRemindersScreen';
+import SuperAdminAuditsScreen from '../screens/SuperAdminAuditsScreen';
+import AdminServicesScreen from '../screens/AdminServicesScreen';
 import MainTabNavigator from './MainTabNavigator';
 import { useAppTheme } from '../context/ThemeContext';
 
@@ -81,6 +84,21 @@ export default function RootNavigator() {
         name="AdminAlerts"
         component={AdminAlertsScreen}
         options={{ title: 'Action Alerts', headerShown: true }}
+      />
+      <Stack.Screen
+        name="AdminReminders"
+        component={AdminRemindersScreen}
+        options={{ title: 'MOT Reminders', headerShown: true }}
+      />
+      <Stack.Screen
+        name="SuperAdminAudits"
+        component={SuperAdminAuditsScreen}
+        options={{ title: 'System Logs & Audits', headerShown: true }}
+      />
+      <Stack.Screen
+        name="AdminServices"
+        component={AdminServicesScreen}
+        options={{ headerShown: false }}
       />
       <Stack.Screen
         name="GarageVerificationReview"

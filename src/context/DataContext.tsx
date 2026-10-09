@@ -131,12 +131,18 @@ interface DataContextType {
   updateGarageStatus: (garageId: string, status: string, verificationStatus?: string, rejectionReason?: string) => Promise<void>;
   updateGarageDocumentStatus: (garageId: string, docId: string, status: 'Verified' | 'Rejected' | 'Pending', rejectionReason?: string) => Promise<any>;
   updateGarageProfile: (garageId: string, updates: Partial<Garage>) => Promise<any>;
+  fetchGarageServices: (garageId: string) => Promise<any>;
+  fetchServiceCatalogTemplates: () => Promise<{ categories: string[]; templates: any[] }>;
+  addGarageService: (garageId: string, serviceData: any) => Promise<any>;
+  updateGarageService: (garageId: string, serviceId: string, updates: any) => Promise<any>;
+  deleteGarageService: (garageId: string, serviceId: string) => Promise<any>;
+  seedGarageDefaultServices: (garageId: string) => Promise<any>;
 }
 
 const DataContext = createContext<DataContextType | undefined>(undefined);
 
-// export const BASE_URL = 'http://localhost:5000/api';
-export const BASE_URL = 'https://api-mot.affyclouditsolutions.com/api';
+export const BASE_URL = 'http://localhost:5000/api';
+// export const BASE_URL = 'https://api-mot.affyclouditsolutions.com/api';
 
 const decodeToken = (tokenStr: string | null) => {
   if (!tokenStr) return null;
@@ -676,6 +682,132 @@ export const DataProvider = ({ children }: { children: ReactNode }) => {
     }
   };
 
+  const fetchGarageServices = async (garageId: string): Promise<any> => {
+    try {
+      const response = await fetch(`${BASE_URL}/garages/${garageId}/services`, {
+        headers: token ? { 'Authorization': `Bearer ${token}` } : {}
+      });
+      const data = await response.json();
+      if (!response.ok) {
+        throw new Error(data.error || 'Failed to fetch services');
+      }
+      return data;
+    } catch (error) {
+      console.error('[DATA CONTEXT] fetchGarageServices error:', error);
+      throw error;
+    }
+  };
+
+  const fetchServiceCatalogTemplates = async (): Promise<{ categories: string[]; templates: any[] }> => {
+    try {
+      const response = await fetch(`${BASE_URL}/garages/templates/catalog`);
+      const data = await response.json();
+      if (!response.ok) {
+        throw new Error(data.error || 'Failed to fetch catalog templates');
+      }
+      return data;
+    } catch (error) {
+      console.error('[DATA CONTEXT] fetchServiceCatalogTemplates error:', error);
+      return {
+        categories: ['MOT', 'Servicing', 'Repairs', 'Tyre replacement', 'Diagnostics', 'Brakes', 'Exhaust', 'Custom'],
+        templates: [
+          { name: 'MOT Test (Class 4)', category: 'MOT', price: 45, duration: 45, description: 'Standard Class 4 MOT Test for cars and light vans.' },
+          { name: 'Full Service', category: 'Servicing', price: 155, duration: 120, description: 'Comprehensive 50+ point inspection & fluid change.' },
+          { name: 'Interim Service', category: 'Servicing', price: 85, duration: 60, description: 'Essential oil & filter replacement with 25-point safety check.' },
+          { name: 'Engine Diagnostic & Scan', category: 'Diagnostics', price: 50, duration: 45, description: 'Full OBD2 computerized diagnostics scan.' },
+          { name: 'Front Brake Pads & Discs', category: 'Brakes', price: 130, duration: 60, description: 'Supply & fitment of front brake pads & discs.' },
+          { name: 'Tyre Replacement & Balancing', category: 'Tyre replacement', price: 65, duration: 45, description: 'New tyre supply, fitment, and precision balancing.' },
+          { name: 'Exhaust Inspection & Repair', category: 'Exhaust', price: 75, duration: 60, description: 'Exhaust leak detection and silencer repair.' }
+        ]
+      };
+    }
+  };
+
+  const addGarageService = async (garageId: string, serviceData: any): Promise<any> => {
+    try {
+      const response = await fetch(`${BASE_URL}/garages/${garageId}/services`, {
+        method: 'POST',
+        headers: {
+          'Content-Type': 'application/json',
+          'Authorization': `Bearer ${token}`
+        },
+        body: JSON.stringify(serviceData)
+      });
+      const data = await response.json();
+      if (!response.ok) {
+        throw new Error(data.error || 'Failed to add service');
+      }
+      await refreshData();
+      return data;
+    } catch (error) {
+      console.error('[DATA CONTEXT] addGarageService error:', error);
+      throw error;
+    }
+  };
+
+  const updateGarageService = async (garageId: string, serviceId: string, updates: any): Promise<any> => {
+    try {
+      const response = await fetch(`${BASE_URL}/garages/${garageId}/services/${serviceId}`, {
+        method: 'PUT',
+        headers: {
+          'Content-Type': 'application/json',
+          'Authorization': `Bearer ${token}`
+        },
+        body: JSON.stringify(updates)
+      });
+      const data = await response.json();
+      if (!response.ok) {
+        throw new Error(data.error || 'Failed to update service');
+      }
+      await refreshData();
+      return data;
+    } catch (error) {
+      console.error('[DATA CONTEXT] updateGarageService error:', error);
+      throw error;
+    }
+  };
+
+  const deleteGarageService = async (garageId: string, serviceId: string): Promise<any> => {
+    try {
+      const response = await fetch(`${BASE_URL}/garages/${garageId}/services/${serviceId}`, {
+        method: 'DELETE',
+        headers: {
+          'Authorization': `Bearer ${token}`
+        }
+      });
+      const data = await response.json();
+      if (!response.ok) {
+        throw new Error(data.error || 'Failed to delete service');
+      }
+      await refreshData();
+      return data;
+    } catch (error) {
+      console.error('[DATA CONTEXT] deleteGarageService error:', error);
+      throw error;
+    }
+  };
+
+  const seedGarageDefaultServices = async (garageId: string): Promise<any> => {
+    try {
+      const response = await fetch(`${BASE_URL}/garages/${garageId}/services/seed-defaults`, {
+        method: 'POST',
+        headers: {
+          'Content-Type': 'application/json',
+          'Authorization': `Bearer ${token}`
+        }
+      });
+      const data = await response.json();
+      if (!response.ok) {
+        throw new Error(data.error || 'Failed to initialize default services');
+      }
+      await refreshData();
+      return data;
+    } catch (error) {
+      console.error('[DATA CONTEXT] seedGarageDefaultServices error:', error);
+      throw error;
+    }
+  };
+
   return (
     <DataContext.Provider
       value={{
@@ -706,6 +838,12 @@ export const DataProvider = ({ children }: { children: ReactNode }) => {
         updateGarageStatus,
         updateGarageDocumentStatus,
         updateGarageProfile,
+        fetchGarageServices,
+        fetchServiceCatalogTemplates,
+        addGarageService,
+        updateGarageService,
+        deleteGarageService,
+        seedGarageDefaultServices,
       }}
     >
       {children}
