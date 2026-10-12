@@ -40,7 +40,7 @@ export interface AlertNotification {
   registrationNumber: string;
   makeModel: string;
   date: string;
-  status: 'Pending' | 'Approved' | 'Acknowledged' | 'Rejected' | 'Completed';
+  status: 'Pending' | 'Approved' | 'Acknowledged' | 'Rejected' | 'Completed' | 'Cancelled';
   rejectionReason?: string;
   garageId?: string;
   serviceName?: string;
@@ -51,6 +51,9 @@ export interface AlertNotification {
   stationId?: string;
   stationName?: string;
   rescheduled?: boolean;
+  cancellationReason?: string;
+  cancelledBy?: string;
+  cancelledAt?: string;
 }
 
 export interface AuditLog {
@@ -126,6 +129,7 @@ interface DataContextType {
   fetchStaffList: () => Promise<any[]>;
   deleteStaffAccount: (staffId: string) => Promise<void>;
   rescheduleBooking: (alertId: string, date: string, slot: string) => Promise<void>;
+  cancelBooking: (alertId: string, reason?: string) => Promise<void>;
   lookupVehicle: (vrn: string) => Promise<any>;
   fetchGarages: () => Promise<Garage[]>;
   updateGarageStatus: (garageId: string, status: string, verificationStatus?: string, rejectionReason?: string) => Promise<void>;
@@ -556,6 +560,27 @@ export const DataProvider = ({ children }: { children: ReactNode }) => {
     }
   };
 
+  const cancelBooking = async (alertId: string, reason?: string): Promise<void> => {
+    try {
+      const response = await fetch(`${BASE_URL}/alerts/${alertId}/cancel`, {
+        method: 'PUT',
+        headers: { 
+          'Content-Type': 'application/json',
+          'Authorization': `Bearer ${token}`
+        },
+        body: JSON.stringify({ reason: reason || '' })
+      });
+      if (!response.ok) {
+        const data = await response.json();
+        throw new Error(data.error || 'Failed to cancel booking');
+      }
+      await refreshData();
+    } catch (error) {
+      console.error('[DATA CONTEXT] cancelBooking error:', error);
+      throw error;
+    }
+  };
+
   const rejectAlert = async (alertId: string, reason: string): Promise<void> => {
     try {
       const response = await fetch(`${BASE_URL}/alerts/${alertId}/reject`, {
@@ -833,6 +858,7 @@ export const DataProvider = ({ children }: { children: ReactNode }) => {
         fetchStaffList,
         deleteStaffAccount,
         rescheduleBooking,
+        cancelBooking,
         lookupVehicle,
         fetchGarages,
         updateGarageStatus,

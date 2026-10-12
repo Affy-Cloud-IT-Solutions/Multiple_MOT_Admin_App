@@ -69,11 +69,11 @@ const formatBookingDate = (dateVal: any) => {
 
 export default function BookedMotsScreen({ navigation }: any) {
   const { theme } = useAppTheme();
-  const { alerts, customers, approveAlert, acknowledgeAlert, rejectAlert, refreshData } = useAppValues();
+  const { alerts, customers, approveAlert, acknowledgeAlert, rejectAlert, cancelBooking, refreshData } = useAppValues();
   const [refreshing, setRefreshing] = useState(false);
   const [loadingAction, setLoadingAction] = useState<string | null>(null);
   const [searchQuery, setSearchQuery] = useState('');
-  const [statusFilter, setStatusFilter] = useState<'ALL' | 'PENDING' | 'APPROVED' | 'REJECTED'>('ALL');
+  const [statusFilter, setStatusFilter] = useState<'ALL' | 'PENDING' | 'APPROVED' | 'REJECTED' | 'CANCELLED'>('ALL');
 
   React.useEffect(() => {
     const unsubscribe = navigation.addListener('focus', () => {
@@ -93,6 +93,7 @@ export default function BookedMotsScreen({ navigation }: any) {
   const pendingCount = useMemo(() => bookedMots.filter(a => a.status === 'Pending').length, [bookedMots]);
   const approvedCount = useMemo(() => bookedMots.filter(a => a.status === 'Approved' || a.status === 'Completed').length, [bookedMots]);
   const rejectedCount = useMemo(() => bookedMots.filter(a => a.status === 'Rejected').length, [bookedMots]);
+  const cancelledCount = useMemo(() => bookedMots.filter(a => a.status === 'Cancelled').length, [bookedMots]);
 
   // Filtered list based on search and tab
   const filteredBookings = useMemo(() => {
@@ -101,6 +102,7 @@ export default function BookedMotsScreen({ navigation }: any) {
       if (statusFilter === 'PENDING' && item.status !== 'Pending') return false;
       if (statusFilter === 'APPROVED' && (item.status !== 'Approved' && item.status !== 'Completed')) return false;
       if (statusFilter === 'REJECTED' && item.status !== 'Rejected') return false;
+      if (statusFilter === 'CANCELLED' && item.status !== 'Cancelled') return false;
 
       // Search filter
       if (searchQuery.trim()) {
@@ -183,6 +185,36 @@ export default function BookedMotsScreen({ navigation }: any) {
       setLoadingAction(null);
       setSelectedAlertId(null);
     }
+  };
+
+  const handleAdminCancelBooking = (item: any) => {
+    const alertId = item.id;
+    const reg = item.registrationNumber || 'Vehicle';
+    const dateStr = formatBookingDate(item.date);
+    const slotStr = getSlotTimeDisplay(item);
+
+    Alert.alert(
+      'Cancel Booking?',
+      `Are you sure you want to cancel the booking for ${reg} on ${dateStr} (${slotStr})?\n\nThis will immediately free up the slot and notify the customer via email.`,
+      [
+        { text: 'Keep Booking', style: 'cancel' },
+        {
+          text: 'Yes, Cancel Booking',
+          style: 'destructive',
+          onPress: async () => {
+            setLoadingAction(`cancel_${alertId}`);
+            try {
+              await cancelBooking(alertId, 'Cancelled by garage staff');
+              Alert.alert('Booking Cancelled', `Booking for ${reg} has been cancelled and customer notified.`);
+            } catch (error: any) {
+              Alert.alert('Error', error?.message || 'Could not cancel booking.');
+            } finally {
+              setLoadingAction(null);
+            }
+          }
+        }
+      ]
+    );
   };
 
   const callCustomer = (phone: string) => {
@@ -315,6 +347,27 @@ export default function BookedMotsScreen({ navigation }: any) {
               Rejected ({rejectedCount})
             </Text>
           </TouchableOpacity>
+
+          <TouchableOpacity
+            style={[
+              styles.filterPill,
+              statusFilter === 'CANCELLED'
+                ? { backgroundColor: '#DC2626', borderColor: '#DC2626' }
+                : { backgroundColor: theme.colors.card, borderColor: theme.colors.border }
+            ]}
+            onPress={() => setStatusFilter('CANCELLED')}
+            activeOpacity={0.7}
+          >
+            <MaterialCommunityIcons 
+              name="calendar-remove" 
+              size={13} 
+              color={statusFilter === 'CANCELLED' ? '#FFFFFF' : '#DC2626'} 
+              style={{ marginRight: 4 }} 
+            />
+            <Text style={[styles.filterPillText, { color: statusFilter === 'CANCELLED' ? '#FFFFFF' : theme.colors.text }]}>
+              Cancelled ({cancelledCount})
+            </Text>
+          </TouchableOpacity>
         </ScrollView>
       </View>
 
@@ -381,6 +434,7 @@ export default function BookedMotsScreen({ navigation }: any) {
                     const isApproved = item.status === 'Approved';
                     const isRejected = item.status === 'Rejected';
                     const isCompleted = item.status === 'Completed';
+                    const isCancelled = item.status === 'Cancelled';
 
                     let statusText = 'Acknowledged';
                     let statusColor = '#6B7280';
@@ -407,6 +461,11 @@ export default function BookedMotsScreen({ navigation }: any) {
                       statusColor = '#EF4444';
                       statusBg = '#EF444415';
                       statusIcon = 'close-circle';
+                    } else if (isCancelled) {
+                      statusText = 'Cancelled';
+                      statusColor = '#DC2626';
+                      statusBg = '#DC262615';
+                      statusIcon = 'calendar-remove';
                     }
 
                     return (
@@ -491,6 +550,51 @@ export default function BookedMotsScreen({ navigation }: any) {
                               <Text style={{ fontSize: 11, fontWeight: '700', color: '#EF4444' }}>Reason for Rejection:</Text>
                               <Text style={[styles.rejectionText, { color: theme.colors.text }]}>{item.rejectionReason}</Text>
                             </View>
+                          </View>
+                        )}
+
+                        {/* Cancellation Notice */}
+                        {isCancelled && (
+                          <View style={[styles.rejectionNotice, { backgroundColor: '#DC262610', borderColor: '#DC262630' }]}>
+                            <MaterialCommunityIcons name="calendar-remove" size={14} color="#DC2626" style={{ marginRight: 6 }} />
+                            <View style={{ flex: 1 }}>
+                              <Text style={{ fontSize: 11, fontWeight: '700', color: '#DC2626' }}>
+                                Cancelled by {item.cancelledBy || 'Customer'}:
+                              </Text>
+                              <Text style={[styles.rejectionText, { color: theme.colors.text }]}>
+                                {item.cancellationReason || 'Slot has been released.'}
+                              </Text>
+                            </View>
+                          </View>
+                        )}
+
+                        {/* Cancel Button for Approved Bookings */}
+                        {isApproved && (
+                          <View style={{ flexDirection: 'row', justifyContent: 'flex-end', marginTop: 8 }}>
+                            <TouchableOpacity
+                              onPress={() => handleAdminCancelBooking(item)}
+                              disabled={loadingAction !== null}
+                              style={{
+                                flexDirection: 'row',
+                                alignItems: 'center',
+                                paddingHorizontal: 10,
+                                paddingVertical: 5,
+                                borderRadius: 6,
+                                borderWidth: 1,
+                                borderColor: '#EF444450',
+                                backgroundColor: '#EF444410',
+                              }}
+                              activeOpacity={0.7}
+                            >
+                              {loadingAction === `cancel_${item.id}` ? (
+                                <ActivityIndicator color="#EF4444" size="small" />
+                              ) : (
+                                <>
+                                  <MaterialCommunityIcons name="calendar-remove" size={13} color="#EF4444" style={{ marginRight: 4 }} />
+                                  <Text style={{ fontSize: 11, fontWeight: '700', color: '#EF4444' }}>Cancel Booking</Text>
+                                </>
+                              )}
+                            </TouchableOpacity>
                           </View>
                         )}
 

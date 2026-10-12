@@ -270,6 +270,7 @@ export default function CustomerDetailScreen({ route, navigation }: any) {
                 const isApproved = b.status === 'Approved';
                 const isRejected = b.status === 'Rejected';
                 const isCompleted = b.status === 'Completed';
+                const isCancelled = b.status === 'Cancelled';
 
                 let statusText = 'Acknowledged';
                 let statusColor = theme.colors.placeholder;
@@ -291,6 +292,10 @@ export default function CustomerDetailScreen({ route, navigation }: any) {
                   statusText = 'Rejected';
                   statusColor = theme.colors.error;
                   statusBg = theme.colors.error + '15';
+                } else if (isCancelled) {
+                  statusText = 'Cancelled';
+                  statusColor = '#DC2626';
+                  statusBg = '#DC262615';
                 }
 
                 return (
@@ -322,6 +327,13 @@ export default function CustomerDetailScreen({ route, navigation }: any) {
                         <View style={[styles.rejectionReasonBox, { backgroundColor: theme.colors.error + '10', borderColor: theme.colors.error }]}>
                           <Text style={{ fontSize: 11, color: theme.colors.error, fontWeight: 'bold' }}>Rejection Reason:</Text>
                           <Text style={{ fontSize: 12, color: theme.colors.text, marginTop: 2 }}>{b.rejectionReason}</Text>
+                        </View>
+                      )}
+
+                      {isCancelled && (
+                        <View style={[styles.rejectionReasonBox, { backgroundColor: '#DC262610', borderColor: '#DC262630' }]}>
+                          <Text style={{ fontSize: 11, color: '#DC2626', fontWeight: 'bold' }}>Cancelled by {b.cancelledBy || 'Customer'}:</Text>
+                          <Text style={{ fontSize: 12, color: theme.colors.text, marginTop: 2 }}>{b.cancellationReason || 'Slot has been released.'}</Text>
                         </View>
                       )}
 
