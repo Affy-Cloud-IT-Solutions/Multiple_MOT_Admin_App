@@ -351,8 +351,8 @@ export default function ProfileScreen({ navigation }: any) {
         </Section>
       )}
 
-      {/* Garage Operations & Tools Hub (For Garage Admin, Staff, Super Admin) */}
-      {user && user.role !== 'customer' && (
+      {/* Garage Operations & Tools Hub (For Garage Admin and Staff only; excluded for Super Admin) */}
+      {user && (user.role === 'garage_admin' || user.role === 'staff') && (
         <Section title="Garage Operations & Tools" theme={theme}>
           <MenuRow
             icon="car-wrench"

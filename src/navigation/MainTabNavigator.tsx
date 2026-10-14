@@ -4,6 +4,7 @@ import MaterialCommunityIcons from 'react-native-vector-icons/MaterialCommunityI
 import AdminDashboardScreen from '../screens/AdminDashboardScreen';
 import SuperAdminDashboardScreen from '../screens/SuperAdminDashboardScreen';
 import SuperAdminGaragesScreen from '../screens/SuperAdminGaragesScreen';
+import SuperAdminAuditsScreen from '../screens/SuperAdminAuditsScreen';
 import AdminCustomersScreen from '../screens/AdminCustomersScreen';
 import AdminServicesScreen from '../screens/AdminServicesScreen';
 import AdminSlotsScreen from '../screens/AdminSlotsScreen';
@@ -31,6 +32,8 @@ export default function MainTabNavigator() {
             iconName = focused ? 'garage' : 'garage-open-variant';
           } else if (route.name === 'Services') {
             iconName = focused ? 'car-wrench' : 'wrench-outline';
+          } else if (route.name === 'Audits') {
+            iconName = focused ? 'clipboard-text-clock' : 'clipboard-text-clock-outline';
           } else if (route.name === 'Customers') {
             iconName = focused ? 'account-multiple' : 'account-multiple-outline';
           } else if (route.name === 'Slots') {
@@ -70,7 +73,7 @@ export default function MainTabNavigator() {
       })}
     >
       {isSuperAdmin ? (
-        // Super Admin Experience: Platform Management (Services, Garages, Customers, Profile)
+        // Super Admin Experience: Platform Management (Overview, Garages, Audits, Profile)
         <>
           <Tab.Screen 
             name="Dashboard" 
@@ -83,14 +86,9 @@ export default function MainTabNavigator() {
             options={{ title: 'Garages' }} 
           />
           <Tab.Screen 
-            name="Services" 
-            component={AdminServicesScreen} 
-            options={{ title: 'Services' }} 
-          />
-          <Tab.Screen 
-            name="Customers" 
-            component={AdminCustomersScreen} 
-            options={{ title: 'Customers' }} 
+            name="Audits" 
+            component={SuperAdminAuditsScreen} 
+            options={{ title: 'Audits' }} 
           />
           <Tab.Screen 
             name="Profile" 

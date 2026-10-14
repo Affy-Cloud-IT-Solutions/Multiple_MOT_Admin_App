@@ -70,6 +70,8 @@ export default function AdminServicesScreen({ navigation }: any) {
     deleteGarageService,
   } = useAppValues();
 
+  const isSuperAdmin = user?.role === 'admin';
+
   // Selected Garage resolution
   const myGarageId = user?.garageId || (garages.length > 0 ? garages[0]._id || garages[0].id : '');
   const [selectedGarageId, setSelectedGarageId] = useState<string>(myGarageId || '');
@@ -140,6 +142,10 @@ export default function AdminServicesScreen({ navigation }: any) {
 
   // Open Modal for Add
   const handleOpenAdd = () => {
+    if (isSuperAdmin) {
+      Alert.alert('Restricted', 'Super Admin cannot add custom services for a garage. Only Garage Admins and Staff can add custom services for their garage.');
+      return;
+    }
     setOpenMenuId(null);
     setEditingService(null);
     setFormName('');
@@ -166,6 +172,10 @@ export default function AdminServicesScreen({ navigation }: any) {
 
   // Save Service (Create or Update)
   const handleSaveService = async () => {
+    if (isSuperAdmin && !editingService) {
+      Alert.alert('Restricted', 'Super Admin cannot add custom services for a garage. Only Garage Admins and Staff can manage services.');
+      return;
+    }
     const targetGId = selectedGarageId || user?.garageId;
     if (!targetGId) {
       Alert.alert('Error', 'Garage ID missing.');
@@ -307,26 +317,30 @@ export default function AdminServicesScreen({ navigation }: any) {
         <View style={{ flex: 1 }}>
           {/* Top Navbar: Back + Title + Count Badge + Smaller "Add Service" Button */}
           <View style={[styles.navbar, { backgroundColor: theme.colors.card, borderColor: theme.colors.border }]}>
-            <TouchableOpacity
-              onPress={() => navigation.goBack()}
-              style={styles.backBtn}
-              activeOpacity={0.7}
-            >
-              <MaterialCommunityIcons name="arrow-left" size={22} color={theme.colors.text} />
-            </TouchableOpacity>
+            {navigation.canGoBack && navigation.canGoBack() ? (
+              <TouchableOpacity
+                onPress={() => navigation.goBack()}
+                style={styles.backBtn}
+                activeOpacity={0.7}
+              >
+                <MaterialCommunityIcons name="arrow-left" size={22} color={theme.colors.text} />
+              </TouchableOpacity>
+            ) : null}
 
             <View style={styles.navTitleGroup}>
-              <Text style={[styles.navTitle, { color: theme.colors.text }]}>Services & Pricing</Text>
+              <Text style={[styles.navTitle, { color: theme.colors.text }]}>Services</Text>
             </View>
 
-            <TouchableOpacity
-              style={[styles.smallAddBtn, { backgroundColor: theme.colors.primary }]}
-              onPress={handleOpenAdd}
-              activeOpacity={0.8}
-            >
-              <MaterialCommunityIcons name="plus" size={15} color="#FFFFFF" />
-              <Text style={styles.smallAddBtnText}>Add Service</Text>
-            </TouchableOpacity>
+            {!isSuperAdmin && (
+              <TouchableOpacity
+                style={[styles.smallAddBtn, { backgroundColor: theme.colors.primary }]}
+                onPress={handleOpenAdd}
+                activeOpacity={0.8}
+              >
+                <MaterialCommunityIcons name="plus" size={15} color="#FFFFFF" />
+                <Text style={styles.smallAddBtnText}>Add Service</Text>
+              </TouchableOpacity>
+            )}
           </View>
 
           {/* Search & Filter Bar */}
@@ -408,13 +422,15 @@ export default function AdminServicesScreen({ navigation }: any) {
                     : 'No services created yet. Tap "+ Add Service" to add your first garage service.'}
                 </Text>
 
-                <TouchableOpacity
-                  style={[styles.smallAddBtn, { backgroundColor: theme.colors.primary, paddingHorizontal: 16, paddingVertical: 8 }]}
-                  onPress={handleOpenAdd}
-                >
-                  <MaterialCommunityIcons name="plus" size={15} color="#FFFFFF" />
-                  <Text style={styles.smallAddBtnText}>Add Custom Service</Text>
-                </TouchableOpacity>
+                {!isSuperAdmin && (
+                  <TouchableOpacity
+                    style={[styles.smallAddBtn, { backgroundColor: theme.colors.primary, paddingHorizontal: 16, paddingVertical: 8 }]}
+                    onPress={handleOpenAdd}
+                  >
+                    <MaterialCommunityIcons name="plus" size={15} color="#FFFFFF" />
+                    <Text style={styles.smallAddBtnText}>Add Custom Service</Text>
+                  </TouchableOpacity>
+                )}
               </View>
             ) : (
               filteredServices.map((service) => {

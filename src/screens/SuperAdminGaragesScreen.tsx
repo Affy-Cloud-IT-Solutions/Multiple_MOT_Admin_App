@@ -255,16 +255,6 @@ export default function SuperAdminGaragesScreen({ navigation }: any) {
 
   return (
     <View style={[styles.container, { backgroundColor: theme.colors.background }]}>
-      {/* Header */}
-      <View style={styles.header}>
-        <View>
-          <Text style={[styles.title, { color: theme.colors.text }]}>Garages Directory</Text>
-          <Text style={[styles.subtitle, { color: theme.colors.placeholder }]}>
-            All UK Registered Garages & Locations ({garages.length})
-          </Text>
-        </View>
-      </View>
-
       {/* Search Bar */}
       <View style={styles.searchSection}>
         <View
@@ -341,7 +331,6 @@ export default function SuperAdminGaragesScreen({ navigation }: any) {
         ) : (
           filteredGarages.map((garage) => {
             const statusColor = getStatusColor(garage.status);
-            const isVerified = garage.verificationStatus === 'Verified';
 
             return (
               <TouchableOpacity
@@ -417,25 +406,6 @@ export default function SuperAdminGaragesScreen({ navigation }: any) {
                       {garage.staffCount ?? 0} Staff
                     </Text>
                   </View>
-                  <View style={styles.metricChip}>
-                    <MaterialCommunityIcons
-                      name={isVerified ? 'check-decagram' : 'alert-circle-outline'}
-                      size={14}
-                      color={isVerified ? '#10B981' : '#F59E0B'}
-                    />
-                    <Text style={[styles.metricChipText, { color: isVerified ? '#10B981' : '#F59E0B' }]}>
-                      {garage.verificationStatus || 'Pending'}
-                    </Text>
-                  </View>
-
-                  {garage.images && garage.images.length > 0 && (
-                    <View style={styles.metricChip}>
-                      <MaterialCommunityIcons name="camera-outline" size={13} color="#0284C7" />
-                      <Text style={[styles.metricChipText, { color: theme.colors.text }]}>
-                        {garage.images.length} Photos
-                      </Text>
-                    </View>
-                  )}
                   <MaterialCommunityIcons name="chevron-right" size={18} color={theme.colors.placeholder} />
                 </View>
               </TouchableOpacity>
@@ -884,55 +854,38 @@ export default function SuperAdminGaragesScreen({ navigation }: any) {
                     )}
                   </View>
 
-                  {/* Action Buttons */}
-                  <Text style={[styles.actionsHeading, { color: theme.colors.text }]}>Platform Governance Actions</Text>
+                  {/* Action Buttons - Only displayed when garage application is Pending */}
+                  {selectedGarage.status === 'Pending' && (
+                    <>
+                      <Text style={[styles.actionsHeading, { color: theme.colors.text }]}>Platform Governance Actions</Text>
 
-                  <View style={styles.actionButtonContainer}>
-                    {selectedGarage.status !== 'Approved' && (
-                      <TouchableOpacity
-                        style={[styles.modalActionBtn, { backgroundColor: '#10B981' }]}
-                        disabled={loadingAction}
-                        onPress={() => handleStatusChange(selectedGarage.id || selectedGarage._id || '', 'Approved', 'Verified')}
-                      >
-                        {loadingAction ? (
-                          <ActivityIndicator size="small" color="#FFFFFF" />
-                        ) : (
-                          <>
-                            <MaterialCommunityIcons name="check-circle" size={18} color="#FFFFFF" />
-                            <Text style={styles.modalActionBtnText}>Approve & Verify Garage</Text>
-                          </>
-                        )}
-                      </TouchableOpacity>
-                    )}
+                      <View style={styles.actionButtonContainer}>
+                        <TouchableOpacity
+                          style={[styles.modalActionBtn, { backgroundColor: '#10B981' }]}
+                          disabled={loadingAction}
+                          onPress={() => handleStatusChange(selectedGarage.id || selectedGarage._id || '', 'Approved', 'Verified')}
+                        >
+                          {loadingAction ? (
+                            <ActivityIndicator size="small" color="#FFFFFF" />
+                          ) : (
+                            <>
+                              <MaterialCommunityIcons name="check-circle" size={18} color="#FFFFFF" />
+                              <Text style={styles.modalActionBtnText}>Approve & Verify Garage</Text>
+                            </>
+                          )}
+                        </TouchableOpacity>
 
-                    {selectedGarage.status === 'Approved' && (
-                      <TouchableOpacity
-                        style={[styles.modalActionBtn, { backgroundColor: '#F59E0B' }]}
-                        disabled={loadingAction}
-                        onPress={() => handleStatusChange(selectedGarage.id || selectedGarage._id || '', 'Suspended')}
-                      >
-                        {loadingAction ? (
-                          <ActivityIndicator size="small" color="#FFFFFF" />
-                        ) : (
-                          <>
-                            <MaterialCommunityIcons name="pause-circle" size={18} color="#FFFFFF" />
-                            <Text style={styles.modalActionBtnText}>Suspend Garage Operations</Text>
-                          </>
-                        )}
-                      </TouchableOpacity>
-                    )}
-
-                    {selectedGarage.status !== 'Rejected' && (
-                      <TouchableOpacity
-                        style={[styles.modalActionBtn, { backgroundColor: '#EF444415', borderWidth: 1, borderColor: '#EF4444' }]}
-                        disabled={loadingAction}
-                        onPress={handleOpenRejectModal}
-                      >
-                        <MaterialCommunityIcons name="close-circle" size={18} color="#EF4444" />
-                        <Text style={[styles.modalActionBtnText, { color: '#EF4444' }]}>Reject Application</Text>
-                      </TouchableOpacity>
-                    )}
-                  </View>
+                        <TouchableOpacity
+                          style={[styles.modalActionBtn, { backgroundColor: '#EF444415', borderWidth: 1, borderColor: '#EF4444' }]}
+                          disabled={loadingAction}
+                          onPress={handleOpenRejectModal}
+                        >
+                          <MaterialCommunityIcons name="close-circle" size={18} color="#EF4444" />
+                          <Text style={[styles.modalActionBtnText, { color: '#EF4444' }]}>Reject Application</Text>
+                        </TouchableOpacity>
+                      </View>
+                    </>
+                  )}
                 </ScrollView>
               </>
             )}
@@ -1003,55 +956,57 @@ export default function SuperAdminGaragesScreen({ navigation }: any) {
                   <Text style={{ color: '#FFFFFF', fontWeight: '700', fontSize: 13 }}>Open & View Document File</Text>
                 </TouchableOpacity>
 
-                <View style={{ flexDirection: 'row', gap: 10, marginTop: 10 }}>
-                  <TouchableOpacity
-                    disabled={docActionLoading}
-                    onPress={() => handleSetDocStatus('Rejected')}
-                    style={{ 
-                      flex: 1, 
-                      flexDirection: 'row', 
-                      alignItems: 'center', 
-                      justifyContent: 'center', 
-                      backgroundColor: '#EF444415', 
-                      borderWidth: 1, 
-                      borderColor: '#EF4444', 
-                      paddingVertical: 10, 
-                      borderRadius: 8 
-                    }}
-                  >
-                    {docActionLoading ? (
-                      <ActivityIndicator size="small" color="#EF4444" />
-                    ) : (
-                      <>
-                        <MaterialCommunityIcons name="close-circle-outline" size={18} color="#EF4444" style={{ marginRight: 4 }} />
-                        <Text style={{ color: '#EF4444', fontWeight: '700', fontSize: 12.5 }}>Reject Doc</Text>
-                      </>
-                    )}
-                  </TouchableOpacity>
+                {selectedGarage?.status === 'Pending' && (
+                  <View style={{ flexDirection: 'row', gap: 10, marginTop: 10 }}>
+                    <TouchableOpacity
+                      disabled={docActionLoading}
+                      onPress={() => handleSetDocStatus('Rejected')}
+                      style={{ 
+                        flex: 1, 
+                        flexDirection: 'row', 
+                        alignItems: 'center', 
+                        justifyContent: 'center', 
+                        backgroundColor: '#EF444415', 
+                        borderWidth: 1, 
+                        borderColor: '#EF4444', 
+                        paddingVertical: 10, 
+                        borderRadius: 8 
+                      }}
+                    >
+                      {docActionLoading ? (
+                        <ActivityIndicator size="small" color="#EF4444" />
+                      ) : (
+                        <>
+                          <MaterialCommunityIcons name="close-circle-outline" size={18} color="#EF4444" style={{ marginRight: 4 }} />
+                          <Text style={{ color: '#EF4444', fontWeight: '700', fontSize: 12.5 }}>Reject Doc</Text>
+                        </>
+                      )}
+                    </TouchableOpacity>
 
-                  <TouchableOpacity
-                    disabled={docActionLoading}
-                    onPress={() => handleSetDocStatus('Verified')}
-                    style={{ 
-                      flex: 1, 
-                      flexDirection: 'row', 
-                      alignItems: 'center', 
-                      justifyContent: 'center', 
-                      backgroundColor: '#10B981', 
-                      paddingVertical: 10, 
-                      borderRadius: 8 
-                    }}
-                  >
-                    {docActionLoading ? (
-                      <ActivityIndicator size="small" color="#FFFFFF" />
-                    ) : (
-                      <>
-                        <MaterialCommunityIcons name="check-circle-outline" size={18} color="#FFFFFF" style={{ marginRight: 4 }} />
-                        <Text style={{ color: '#FFFFFF', fontWeight: '700', fontSize: 12.5 }}>Verify Doc</Text>
-                      </>
-                    )}
-                  </TouchableOpacity>
-                </View>
+                    <TouchableOpacity
+                      disabled={docActionLoading}
+                      onPress={() => handleSetDocStatus('Verified')}
+                      style={{ 
+                        flex: 1, 
+                        flexDirection: 'row', 
+                        alignItems: 'center', 
+                        justifyContent: 'center', 
+                        backgroundColor: '#10B981', 
+                        paddingVertical: 10, 
+                        borderRadius: 8 
+                      }}
+                    >
+                      {docActionLoading ? (
+                        <ActivityIndicator size="small" color="#FFFFFF" />
+                      ) : (
+                        <>
+                          <MaterialCommunityIcons name="check-circle-outline" size={18} color="#FFFFFF" style={{ marginRight: 4 }} />
+                          <Text style={{ color: '#FFFFFF', fontWeight: '700', fontSize: 12.5 }}>Verify Doc</Text>
+                        </>
+                      )}
+                    </TouchableOpacity>
+                  </View>
+                )}
               </View>
             )}
           </View>
@@ -1209,6 +1164,7 @@ const styles = StyleSheet.create({
   },
   searchSection: {
     paddingHorizontal: 16,
+    paddingTop: 12,
     marginBottom: 8,
   },
   searchBar: {

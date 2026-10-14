@@ -131,10 +131,6 @@ export default function SuperAdminDashboardScreen({ navigation }: any) {
       {/* Header Banner */}
       <View style={styles.header}>
         <View style={{ flex: 1 }}>
-          <View style={styles.roleTag}>
-            <MaterialCommunityIcons name="shield-crown" size={14} color="#6366F1" />
-            <Text style={styles.roleTagText}>SUPER ADMIN CONSOLE</Text>
-          </View>
           <Text style={[styles.title, { color: theme.colors.text }]}>Platform Overview</Text>
           <Text style={[styles.subtitle, { color: theme.colors.placeholder }]}>
             UK-wide Garage & Network Management

@@ -686,7 +686,7 @@ export default function AdminCustomersScreen({ navigation }: any) {
             <Text style={[styles.emptyText, { color: theme.colors.placeholder }]}>No customers found</Text>
           </View>
         ) : (
-          filteredCustomers.map((c) => {
+          filteredCustomers.map((c, index) => {
             const customerVehicles = vehicles.filter((v) => 
               v.customerId && (
                 String(v.customerId).toLowerCase() === String(c.id || '').toLowerCase() ||
@@ -694,48 +694,72 @@ export default function AdminCustomersScreen({ navigation }: any) {
               )
             );
             const isExpanded = expandedCustomerId === c.id;
+            const listBorderColor = theme.dark ? '#334155' : '#CBD5E1';
 
             return (
-              <View key={c.id} style={[styles.customerCard, { backgroundColor: theme.colors.card, borderColor: theme.colors.border }]}>
-                <TouchableOpacity onPress={() => toggleExpandCustomer(c.id)} style={styles.customerHeader}>
+              <View
+                key={c.id}
+                style={[
+                  styles.customerCard,
+                  {
+                    backgroundColor: theme.colors.card,
+                  }
+                ]}
+              >
+                {index === 0 && (
+                  <View style={[styles.horizontalBorderLine, { backgroundColor: listBorderColor }]} />
+                )}
+                <TouchableOpacity
+                  onPress={() => toggleExpandCustomer(c.id)}
+                  style={styles.customerHeader}
+                  activeOpacity={0.65}
+                >
                   <View style={styles.customerHeaderLeft}>
-                    <View style={styles.customerIcon}>
-                      <Text style={styles.customerInitial}>
-                        {c.firstName[0]}{c.lastName[0]}
+                    <View style={[styles.customerIcon, { backgroundColor: theme.colors.secondary + '18' }]}>
+                      <Text style={[styles.customerInitial, { color: theme.colors.secondary }]}>
+                        {(c.firstName?.[0] || '').toUpperCase()}{(c.lastName?.[0] || '').toUpperCase()}
                       </Text>
                     </View>
-                    <View>
-                      <Text style={[styles.customerNameText, { color: theme.colors.text }]}>
+                    <View style={{ flex: 1 }}>
+                      <Text style={[styles.customerNameText, { color: theme.colors.text }]} numberOfLines={1}>
                         {c.firstName} {c.lastName}
                       </Text>
                       <View style={styles.customerInfoCol}>
-                        <View style={styles.customerInfoItem}>
-                          <MaterialCommunityIcons name="phone" size={12} color={theme.colors.placeholder} />
-                          <Text style={{ fontSize: 12, color: theme.colors.placeholder, marginLeft: 4 }}>
-                            {c.mobile}
-                          </Text>
-                        </View>
-                        <View style={styles.customerInfoItem}>
-                          <MaterialCommunityIcons name="email" size={12} color={theme.colors.placeholder} />
-                          <Text style={{ fontSize: 12, color: theme.colors.placeholder, marginLeft: 4 }}>
-                            {c.email}
-                          </Text>
-                        </View>
+                        {c.mobile ? (
+                          <View style={styles.customerInfoItem}>
+                            <MaterialCommunityIcons name="phone" size={11} color={theme.colors.placeholder} />
+                            <Text style={styles.customerInfoText}>
+                              {c.mobile}
+                            </Text>
+                          </View>
+                        ) : null}
+                        {customerVehicles.length > 0 && (
+                          <View style={[styles.customerInfoItem, { marginLeft: c.mobile ? 8 : 0 }]}>
+                            {c.mobile && (
+                              <Text style={{ color: theme.colors.placeholder, marginRight: 8, fontSize: 11 }}>•</Text>
+                            )}
+                            <MaterialCommunityIcons name="car" size={13} color={theme.colors.secondary} />
+                            <Text style={[styles.customerVehicleCountText, { color: theme.colors.secondary, marginLeft: 3 }]}>
+                              {customerVehicles.length} {customerVehicles.length === 1 ? 'Vehicle' : 'Vehicles'}
+                            </Text>
+                          </View>
+                        )}
                       </View>
                     </View>
                   </View>
                   <View style={styles.customerHeaderRight}>
                     <MaterialCommunityIcons
                       name={isExpanded ? 'chevron-up' : 'chevron-down'}
-                      size={20}
+                      size={18}
                       color={theme.colors.placeholder}
                     />
                   </View>
                 </TouchableOpacity>
 
                 {isExpanded && (
-                  <View style={styles.expandedContent}>
-                    <View style={[styles.divider, { backgroundColor: theme.colors.border }]} />
+                  <>
+                    <View style={[styles.horizontalBorderLine, { backgroundColor: listBorderColor }]} />
+                    <View style={[styles.expandedContent, { backgroundColor: theme.dark ? '#18181B' : '#F8FAFC' }]}>
 
                     <View style={{ flexDirection: 'row', gap: 8, marginVertical: 10 }}>
                       <TouchableOpacity
@@ -854,8 +878,8 @@ export default function AdminCustomersScreen({ navigation }: any) {
                                 justifyContent: 'space-between',
                                 alignItems: 'center',
                                 paddingVertical: 10,
-                                borderBottomWidth: 0.5,
-                                borderColor: theme.colors.border
+                                borderBottomWidth: 1,
+                                borderColor: listBorderColor
                               }}
                             >
                               <View style={styles.recentPlate}>
@@ -1034,7 +1058,7 @@ export default function AdminCustomersScreen({ navigation }: any) {
                         const isScrapped = v.status === 'Scrapped';
                         
                         return (
-                          <View key={v.id} style={{ borderBottomWidth: 0.8, borderColor: theme.colors.border, paddingVertical: 10 }}>
+                          <View key={v.id} style={{ borderBottomWidth: 1, borderColor: listBorderColor, paddingVertical: 10 }}>
                             <View style={{ flexDirection: 'row', justifyContent: 'space-between', alignItems: 'center' }}>
                               <View style={styles.vehicleRowLeft}>
                                 <View style={styles.recentPlate}>
@@ -1100,8 +1124,11 @@ export default function AdminCustomersScreen({ navigation }: any) {
                       })
                     )}
                   </View>
-                )}
-              </View>
+                </>
+              )}
+
+              <View style={[styles.horizontalBorderLine, { backgroundColor: listBorderColor }]} />
+            </View>
             );
           })
         )}
@@ -1147,10 +1174,11 @@ const styles = StyleSheet.create({
     elevation: 2,
   },
   scrollContent: {
-    paddingHorizontal: 16,
+    paddingHorizontal: 0,
     paddingBottom: 32,
   },
   formCard: {
+    marginHorizontal: 16,
     borderWidth: 1,
     borderRadius: 14,
     padding: 16,
@@ -1242,21 +1270,18 @@ const styles = StyleSheet.create({
     marginTop: 8,
   },
   customerCard: {
-    borderWidth: 1,
-    borderRadius: 12,
-    marginBottom: 12,
-    overflow: 'hidden',
-    elevation: 1.5,
-    shadowColor: '#000',
-    shadowOffset: { width: 0, height: 1 },
-    shadowOpacity: 0.04,
-    shadowRadius: 2,
+    width: '100%',
+  },
+  horizontalBorderLine: {
+    width: '100%',
+    height: 1,
   },
   customerHeader: {
     flexDirection: 'row',
     justifyContent: 'space-between',
     alignItems: 'center',
-    padding: 14,
+    paddingHorizontal: 16,
+    paddingVertical: 10,
   },
   customerHeaderLeft: {
     flexDirection: 'row',
@@ -1264,39 +1289,51 @@ const styles = StyleSheet.create({
     flex: 1,
   },
   customerIcon: {
-    width: 40,
-    height: 40,
-    borderRadius: 20,
-    backgroundColor: '#FFD300',
+    width: 36,
+    height: 36,
+    borderRadius: 18,
     justifyContent: 'center',
     alignItems: 'center',
     marginRight: 12,
   },
   customerInitial: {
-    color: '#000',
-    fontWeight: 'bold',
-    fontSize: 14,
+    fontWeight: '700',
+    fontSize: 13,
   },
   customerInfoCol: {
-    flexDirection: 'column',
-    marginTop: 4,
-    gap: 3,
+    flexDirection: 'row',
+    alignItems: 'center',
+    marginTop: 2,
+    flexWrap: 'wrap',
   },
   customerInfoItem: {
     flexDirection: 'row',
     alignItems: 'center',
   },
+  customerInfoText: {
+    fontSize: 12,
+    color: '#6B7280',
+    marginLeft: 3,
+  },
+  customerVehicleCountText: {
+    fontSize: 11.5,
+    fontWeight: '600',
+    marginLeft: 5,
+  },
   customerNameText: {
     fontSize: 15,
-    fontWeight: 'bold',
+    fontWeight: '600',
+    letterSpacing: -0.2,
   },
   customerHeaderRight: {
     flexDirection: 'row',
     alignItems: 'center',
+    marginLeft: 8,
   },
   expandedContent: {
-    paddingHorizontal: 14,
+    paddingHorizontal: 16,
     paddingBottom: 14,
+    paddingTop: 6,
   },
   divider: {
     height: 1,

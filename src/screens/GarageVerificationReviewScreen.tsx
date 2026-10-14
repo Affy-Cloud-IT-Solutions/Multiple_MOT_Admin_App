@@ -497,57 +497,61 @@ export default function GarageVerificationReviewScreen({ route, navigation }: an
                         setSelectedDoc(doc);
                         setDocPreviewModalVisible(true);
                       }}
-                      style={[styles.previewDocBtn, { borderColor: theme.colors.border }]}
+                      style={[styles.previewDocBtn, { borderColor: theme.colors.border }, !isPending && { flex: 1 }]}
                     >
                       <MaterialCommunityIcons name="eye-outline" size={16} color={theme.colors.primary} style={{ marginRight: 4 }} />
                       <Text style={[styles.previewDocBtnText, { color: theme.colors.primary }]}>Preview Document</Text>
                     </TouchableOpacity>
 
-                    {/* Approve Document Button */}
-                    <TouchableOpacity
-                      onPress={() => handleApproveDocument(doc)}
-                      disabled={savingDocAction || docVerified}
-                      style={[
-                        styles.approveDocBtn,
-                        {
-                          backgroundColor: docVerified ? '#10B98120' : '#10B981',
-                          opacity: savingDocAction ? 0.6 : 1
-                        }
-                      ]}
-                    >
-                      <MaterialCommunityIcons
-                        name="check"
-                        size={16}
-                        color={docVerified ? '#10B981' : '#FFFFFF'}
-                        style={{ marginRight: 4 }}
-                      />
-                      <Text style={[styles.approveDocBtnText, { color: docVerified ? '#10B981' : '#FFFFFF' }]}>
-                        {docVerified ? 'Verified ✓' : 'Approve'}
-                      </Text>
-                    </TouchableOpacity>
+                    {/* Approve Document Button - Only when Pending */}
+                    {isPending && (
+                      <TouchableOpacity
+                        onPress={() => handleApproveDocument(doc)}
+                        disabled={savingDocAction || docVerified}
+                        style={[
+                          styles.approveDocBtn,
+                          {
+                            backgroundColor: docVerified ? '#10B98120' : '#10B981',
+                            opacity: savingDocAction ? 0.6 : 1
+                          }
+                        ]}
+                      >
+                        <MaterialCommunityIcons
+                          name="check"
+                          size={16}
+                          color={docVerified ? '#10B981' : '#FFFFFF'}
+                          style={{ marginRight: 4 }}
+                        />
+                        <Text style={[styles.approveDocBtnText, { color: docVerified ? '#10B981' : '#FFFFFF' }]}>
+                          {docVerified ? 'Verified ✓' : 'Approve'}
+                        </Text>
+                      </TouchableOpacity>
+                    )}
 
-                    {/* Reject Document Button */}
-                    <TouchableOpacity
-                      onPress={() => openRejectDocModal(doc)}
-                      disabled={savingDocAction}
-                      style={[
-                        styles.rejectDocBtn,
-                        {
-                          backgroundColor: docRejected ? '#EF444420' : '#EF4444',
-                          opacity: savingDocAction ? 0.6 : 1
-                        }
-                      ]}
-                    >
-                      <MaterialCommunityIcons
-                        name="close"
-                        size={16}
-                        color={docRejected ? '#EF4444' : '#FFFFFF'}
-                        style={{ marginRight: 4 }}
-                      />
-                      <Text style={[styles.rejectDocBtnText, { color: docRejected ? '#EF4444' : '#FFFFFF' }]}>
-                        {docRejected ? 'Rejected ✗' : 'Reject'}
-                      </Text>
-                    </TouchableOpacity>
+                    {/* Reject Document Button - Only when Pending */}
+                    {isPending && (
+                      <TouchableOpacity
+                        onPress={() => openRejectDocModal(doc)}
+                        disabled={savingDocAction}
+                        style={[
+                          styles.rejectDocBtn,
+                          {
+                            backgroundColor: docRejected ? '#EF444420' : '#EF4444',
+                            opacity: savingDocAction ? 0.6 : 1
+                          }
+                        ]}
+                      >
+                        <MaterialCommunityIcons
+                          name="close"
+                          size={16}
+                          color={docRejected ? '#EF4444' : '#FFFFFF'}
+                          style={{ marginRight: 4 }}
+                        />
+                        <Text style={[styles.rejectDocBtnText, { color: docRejected ? '#EF4444' : '#FFFFFF' }]}>
+                          {docRejected ? 'Rejected ✗' : 'Reject'}
+                        </Text>
+                      </TouchableOpacity>
+                    )}
                   </View>
                 </View>
               );
@@ -556,69 +560,95 @@ export default function GarageVerificationReviewScreen({ route, navigation }: an
         </View>
       </ScrollView>
 
-      {/* MASTER DECISION BAR AT BOTTOM */}
-      <View style={[styles.bottomDecisionBar, { backgroundColor: theme.colors.card, borderTopColor: theme.colors.border }]}>
-        <View style={{ flexDirection: 'row', alignItems: 'center', justifyContent: 'space-between', marginBottom: 10 }}>
-          <View>
-            <Text style={[styles.decisionSummaryTitle, { color: theme.colors.text }]}>Final Application Decision</Text>
-            <Text style={[styles.decisionSummarySubtitle, { color: theme.colors.placeholder }]}>
-              {rejectedDocsCount > 0
-                ? `⚠️ ${rejectedDocsCount} document(s) rejected — require re-upload`
-                : verifiedDocsCount === docs.length && docs.length > 0
-                ? 'All documents verified & ready for authorization'
-                : 'Review all credentials before finalizing'}
-            </Text>
+      {/* MASTER DECISION BAR AT BOTTOM - ONLY WHEN PENDING */}
+      {isPending ? (
+        <View style={[styles.bottomDecisionBar, { backgroundColor: theme.colors.card, borderTopColor: theme.colors.border }]}>
+          <View style={{ flexDirection: 'row', alignItems: 'center', justifyContent: 'space-between', marginBottom: 10 }}>
+            <View>
+              <Text style={[styles.decisionSummaryTitle, { color: theme.colors.text }]}>Final Application Decision</Text>
+              <Text style={[styles.decisionSummarySubtitle, { color: theme.colors.placeholder }]}>
+                {rejectedDocsCount > 0
+                  ? `⚠️ ${rejectedDocsCount} document(s) rejected — require re-upload`
+                  : verifiedDocsCount === docs.length && docs.length > 0
+                  ? 'All documents verified & ready for authorization'
+                  : 'Review all credentials before finalizing'}
+              </Text>
+            </View>
+          </View>
+
+          <View style={styles.decisionButtonRow}>
+            {/* Final Reject Button */}
+            <TouchableOpacity
+              onPress={() => {
+                // Pre-fill master reason if any docs were rejected
+                const rejectedList = docs
+                  .filter(d => d.status === 'Rejected' && d.rejectionReason)
+                  .map(d => `• ${d.name}: ${d.rejectionReason}`)
+                  .join('\n');
+                setMasterRejectionReason(
+                  rejectedList
+                    ? `Please address the following document issues and re-submit:\n${rejectedList}`
+                    : 'Application requires updated MOT documentation and facility photos.'
+                );
+                setMasterRejectModalVisible(true);
+              }}
+              disabled={savingMasterAction}
+              style={[styles.masterRejectBtn, { opacity: savingMasterAction ? 0.6 : 1 }]}
+            >
+              <MaterialCommunityIcons name="close-circle-outline" size={18} color="#FFFFFF" style={{ marginRight: 6 }} />
+              <Text style={styles.masterRejectBtnText}>Reject Application</Text>
+            </TouchableOpacity>
+
+            {/* Final Approve Button */}
+            <TouchableOpacity
+              onPress={handleMasterApproveGarage}
+              disabled={savingMasterAction}
+              style={[
+                styles.masterApproveBtn,
+                {
+                  backgroundColor: '#10B981',
+                  opacity: savingMasterAction ? 0.6 : 1
+                }
+              ]}
+            >
+              {savingMasterAction ? (
+                <ActivityIndicator size="small" color="#FFFFFF" />
+              ) : (
+                <>
+                  <MaterialCommunityIcons name="check-decagram" size={18} color="#FFFFFF" style={{ marginRight: 6 }} />
+                  <Text style={styles.masterApproveBtnText}>
+                    Approve & Activate Garage
+                  </Text>
+                </>
+              )}
+            </TouchableOpacity>
           </View>
         </View>
-
-        <View style={styles.decisionButtonRow}>
-          {/* Final Reject Button */}
-          <TouchableOpacity
-            onPress={() => {
-              // Pre-fill master reason if any docs were rejected
-              const rejectedList = docs
-                .filter(d => d.status === 'Rejected' && d.rejectionReason)
-                .map(d => `• ${d.name}: ${d.rejectionReason}`)
-                .join('\n');
-              setMasterRejectionReason(
-                rejectedList
-                  ? `Please address the following document issues and re-submit:\n${rejectedList}`
-                  : 'Application requires updated MOT documentation and facility photos.'
-              );
-              setMasterRejectModalVisible(true);
-            }}
-            disabled={savingMasterAction}
-            style={[styles.masterRejectBtn, { opacity: savingMasterAction ? 0.6 : 1 }]}
-          >
-            <MaterialCommunityIcons name="close-circle-outline" size={18} color="#FFFFFF" style={{ marginRight: 6 }} />
-            <Text style={styles.masterRejectBtnText}>Reject Application</Text>
-          </TouchableOpacity>
-
-          {/* Final Approve Button */}
-          <TouchableOpacity
-            onPress={handleMasterApproveGarage}
-            disabled={savingMasterAction || isApproved}
-            style={[
-              styles.masterApproveBtn,
-              {
-                backgroundColor: isApproved ? '#10B98180' : '#10B981',
-                opacity: savingMasterAction ? 0.6 : 1
-              }
-            ]}
-          >
-            {savingMasterAction ? (
-              <ActivityIndicator size="small" color="#FFFFFF" />
-            ) : (
-              <>
-                <MaterialCommunityIcons name="check-decagram" size={18} color="#FFFFFF" style={{ marginRight: 6 }} />
-                <Text style={styles.masterApproveBtnText}>
-                  {isApproved ? 'Approved ✓' : 'Approve & Activate Garage'}
-                </Text>
-              </>
-            )}
-          </TouchableOpacity>
+      ) : isApproved ? (
+        <View style={[styles.bottomDecisionBar, { backgroundColor: theme.colors.card, borderTopColor: '#10B98130', paddingVertical: 14 }]}>
+          <View style={{ flexDirection: 'row', alignItems: 'center', backgroundColor: '#10B98115', borderRadius: 10, padding: 12, borderWidth: 1, borderColor: '#10B98140' }}>
+            <MaterialCommunityIcons name="check-decagram" size={26} color="#10B981" style={{ marginRight: 10 }} />
+            <View style={{ flex: 1 }}>
+              <Text style={{ fontSize: 14, fontWeight: '700', color: '#10B981' }}>Garage Application Approved</Text>
+              <Text style={{ fontSize: 11.5, color: theme.colors.placeholder, marginTop: 2 }}>
+                Full operational credentials verified. Garage is active for public bookings.
+              </Text>
+            </View>
+          </View>
         </View>
-      </View>
+      ) : isRejected ? (
+        <View style={[styles.bottomDecisionBar, { backgroundColor: theme.colors.card, borderTopColor: '#EF444430', paddingVertical: 14 }]}>
+          <View style={{ flexDirection: 'row', alignItems: 'center', backgroundColor: '#EF444415', borderRadius: 10, padding: 12, borderWidth: 1, borderColor: '#EF444440' }}>
+            <MaterialCommunityIcons name="close-circle" size={26} color="#EF4444" style={{ marginRight: 10 }} />
+            <View style={{ flex: 1 }}>
+              <Text style={{ fontSize: 14, fontWeight: '700', color: '#EF4444' }}>Garage Application Rejected</Text>
+              <Text style={{ fontSize: 11.5, color: theme.colors.text, marginTop: 2 }}>
+                {garage.rejectionReason || 'Application has been rejected. Applicant must submit new credentials.'}
+              </Text>
+            </View>
+          </View>
+        </View>
+      ) : null}
 
       {/* MODAL 1: SINGLE DOCUMENT REJECTION MODAL */}
       <Modal

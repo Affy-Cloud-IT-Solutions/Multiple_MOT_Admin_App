@@ -245,7 +245,27 @@ export default function AdminDashboardScreen({ navigation }: any) {
           bookedMots.slice(0, 5).map((booking) => {
             const cleanMake = (booking.makeModel || 'Vehicle').split(' (Slot:')[0]?.split(' at ')[0].trim();
             const slotInfo = booking.slotTime || (booking.makeModel?.match(/Slot:\s*([^\n\r]+)/i)?.[1]) || '';
-            const isCompleted = booking.status === 'Completed';
+            const rawStatus = (booking.status || 'Booked').toLowerCase();
+
+            // Correct status colors: Completed (Green), Approved (Sky Blue / Teal), Cancelled/Rejected (Red), Pending (Amber)
+            let statusColor = '#3B82F6';
+            let statusBg = '#3B82F618';
+            if (rawStatus === 'completed') {
+              statusColor = '#10B981'; // Green
+              statusBg = '#10B98118';
+            } else if (rawStatus === 'approved') {
+              statusColor = '#0284C7'; // Blue/Cyan
+              statusBg = '#0284C718';
+            } else if (rawStatus === 'cancelled' || rawStatus === 'canceled') {
+              statusColor = '#EF4444'; // Red
+              statusBg = '#EF444418';
+            } else if (rawStatus === 'rejected') {
+              statusColor = '#DC2626'; // Dark Red
+              statusBg = '#DC262618';
+            } else if (rawStatus === 'pending') {
+              statusColor = '#F59E0B'; // Amber
+              statusBg = '#F59E0B18';
+            }
 
             return (
               <TouchableOpacity
@@ -269,8 +289,8 @@ export default function AdminDashboardScreen({ navigation }: any) {
                       {cleanMake}
                     </Text>
                   </View>
-                  <View style={[styles.statusBadge, { backgroundColor: isCompleted ? '#10B98115' : '#3B82F615' }]}>
-                    <Text style={[styles.statusBadgeText, { color: isCompleted ? '#10B981' : '#3B82F6' }]}>
+                  <View style={[styles.statusBadge, { backgroundColor: statusBg }]}>
+                    <Text style={[styles.statusBadgeText, { color: statusColor }]}>
                       {booking.status || 'Booked'}
                     </Text>
                   </View>

@@ -91,35 +91,7 @@ export default function SuperAdminAuditsScreen({ navigation }: any) {
 
   return (
     <View style={[styles.container, { backgroundColor: theme.colors.background }]}>
-      {/* Header */}
-      <View style={styles.header}>
-        <View style={{ flex: 1 }}>
-          <Text style={[styles.title, { color: theme.colors.text }]}>Platform Audits</Text>
-          <Text style={[styles.subtitle, { color: theme.colors.placeholder }]}>
-            Real-time System Event History & Activity Trail ({audits.length})
-          </Text>
-        </View>
-        <TouchableOpacity
-          style={[styles.refreshBtn, { borderColor: theme.colors.border, backgroundColor: theme.colors.card }]}
-          disabled={isRefreshing}
-          onPress={async () => {
-            setIsRefreshing(true);
-            try {
-              await refreshData();
-            } finally {
-              setIsRefreshing(false);
-            }
-          }}
-        >
-          {isRefreshing ? (
-            <ActivityIndicator size="small" color={theme.colors.secondary} />
-          ) : (
-            <MaterialCommunityIcons name="refresh" size={20} color={theme.colors.secondary} />
-          )}
-        </TouchableOpacity>
-      </View>
-
-      {/* Search Bar */}
+      {/* Search Bar & Refresh */}
       <View style={styles.searchSection}>
         <View
           style={[
@@ -141,6 +113,24 @@ export default function SuperAdminAuditsScreen({ navigation }: any) {
             </TouchableOpacity>
           )}
         </View>
+        <TouchableOpacity
+          style={[styles.refreshBtn, { borderColor: theme.colors.border, backgroundColor: theme.colors.card }]}
+          disabled={isRefreshing}
+          onPress={async () => {
+            setIsRefreshing(true);
+            try {
+              await refreshData();
+            } finally {
+              setIsRefreshing(false);
+            }
+          }}
+        >
+          {isRefreshing ? (
+            <ActivityIndicator size="small" color={theme.colors.secondary} />
+          ) : (
+            <MaterialCommunityIcons name="refresh" size={20} color={theme.colors.secondary} />
+          )}
+        </TouchableOpacity>
       </View>
 
       {/* Filter Tabs - Horizontal Scroll */}
@@ -258,18 +248,23 @@ const styles = StyleSheet.create({
     marginTop: 2,
   },
   refreshBtn: {
-    width: 38,
-    height: 38,
-    borderRadius: 8,
+    width: 44,
+    height: 44,
+    borderRadius: 10,
     borderWidth: 1,
     alignItems: 'center',
     justifyContent: 'center',
   },
   searchSection: {
+    flexDirection: 'row',
+    alignItems: 'center',
     paddingHorizontal: 16,
+    paddingTop: 12,
     marginBottom: 8,
+    gap: 8,
   },
   searchBar: {
+    flex: 1,
     flexDirection: 'row',
     alignItems: 'center',
     borderWidth: 1,
