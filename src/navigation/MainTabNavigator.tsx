@@ -59,6 +59,7 @@ export default function MainTabNavigator() {
           fontWeight: 'bold',
           fontSize: 11,
         },
+        headerShown: false,
         headerStyle: {
           backgroundColor: theme.colors.card,
           elevation: 2,
@@ -78,22 +79,22 @@ export default function MainTabNavigator() {
           <Tab.Screen 
             name="Dashboard" 
             component={SuperAdminDashboardScreen} 
-            options={{ title: 'Overview' }} 
+            options={{ title: 'Overview', headerShown: false }} 
           />
           <Tab.Screen 
             name="Garages" 
             component={SuperAdminGaragesScreen} 
-            options={{ title: 'Garages' }} 
+            options={{ title: 'Garages', headerShown: false }} 
           />
           <Tab.Screen 
             name="Audits" 
             component={SuperAdminAuditsScreen} 
-            options={{ title: 'Audits' }} 
+            options={{ title: 'Audits', headerShown: false }} 
           />
           <Tab.Screen 
             name="Profile" 
             component={ProfileScreen} 
-            options={{ title: 'Settings' }} 
+            options={{ title: 'Settings', headerShown: false }} 
           />
         </>
       ) : (
@@ -102,27 +103,27 @@ export default function MainTabNavigator() {
           <Tab.Screen 
             name="Dashboard" 
             component={AdminDashboardScreen} 
-            options={{ title: 'Dashboard' }} 
+            options={{ title: 'Dashboard', headerShown: false }} 
           />
           <Tab.Screen 
             name="Services" 
             component={AdminServicesScreen} 
-            options={{ title: 'Services' }} 
+            options={{ title: 'Services', headerShown: false }} 
           />
           <Tab.Screen 
             name="Customers" 
             component={AdminCustomersScreen} 
-            options={{ title: 'Customers' }} 
+            options={{ title: 'Customers', headerShown: false }} 
           />
           <Tab.Screen 
             name="Slots" 
             component={AdminSlotsScreen} 
-            options={{ title: 'Slots' }} 
+            options={{ title: 'Slots', headerShown: false }} 
           />
           <Tab.Screen 
             name="Profile" 
             component={ProfileScreen} 
-            options={{ title: 'Settings' }} 
+            options={{ title: 'Settings', headerShown: false }} 
           />
         </>
       )}
