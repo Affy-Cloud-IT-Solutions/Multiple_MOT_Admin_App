@@ -8,6 +8,7 @@ import SuperAdminAuditsScreen from '../screens/SuperAdminAuditsScreen';
 import AdminCustomersScreen from '../screens/AdminCustomersScreen';
 import AdminServicesScreen from '../screens/AdminServicesScreen';
 import AdminSlotsScreen from '../screens/AdminSlotsScreen';
+import AdminAlertsScreen from '../screens/AdminAlertsScreen';
 import ProfileScreen from '../screens/ProfileScreen';
 import { useAppTheme } from '../context/ThemeContext';
 import { useAppValues } from '../context/DataContext';
@@ -16,30 +17,32 @@ const Tab = createBottomTabNavigator();
 
 export default function MainTabNavigator() {
   const { theme } = useAppTheme();
-  const { alerts, user } = useAppValues();
+  const { user } = useAppValues();
 
   const isSuperAdmin = user?.role === 'admin';
 
   return (
     <Tab.Navigator
       screenOptions={({ route }) => ({
-        tabBarIcon: ({ color, size, focused }) => {
-          let iconName = 'home';
+        tabBarIcon: ({ color, size }) => {
+          let iconName = 'circle-outline';
 
           if (route.name === 'Dashboard') {
-            iconName = focused ? 'view-dashboard' : 'view-dashboard-outline';
+            iconName = 'view-dashboard-outline';
           } else if (route.name === 'Garages') {
-            iconName = focused ? 'garage' : 'garage-open-variant';
+            iconName = 'garage-variant';
           } else if (route.name === 'Services') {
-            iconName = focused ? 'car-wrench' : 'wrench-outline';
+            iconName = 'car-wrench';
           } else if (route.name === 'Audits') {
-            iconName = focused ? 'clipboard-text-clock' : 'clipboard-text-clock-outline';
+            iconName = 'clipboard-text-clock-outline';
           } else if (route.name === 'Customers') {
-            iconName = focused ? 'account-multiple' : 'account-multiple-outline';
+            iconName = 'account-group-outline';
           } else if (route.name === 'Slots') {
-            iconName = focused ? 'calendar-clock' : 'calendar-clock-outline';
+            iconName = 'calendar-clock-outline';
+          } else if (route.name === 'Reminders') {
+            iconName = 'bell-outline';
           } else if (route.name === 'Profile') {
-            iconName = focused ? 'account-circle' : 'account-circle-outline';
+            iconName = 'cog-outline';
           }
 
           return <MaterialCommunityIcons name={iconName} size={size} color={color} />;
@@ -120,6 +123,15 @@ export default function MainTabNavigator() {
             component={AdminSlotsScreen} 
             options={{ title: 'Slots', headerShown: false }} 
           />
+          {/* <Tab.Screen 
+            name="Reminders" 
+            component={AdminAlertsScreen} 
+            options={{ 
+              title: 'Reminders', 
+              headerShown: false,
+              tabBarBadge: pendingAlertsCount > 0 ? pendingAlertsCount : undefined,
+            }} 
+          /> */}
           <Tab.Screen 
             name="Profile" 
             component={ProfileScreen} 

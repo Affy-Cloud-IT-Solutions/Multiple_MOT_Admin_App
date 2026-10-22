@@ -49,9 +49,57 @@ const formatBookingDate = (dateVal: any) => {
   return String(dateVal);
 };
 
+interface GarageServiceItem {
+  id?: string;
+  _id?: string;
+  name: string;
+  category?: string;
+  price: number;
+  duration?: number;
+  description?: string;
+  isActive?: boolean;
+}
+
+const DEFAULT_SERVICES: GarageServiceItem[] = [
+  { id: 'mot_test', name: 'MOT Test (Class 4)', category: 'MOT', price: 45, duration: 45, description: 'Class 4 annual DVSA vehicle inspection' },
+  { id: 'full_service', name: 'Full Service', category: 'Servicing', price: 155, duration: 120, description: 'Comprehensive annual full car service' },
+  { id: 'interim_service', name: 'Interim Service', category: 'Servicing', price: 85, duration: 60, description: '6-month / 6,000 miles oil & filter inspection' },
+  { id: 'major_service', name: 'Major Service', category: 'Servicing', price: 210, duration: 180, description: 'Complete 24-month overhaul & spark plugs' },
+  { id: 'brakes', name: 'Brakes & Discs', category: 'Brakes', price: 130, duration: 60, description: 'Brake pads, discs inspection & replacement' },
+  { id: 'tyres', name: 'Tyres & Tracking', category: 'Tyre replacement', price: 65, duration: 45, description: 'Tyre fitting, balancing & wheel alignment' },
+  { id: 'diagnostics', name: 'Diagnostics Scan', category: 'Diagnostics', price: 50, duration: 45, description: 'Full computerized engine diagnostics' },
+  { id: 'air_con', name: 'Air Conditioning Service', category: 'Air Conditioning', price: 70, duration: 45, description: 'Refrigerant regas & system sanitization' },
+];
+
+const SERVICE_CATEGORY_STYLES: Record<string, { bg: string; text: string; icon: string }> = {
+  'MOT': { bg: '#E0F2FE', text: '#0284C7', icon: 'shield-check' },
+  'Servicing': { bg: '#FEF3C7', text: '#D97706', icon: 'car-wrench' },
+  'Repairs': { bg: '#FEE2E2', text: '#DC2626', icon: 'hammer-wrench' },
+  'Tyre replacement': { bg: '#F3E8FF', text: '#9333EA', icon: 'tire' },
+  'Tyres': { bg: '#F3E8FF', text: '#9333EA', icon: 'tire' },
+  'Diagnostics': { bg: '#ECFDF5', text: '#059669', icon: 'laptop' },
+  'Brakes': { bg: '#FFE4E6', text: '#E11D48', icon: 'car-brake-alert' },
+  'Exhaust': { bg: '#F1F5F9', text: '#475569', icon: 'smoke' },
+  'Air Conditioning': { bg: '#E0F7FA', text: '#00838F', icon: 'snowflake' },
+  'Custom': { bg: '#F3F4F6', text: '#374151', icon: 'cog-outline' },
+};
+
+const getServiceCatStyle = (category?: string, name?: string) => {
+  const cat = category || '';
+  if (SERVICE_CATEGORY_STYLES[cat]) return SERVICE_CATEGORY_STYLES[cat];
+  const lowerName = (name || '').toLowerCase();
+  if (lowerName.includes('mot')) return SERVICE_CATEGORY_STYLES['MOT'];
+  if (lowerName.includes('service')) return SERVICE_CATEGORY_STYLES['Servicing'];
+  if (lowerName.includes('brake')) return SERVICE_CATEGORY_STYLES['Brakes'];
+  if (lowerName.includes('tyre') || lowerName.includes('tire')) return SERVICE_CATEGORY_STYLES['Tyres'];
+  if (lowerName.includes('diag')) return SERVICE_CATEGORY_STYLES['Diagnostics'];
+  if (lowerName.includes('air') || lowerName.includes('ac')) return SERVICE_CATEGORY_STYLES['Air Conditioning'];
+  return SERVICE_CATEGORY_STYLES['Custom'];
+};
+
 export default function AdminBookMotScreen({ route, navigation }: any) {
   const { theme } = useAppTheme();
-  const { addAlert, addAudit, refreshData, user, vehicles = [], alerts = [] } = useAppValues();
+  const { addAlert, addAudit, refreshData, user, vehicles = [], alerts = [], garages = [], fetchGarageServices } = useAppValues();
 
   // Selected customer and vehicle passed from AdminCustomersScreen
   const customer = route?.params?.customer || {
@@ -115,7 +163,100 @@ export default function AdminBookMotScreen({ route, navigation }: any) {
   const [notes, setNotes] = useState('');
   const [loading, setLoading] = useState(false);
 
+  // Available services for this garage
+  const [garageServices, setGarageServices] = useState<GarageServiceItem[]>([]);
+  const [loadingServices, setLoadingServices] = useState(false);
+  const [selectedServices, setSelectedServices] = useState<GarageServiceItem[]>([]);
+
+  const toggleSelectService = (srv: GarageServiceItem) => {
+    setSelectedServices(prev => {
+      const exists = prev.some(s => (s.id && srv.id && s.id === srv.id) || (s._id && srv._id && s._id === srv._id) || (s.name === srv.name));
+      if (exists) {
+        if (prev.length <= 1) {
+          Alert.alert('Notice', 'At least one service must remain selected.');
+          return prev;
+        }
+        return prev.filter(s => !((s.id && srv.id && s.id === srv.id) || (s._id && srv._id && s._id === srv._id) || (s.name === srv.name)));
+      } else {
+        return [...prev, srv];
+      }
+    });
+  };
+
+  const hasMot = React.useMemo(() => {
+    return selectedServices.some(s => (s.category || '').toUpperCase() === 'MOT' || (s.name || '').toUpperCase().includes('MOT'));
+  }, [selectedServices]);
+
+  const isDateOnly = React.useMemo(() => !hasMot, [hasMot]);
+
+  const totalServicePrice = React.useMemo(() => {
+    return selectedServices.reduce((sum, s) => sum + (Number(s.price) || 0), 0);
+  }, [selectedServices]);
+
+  const totalServiceDuration = React.useMemo(() => {
+    return selectedServices.reduce((sum, s) => sum + (Number(s.duration) || 45), 0);
+  }, [selectedServices]);
+
+  const selectedServiceNames = React.useMemo(() => {
+    return selectedServices.map(s => s.name).join(' + ') || 'Service';
+  }, [selectedServices]);
+
   const garageId = user?.garageId;
+
+  // Load services for this garage
+  React.useEffect(() => {
+    let isMounted = true;
+    const loadServices = async () => {
+      const gId = user?.garageId || (garages.length > 0 ? (garages[0].id || garages[0]._id) : '');
+      const currentGarage = garages.find(g => (g.id || g._id) === gId);
+
+      if (currentGarage && Array.isArray(currentGarage.services) && currentGarage.services.length > 0) {
+        const activeOnly = currentGarage.services.filter((s: any) => s.isActive !== false);
+        if (activeOnly.length > 0 && isMounted) {
+          setGarageServices(activeOnly);
+          const initialMatch = route?.params?.serviceName
+            ? activeOnly.find((s: any) => s.name?.toLowerCase() === route.params.serviceName.toLowerCase()) || activeOnly[0]
+            : activeOnly[0];
+          setSelectedServices(initialMatch ? [initialMatch] : (activeOnly.length > 0 ? [activeOnly[0]] : []));
+          return;
+        }
+      }
+
+      if (gId && fetchGarageServices) {
+        try {
+          setLoadingServices(true);
+          const data = await fetchGarageServices(gId);
+          const list = Array.isArray(data?.services) ? data.services : (Array.isArray(data) ? data : []);
+          const activeOnly = list.filter((s: any) => s.isActive !== false);
+          if (isMounted) {
+            if (activeOnly.length > 0) {
+              setGarageServices(activeOnly);
+              const initialMatch = route?.params?.serviceName
+                ? activeOnly.find((s: any) => s.name?.toLowerCase() === route.params.serviceName.toLowerCase()) || activeOnly[0]
+                : activeOnly[0];
+              setSelectedServices(initialMatch ? [initialMatch] : [activeOnly[0]]);
+            } else {
+              setGarageServices([]);
+              setSelectedServices([]);
+            }
+          }
+          return;
+        } catch (e) {
+          console.warn('Could not fetch garage services in AdminBookMotScreen:', e);
+        } finally {
+          if (isMounted) setLoadingServices(false);
+        }
+      }
+
+      if (isMounted) {
+        setGarageServices([]);
+        setSelectedServices([]);
+      }
+    };
+
+    loadServices();
+    return () => { isMounted = false; };
+  }, [user?.garageId, garages, fetchGarageServices, route?.params?.serviceName]);
 
   // Date and Time options for slot selection
   const [currentViewDate, setCurrentViewDate] = useState(new Date());
@@ -268,15 +409,19 @@ export default function AdminBookMotScreen({ route, navigation }: any) {
 
   const handleConfirmBooking = async () => {
     if (!selectedVehicle) {
-      Alert.alert('Vehicle Missing', 'Please select a vehicle to book MOT.');
+      Alert.alert('Vehicle Missing', 'Please select a vehicle to book service.');
+      return;
+    }
+    if (selectedServices.length === 0) {
+      Alert.alert('Service Missing', 'Please select at least one service to book.');
       return;
     }
     if (!selectedDate) {
       Alert.alert('Selection Missing', 'Please select an appointment date.');
       return;
     }
-    if (!selectedTime) {
-      Alert.alert('Selection Missing', 'Please select a time slot.');
+    if (hasMot && !selectedTime) {
+      Alert.alert('Selection Missing', 'Please select an MOT bay time slot.');
       return;
     }
 
@@ -289,27 +434,43 @@ export default function AdminBookMotScreen({ route, navigation }: any) {
         ? `${parseInt(parts[2])} ${monthsList[parseInt(parts[1]) - 1]}`
         : selectedDate;
 
-      const slotNum = selectedSlot?.slotNumber || getSlotNumber({ slotTime: selectedTime });
+      const slotNum = hasMot ? (selectedSlot?.slotNumber || getSlotNumber({ slotTime: selectedTime })) : undefined;
+      const finalSlotTime = hasMot ? (selectedSlot?.time || selectedTime) : 'Full Day Drop-off';
+      const serviceTitle = selectedServiceNames;
+      const servicePrice = totalServicePrice;
+      const serviceDuration = totalServiceDuration;
 
       // Add BOOKED alert notification directly with Approved status
       await addAlert({
         type: 'BOOKED',
         customerName: `${customer.firstName} ${customer.lastName}`,
         customerId: customer.id,
+        customerEmail: customer.email,
+        customerMobile: customer.mobile,
         garageId: user?.garageId,
-        slotTime: selectedSlot?.time || selectedTime,
+        serviceName: serviceTitle,
+        services: selectedServices.map(s => ({
+          name: s.name,
+          category: s.category || '',
+          price: s.price,
+          duration: s.duration,
+        })),
+        hasMot,
+        isDateOnly,
+        price: servicePrice,
+        duration: serviceDuration,
+        slotTime: finalSlotTime,
         slotNumber: slotNum,
-        duration: selectedSlot?.slotDuration || 45,
         registrationNumber: selectedVehicle.registrationNumber,
-        makeModel: `${selectedVehicle.make} ${selectedVehicle.model} - Slot: ${selectedSlot?.time || selectedTime}`,
+        makeModel: `${selectedVehicle.make} ${selectedVehicle.model} - ${serviceTitle} (${finalSlotTime})`,
         status: 'Approved',
         date: selectedDate,
       });
 
       // Log to audit history
       await addAudit(
-        existingBooking ? 'MOT Booking Rescheduled' : 'MOT Booking Booked',
-        `Garage staff ${existingBooking ? 'rescheduled' : 'booked'} MOT slot for ${customer.firstName} ${customer.lastName}'s ${selectedVehicle.make} ${selectedVehicle.model} (${selectedVehicle.registrationNumber}) on ${displayDateStr} at Slot #${slotNum || 'Slot'} (${selectedTime})`
+        existingBooking ? `${serviceTitle} Booking Rescheduled` : `${serviceTitle} Booking Booked`,
+        `Garage staff ${existingBooking ? 'rescheduled' : 'booked'} ${serviceTitle} (£${servicePrice}) for ${customer.firstName} ${customer.lastName}'s ${selectedVehicle.make} ${selectedVehicle.model} (${selectedVehicle.registrationNumber}) on ${displayDateStr} (${hasMot ? `Slot #${slotNum || 'Slot'} ${selectedTime}` : 'Full Day Drop-off'})`
       );
 
       await refreshData();
@@ -317,8 +478,8 @@ export default function AdminBookMotScreen({ route, navigation }: any) {
 
       // Show Toast Notification
       const successMessage = existingBooking
-        ? `MOT Booking successfully rescheduled for ${customer.firstName} ${customer.lastName} (${selectedVehicle.registrationNumber})!`
-        : `MOT Booking confirmed and approved for ${customer.firstName} ${customer.lastName}!`;
+        ? `${serviceTitle} successfully rescheduled for ${customer.firstName} ${customer.lastName} (${selectedVehicle.registrationNumber})!`
+        : `${serviceTitle} booking confirmed and approved for ${customer.firstName} ${customer.lastName}!`;
       
       Toast.show({
         type: 'success',
@@ -342,7 +503,7 @@ export default function AdminBookMotScreen({ route, navigation }: any) {
           <MaterialCommunityIcons name="arrow-left" size={22} color={theme.colors.text} />
         </TouchableOpacity>
         <Text style={[styles.navTitle, { color: theme.colors.text }]}>
-          Book MOT (Admin Flow)
+          Book Service Appointment
         </Text>
         <View style={{ width: 60 }} />
       </View>
@@ -354,7 +515,7 @@ export default function AdminBookMotScreen({ route, navigation }: any) {
           <View style={styles.cardTopBadgeRow}>
             <View style={[styles.staffDirectBadge, { backgroundColor: '#10B98115', borderColor: '#10B98140' }]}>
               <MaterialCommunityIcons name="shield-check" size={14} color="#10B981" />
-              <Text style={styles.staffDirectBadgeText}>Garage Staff Direct Booking • Instant Approval</Text>
+              <Text style={styles.staffDirectBadgeText}>Garage Staff Direct Booking • Instant Confirmation</Text>
             </View>
           </View>
 
@@ -556,8 +717,101 @@ export default function AdminBookMotScreen({ route, navigation }: any) {
           </View>
         </View>
 
+        {/* 1. Service Selection Section (Multi-Select Support) */}
+        <View style={{ flexDirection: 'row', alignItems: 'center', justifyContent: 'space-between', marginBottom: 8, marginTop: 4 }}>
+          <View style={{ flexDirection: 'row', alignItems: 'center' }}>
+            <MaterialCommunityIcons name="tools" size={16} color={theme.colors.placeholder} style={{ marginRight: 6 }} />
+            <Text style={[styles.sectionHeading, { color: theme.colors.text, marginBottom: 0 }]}>
+              1. Select Services to Book ({selectedServices.length} selected)
+            </Text>
+          </View>
+          {selectedServices.length > 0 && (
+            <View style={{ backgroundColor: theme.colors.primary + '18', paddingHorizontal: 8, paddingVertical: 3, borderRadius: 6 }}>
+              <Text style={{ fontSize: 11, fontWeight: '700', color: theme.colors.primary }}>
+                Total £{totalServicePrice.toFixed(2)} • ~{totalServiceDuration}m
+              </Text>
+            </View>
+          )}
+        </View>
+
+        {loadingServices ? (
+          <View style={[styles.emptyNoticeCard, { backgroundColor: theme.colors.card, borderColor: theme.colors.border, marginBottom: 14 }]}>
+            <ActivityIndicator size="small" color={theme.colors.secondary} style={{ marginRight: 8 }} />
+            <Text style={{ color: theme.colors.placeholder, fontSize: 13 }}>Loading available services...</Text>
+          </View>
+        ) : garageServices.length === 0 ? (
+          <View style={[styles.emptyNoticeCard, { backgroundColor: theme.colors.card, borderColor: theme.colors.border, marginBottom: 14 }]}>
+            <MaterialCommunityIcons name="alert-circle-outline" size={18} color={theme.colors.placeholder} style={{ marginRight: 8 }} />
+            <Text style={{ color: theme.colors.placeholder, fontSize: 13 }}>No services configured for this garage yet.</Text>
+          </View>
+        ) : (
+          <ScrollView
+            horizontal
+            showsHorizontalScrollIndicator={false}
+            contentContainerStyle={{ gap: 8, paddingBottom: 4, marginBottom: 16 }}
+          >
+            {garageServices.map((srv) => {
+              const isSel = selectedServices.some(s =>
+                (s.id && srv.id && s.id === srv.id) ||
+                (s._id && srv._id && s._id === srv._id) ||
+                (s.name === srv.name)
+              );
+              const catStyle = getServiceCatStyle(srv.category, srv.name);
+
+              return (
+                <TouchableOpacity
+                  key={srv.id || srv._id || srv.name}
+                  onPress={() => toggleSelectService(srv)}
+                  activeOpacity={0.8}
+                  style={[
+                    styles.serviceChipCard,
+                    {
+                      backgroundColor: isSel ? theme.colors.primary + '14' : theme.colors.card,
+                      borderColor: isSel ? theme.colors.primary : theme.colors.border,
+                      borderWidth: isSel ? 1.5 : 1,
+                    }
+                  ]}
+                >
+                  <View style={{ flexDirection: 'row', alignItems: 'center' }}>
+                    <View style={[styles.serviceChipIcon, { backgroundColor: catStyle.bg }]}>
+                      <MaterialCommunityIcons name={catStyle.icon as any} size={16} color={catStyle.text} />
+                    </View>
+                    <View style={{ marginLeft: 8 }}>
+                      <Text
+                        style={[
+                          styles.serviceChipTitle,
+                          { color: theme.colors.text, fontWeight: isSel ? '800' : '600' }
+                        ]}
+                        numberOfLines={1}
+                      >
+                        {srv.name}
+                      </Text>
+                      <View style={{ flexDirection: 'row', alignItems: 'center', marginTop: 2 }}>
+                        <Text style={{ fontSize: 11, fontWeight: '700', color: theme.colors.primary }}>
+                          £{srv.price}
+                        </Text>
+                        <Text style={{ fontSize: 10, color: theme.colors.placeholder, marginLeft: 6 }}>
+                          • {srv.duration || 45} mins
+                        </Text>
+                      </View>
+                    </View>
+                    <MaterialCommunityIcons
+                      name={isSel ? "checkbox-marked-circle" : "checkbox-blank-circle-outline"}
+                      size={18}
+                      color={isSel ? theme.colors.primary : theme.colors.placeholder}
+                      style={{ marginLeft: 8 }}
+                    />
+                  </View>
+                </TouchableOpacity>
+              );
+            })}
+          </ScrollView>
+        )}
+
         {/* Date Selector Section */}
-        <Text style={[styles.sectionHeading, { color: theme.colors.text }]}>1. Select Appointment Date</Text>
+        <Text style={[styles.sectionHeading, { color: theme.colors.text }]}>
+          2. Select {isDateOnly ? 'Workshop Drop-off Date' : 'Appointment Date'}
+        </Text>
         <View style={[styles.calendarCard, { backgroundColor: theme.colors.card, borderColor: theme.colors.border }]}>
           {/* Header */}
           <View style={styles.calendarHeader}>
@@ -624,18 +878,35 @@ export default function AdminBookMotScreen({ route, navigation }: any) {
           </View>
         </View>
 
-        {/* Time Selector Section */}
+        {/* 3. Time Selector or Date-Only Workshop Intake Banner */}
         <View style={{ flexDirection: 'row', alignItems: 'center', justifyContent: 'space-between', marginBottom: 12 }}>
           <View style={{ flexDirection: 'row', alignItems: 'center' }}>
-            <MaterialCommunityIcons name="clock-outline" size={16} color={theme.colors.placeholder} style={{ marginRight: 6 }} />
+            <MaterialCommunityIcons
+              name={isDateOnly ? "car-clock" : "clock-outline"}
+              size={16}
+              color={theme.colors.placeholder}
+              style={{ marginRight: 6 }}
+            />
             <Text style={[styles.sectionHeading, { color: theme.colors.text, marginBottom: 0 }]}>
-              2. Choose MOT Test Slot
+              {isDateOnly ? '3. Workshop Drop-Off Intake' : '3. Choose Appointment Time Slot'}
             </Text>
           </View>
-          {loadingSlots && <ActivityIndicator size="small" color={theme.colors.secondary} />}
+          {!isDateOnly && loadingSlots && <ActivityIndicator size="small" color={theme.colors.secondary} />}
         </View>
 
-        {!selectedDate ? (
+        {isDateOnly ? (
+          <View style={[styles.emptyNoticeCard, { backgroundColor: '#10B98110', borderColor: '#10B98130', flexDirection: 'column', alignItems: 'flex-start', padding: 14, marginBottom: 16 }]}>
+            <View style={{ flexDirection: 'row', alignItems: 'center', marginBottom: 6 }}>
+              <MaterialCommunityIcons name="calendar-check" size={20} color="#10B981" style={{ marginRight: 8 }} />
+              <Text style={{ fontSize: 14, fontWeight: '700', color: '#10B981' }}>
+                Full-Day Workshop Drop-off (08:00 – 18:00)
+              </Text>
+            </View>
+            <Text style={{ fontSize: 12.5, color: theme.colors.text, lineHeight: 18 }}>
+              No 45-minute bay slot is needed for {selectedServiceNames}. Customer will bring the vehicle to the garage on {selectedDate ? formatBookingDate(selectedDate) : 'the selected date'} (drop-off 08:00 – 10:30).
+            </Text>
+          </View>
+        ) : !selectedDate ? (
           <View style={[styles.emptyNoticeCard, { backgroundColor: theme.colors.card, borderColor: theme.colors.border }]}>
             <MaterialCommunityIcons name="calendar-clock" size={22} color={theme.colors.placeholder} />
             <Text style={{ marginLeft: 8, color: theme.colors.placeholder, fontSize: 13 }}>
@@ -835,7 +1106,7 @@ export default function AdminBookMotScreen({ route, navigation }: any) {
         )}
 
         {/* Notes Input */}
-        <Text style={[styles.sectionHeading, { color: theme.colors.text, marginTop: 16 }]}>3. Staff Booking Notes (Optional)</Text>
+        <Text style={[styles.sectionHeading, { color: theme.colors.text, marginTop: 16 }]}>4. Staff Booking Notes (Optional)</Text>
         <TextInput
           style={[styles.notesInput, { borderColor: theme.colors.border, color: theme.colors.text, backgroundColor: theme.colors.card }]}
           placeholder="Enter any customer requests, parts updates or booking comments here..."
@@ -847,7 +1118,7 @@ export default function AdminBookMotScreen({ route, navigation }: any) {
         />
 
         {/* Booking Summary Box Before Confirmation */}
-        {selectedDate && selectedTime && (
+        {selectedDate && (isDateOnly || selectedTime) && (
           <View style={[styles.bookingSummaryCard, { backgroundColor: theme.colors.card, borderColor: theme.colors.border }]}>
             <View style={{ flexDirection: 'row', alignItems: 'center', marginBottom: 10 }}>
               <MaterialCommunityIcons name="file-document" size={18} color={theme.colors.secondary} style={{ marginRight: 6 }} />
@@ -871,18 +1142,36 @@ export default function AdminBookMotScreen({ route, navigation }: any) {
             </View>
 
             <View style={styles.summaryRow}>
-              <Text style={[styles.summaryLabel, { color: theme.colors.placeholder }]}>Appointment Date:</Text>
+              <Text style={[styles.summaryLabel, { color: theme.colors.placeholder }]}>
+                {isDateOnly ? 'Drop-off Date:' : 'Appointment Date:'}
+              </Text>
               <Text style={[styles.summaryValue, { color: theme.colors.text }]}>
                 {formatBookingDate(selectedDate)}
               </Text>
             </View>
 
             <View style={styles.summaryRow}>
-              <Text style={[styles.summaryLabel, { color: theme.colors.placeholder }]}>Selected Slot:</Text>
-              <Text style={[styles.summaryValue, { color: theme.colors.secondary, fontWeight: 'bold' }]}>
-                Slot #{selectedSlot?.slotNumber || getSlotNumber({ slotTime: selectedTime })} ({selectedSlot?.time || selectedTime} - {selectedSlot?.endTime || '45m'})
+              <Text style={[styles.summaryLabel, { color: theme.colors.placeholder }]}>Selected Services:</Text>
+              <Text style={[styles.summaryValue, { color: theme.colors.primary, fontWeight: 'bold' }]}>
+                {selectedServiceNames} • £{totalServicePrice.toFixed(2)} (~{totalServiceDuration}m)
               </Text>
             </View>
+
+            {isDateOnly ? (
+              <View style={styles.summaryRow}>
+                <Text style={[styles.summaryLabel, { color: theme.colors.placeholder }]}>Intake Schedule:</Text>
+                <Text style={[styles.summaryValue, { color: '#10B981', fontWeight: 'bold' }]}>
+                  Full-Day Drop-off (08:00 – 18:00)
+                </Text>
+              </View>
+            ) : (
+              <View style={styles.summaryRow}>
+                <Text style={[styles.summaryLabel, { color: theme.colors.placeholder }]}>Selected Slot:</Text>
+                <Text style={[styles.summaryValue, { color: theme.colors.secondary, fontWeight: 'bold' }]}>
+                  Slot #{selectedSlot?.slotNumber || getSlotNumber({ slotTime: selectedTime })} ({selectedSlot?.time || selectedTime} - {selectedSlot?.endTime || '45m'})
+                </Text>
+              </View>
+            )}
 
             <View style={styles.summaryRow}>
               <Text style={[styles.summaryLabel, { color: theme.colors.placeholder }]}>Action Type:</Text>
@@ -906,7 +1195,9 @@ export default function AdminBookMotScreen({ route, navigation }: any) {
               <View style={styles.btnContent}>
                 <MaterialCommunityIcons name="calendar-check" size={20} color={theme.dark ? theme.colors.background : '#FFFFFF'} style={{ marginRight: 6 }} />
                 <Text style={[styles.submitBtnText, { color: theme.dark ? theme.colors.background : '#FFFFFF' }]}>
-                  {existingBooking ? 'Confirm & Reschedule Booking' : 'Confirm & Approve Booking'}
+                  {existingBooking
+                    ? 'Confirm & Reschedule Booking'
+                    : `Confirm Booking • £${totalServicePrice.toFixed(2)}`}
                 </Text>
               </View>
             )}
@@ -1366,5 +1657,21 @@ const styles = StyleSheet.create({
     fontWeight: '600',
     maxWidth: '65%',
     textAlign: 'right',
+  },
+  serviceChipCard: {
+    paddingHorizontal: 12,
+    paddingVertical: 10,
+    borderRadius: 12,
+    minWidth: 165,
+  },
+  serviceChipIcon: {
+    width: 32,
+    height: 32,
+    borderRadius: 8,
+    justifyContent: 'center',
+    alignItems: 'center',
+  },
+  serviceChipTitle: {
+    fontSize: 13,
   },
 });

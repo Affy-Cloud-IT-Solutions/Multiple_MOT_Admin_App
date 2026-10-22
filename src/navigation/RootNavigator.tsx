@@ -14,6 +14,7 @@ import AdminRemindersScreen from '../screens/AdminRemindersScreen';
 import SuperAdminAuditsScreen from '../screens/SuperAdminAuditsScreen';
 import AdminServicesScreen from '../screens/AdminServicesScreen';
 import AdminCustomersScreen from '../screens/AdminCustomersScreen';
+import GarageSetupScreen from '../screens/GarageSetupScreen';
 import MainTabNavigator from './MainTabNavigator';
 import { useAppTheme } from '../context/ThemeContext';
 
@@ -109,6 +110,11 @@ export default function RootNavigator() {
       <Stack.Screen
         name="Customers"
         component={AdminCustomersScreen}
+        options={{ headerShown: false }}
+      />
+      <Stack.Screen
+        name="GarageSetup"
+        component={GarageSetupScreen}
         options={{ headerShown: false }}
       />
     </Stack.Navigator>

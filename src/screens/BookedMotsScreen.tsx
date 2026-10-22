@@ -12,6 +12,7 @@ import {
   TextInput,
   Dimensions,
   Linking,
+  Platform,
 } from 'react-native';
 import MaterialCommunityIcons from 'react-native-vector-icons/MaterialCommunityIcons';
 import { useAppTheme } from '../context/ThemeContext';
@@ -26,10 +27,12 @@ const STANDARD_SLOTS = [
   '14:30', '15:15', '16:00', '16:45'
 ];
 
-const getSlotNumber = (item: any) => {
-  if (item.slotNumber) return item.slotNumber;
-  let timeStr = item.slotTime || '';
-  if (!timeStr && item.makeModel) {
+const getSlotNumber = (item: any): number | null => {
+  if (item?.slotNumber && typeof item.slotNumber === 'number' && item.slotNumber > 0) {
+    return item.slotNumber;
+  }
+  let timeStr = item?.slotTime || '';
+  if (!timeStr && item?.makeModel) {
     const match = item.makeModel.match(/Slot:\s*(\d{1,2}:\d{2}(?:\s*[AP]M)?)/i) ||
                   item.makeModel.match(/at\s+(\d{1,2}:\d{2}(?:\s*[AP]M)?)/i);
     if (match) timeStr = match[1];
@@ -42,18 +45,54 @@ const getSlotNumber = (item: any) => {
   return null;
 };
 
-const getSlotDisplay = (item: any) => {
-  const num = getSlotNumber(item);
-  return num ? `Slot #${num}` : 'MOT Slot';
+const isMotBooking = (item: any): boolean => {
+  if (item?.hasMot === true) return true;
+  if (item?.isDateOnly === true && !item?.slotTime && !item?.serviceName?.toUpperCase().includes('MOT')) {
+    return false;
+  }
+
+  // Check serviceName
+  const sName = (item?.serviceName || '').toUpperCase();
+  if (sName.includes('MOT')) return true;
+
+  // Check multi-services array
+  if (Array.isArray(item?.services) && item.services.length > 0) {
+    const hasMot = item.services.some((s: any) => {
+      const name = (typeof s === 'string' ? s : s?.name || '').toUpperCase();
+      const cat = (typeof s === 'object' ? s?.category || '' : '').toUpperCase();
+      return name.includes('MOT') || cat === 'MOT';
+    });
+    if (hasMot) return true;
+  }
+
+  // Check slotNumber or slotTime
+  if (item?.slotNumber && typeof item.slotNumber === 'number' && item.slotNumber > 0) return true;
+  if (item?.slotTime && item.slotTime !== 'Full Day Drop-off' && item.slotTime !== 'Drop-off (Full Day)') return true;
+
+  // Check makeModel string for slot info (e.g. "AUDI A6 - Slot: 08:00")
+  if (item?.makeModel && /Slot:\s*\d{1,2}:\d{2}/i.test(item.makeModel)) return true;
+
+  return false;
 };
 
-const getSlotTimeDisplay = (item: any) => {
-  if (item.slotTime) return item.slotTime;
-  if (item.makeModel) {
+const getMotSlotDisplay = (item: any): string => {
+  const num = getSlotNumber(item);
+  let timeStr = item?.slotTime || '';
+  if (!timeStr && item?.makeModel) {
     const match = item.makeModel.match(/Slot:\s*([^\n\r]+)/i);
-    if (match) return match[1].trim();
+    if (match) timeStr = match[1].trim();
   }
-  return '45-Min Test Slot';
+
+  if (num && timeStr && timeStr !== 'Full Day Drop-off' && timeStr !== 'Drop-off (Full Day)') {
+    return `Slot #${num} • ${timeStr}`;
+  }
+  if (num) {
+    return `Slot #${num}`;
+  }
+  if (timeStr && timeStr !== 'Full Day Drop-off' && timeStr !== 'Drop-off (Full Day)') {
+    return `Slot: ${timeStr}`;
+  }
+  return 'MOT Slot';
 };
 
 const formatBookingDate = (dateVal: any) => {
@@ -67,6 +106,170 @@ const formatBookingDate = (dateVal: any) => {
   return String(dateVal);
 };
 
+// Search Helper: Matches Date strictly (formatted, raw, DD-MM-YYYY, DD/MM/YYYY, month name, year)
+const matchesDate = (dateVal: any, query: string) => {
+  if (!dateVal || !query) return false;
+  const q = query.toLowerCase().trim();
+
+  // 1. Formatted display string (e.g. "Wed, 21 Oct 2026")
+  const formatted = formatBookingDate(dateVal).toLowerCase();
+  if (formatted.includes(q)) return true;
+
+  // 2. Raw string (e.g. "2026-10-21")
+  const rawStr = String(dateVal).toLowerCase();
+  if (rawStr.includes(q)) return true;
+
+  // 3. Date variations
+  try {
+    const d = new Date(dateVal);
+    if (!isNaN(d.getTime())) {
+      const day = String(d.getDate()).padStart(2, '0');
+      const dayNoPad = String(d.getDate());
+      const month = String(d.getMonth() + 1).padStart(2, '0');
+      const year = String(d.getFullYear());
+
+      const months = ['january', 'february', 'march', 'april', 'may', 'june', 'july', 'august', 'september', 'october', 'november', 'december'];
+      const shortMonths = ['jan', 'feb', 'mar', 'apr', 'may', 'jun', 'jul', 'aug', 'sep', 'oct', 'nov', 'dec'];
+
+      const monthName = months[d.getMonth()];
+      const shortMonthName = shortMonths[d.getMonth()];
+
+      const variations = [
+        `${day}-${month}-${year}`,
+        `${day}/${month}/${year}`,
+        `${dayNoPad}-${month}-${year}`,
+        `${dayNoPad}/${month}/${year}`,
+        `${day} ${monthName} ${year}`,
+        `${dayNoPad} ${monthName} ${year}`,
+        `${day} ${shortMonthName} ${year}`,
+        `${dayNoPad} ${shortMonthName} ${year}`,
+        `${day} ${shortMonthName}`,
+        `${dayNoPad} ${shortMonthName}`,
+        `${day} ${monthName}`,
+        `${dayNoPad} ${monthName}`,
+        monthName,
+        shortMonthName,
+        year
+      ];
+
+      if (variations.some(v => v.includes(q))) return true;
+    }
+  } catch (e) {}
+
+  return false;
+};
+
+// Search Helper: Matches VRN strictly
+const matchesVrn = (vrn: string | undefined, query: string) => {
+  if (!vrn || !query) return false;
+  const cleanVrn = vrn.toLowerCase().replace(/\s+/g, '');
+  const cleanQ = query.toLowerCase().replace(/\s+/g, '');
+  return cleanVrn.includes(cleanQ) || vrn.toLowerCase().includes(query.toLowerCase().trim());
+};
+
+// Search Helper: Matches Customer Name strictly
+const matchesCustomer = (name: string | undefined, query: string) => {
+  if (!name || !query) return false;
+  return name.toLowerCase().includes(query.toLowerCase().trim());
+};
+
+const getFilterLabel = (status: string) => {
+  switch (status) {
+    case 'PENDING': return 'Pending';
+    case 'APPROVED': return 'Confirmed';
+    case 'REJECTED': return 'Rejected';
+    case 'CANCELLED': return 'Cancelled';
+    default: return 'All';
+  }
+};
+
+const getFilterIcon = (status: string) => {
+  switch (status) {
+    case 'PENDING': return 'clock-alert-outline';
+    case 'APPROVED': return 'check-circle-outline';
+    case 'REJECTED': return 'close-circle-outline';
+    case 'CANCELLED': return 'calendar-remove';
+    default: return 'clipboard-list-outline';
+  }
+};
+
+const getFilterColor = (status: string) => {
+  switch (status) {
+    case 'PENDING': return '#F59E0B';
+    case 'APPROVED': return '#10B981';
+    case 'REJECTED': return '#EF4444';
+    case 'CANCELLED': return '#DC2626';
+    default: return '#3B82F6';
+  }
+};
+
+export type DateFilterType = 'ALL' | 'TODAY' | 'TOMORROW' | 'THIS_WEEK' | 'CUSTOM';
+
+const toYMD = (dateVal: any): string | null => {
+  if (!dateVal) return null;
+  if (typeof dateVal === 'string') {
+    const matchIso = dateVal.match(/^(\d{4})-(\d{1,2})-(\d{1,2})/);
+    if (matchIso) {
+      return `${matchIso[1]}-${matchIso[2].padStart(2, '0')}-${matchIso[3].padStart(2, '0')}`;
+    }
+    const matchUk = dateVal.match(/^(\d{1,2})[/-](\d{1,2})[/-](\d{4})/);
+    if (matchUk) {
+      return `${matchUk[3]}-${matchUk[2].padStart(2, '0')}-${matchUk[1].padStart(2, '0')}`;
+    }
+  }
+  try {
+    const d = new Date(dateVal);
+    if (!isNaN(d.getTime())) {
+      const y = d.getFullYear();
+      const m = String(d.getMonth() + 1).padStart(2, '0');
+      const day = String(d.getDate()).padStart(2, '0');
+      return `${y}-${m}-${day}`;
+    }
+  } catch (e) {}
+  return null;
+};
+
+const formatYMDToDisplay = (ymd: string): string => {
+  try {
+    const parts = ymd.split('-');
+    if (parts.length === 3) {
+      const y = parseInt(parts[0], 10);
+      const m = parseInt(parts[1], 10) - 1;
+      const d = parseInt(parts[2], 10);
+      const date = new Date(y, m, d);
+      if (!isNaN(date.getTime())) {
+        return date.toLocaleDateString('en-GB', { day: 'numeric', month: 'short', year: 'numeric' });
+      }
+    }
+  } catch (e) {}
+  return ymd;
+};
+
+const getDateFilterLabel = (type: DateFilterType, customDate?: string | null) => {
+  switch (type) {
+    case 'TODAY': return 'Today';
+    case 'TOMORROW': return 'Tomorrow';
+    case 'THIS_WEEK': return 'Next 7 Days';
+    case 'CUSTOM': return customDate ? formatYMDToDisplay(customDate) : 'Custom Date';
+    default: return 'All Dates';
+  }
+};
+
+const getDateFilterIcon = (type: DateFilterType) => {
+  switch (type) {
+    case 'TODAY': return 'calendar-today';
+    case 'TOMORROW': return 'calendar-arrow-right';
+    case 'THIS_WEEK': return 'calendar-week';
+    case 'CUSTOM': return 'calendar-check';
+    default: return 'calendar-blank-outline';
+  }
+};
+
+const monthNames = [
+  'January', 'February', 'March', 'April', 'May', 'June',
+  'July', 'August', 'September', 'October', 'November', 'December'
+];
+
 export default function BookedMotsScreen({ navigation }: any) {
   const { theme } = useAppTheme();
   const { alerts, customers, approveAlert, acknowledgeAlert, rejectAlert, cancelBooking, refreshData } = useAppValues();
@@ -74,6 +277,11 @@ export default function BookedMotsScreen({ navigation }: any) {
   const [loadingAction, setLoadingAction] = useState<string | null>(null);
   const [searchQuery, setSearchQuery] = useState('');
   const [statusFilter, setStatusFilter] = useState<'ALL' | 'PENDING' | 'APPROVED' | 'REJECTED' | 'CANCELLED'>('ALL');
+  const [dateFilter, setDateFilter] = useState<DateFilterType>('ALL');
+  const [selectedCustomDate, setSelectedCustomDate] = useState<string | null>(null);
+  const [filterBottomSheetVisible, setFilterBottomSheetVisible] = useState(false);
+  const [calendarModalVisible, setCalendarModalVisible] = useState(false);
+  const [currentViewDate, setCurrentViewDate] = useState<Date>(new Date());
 
   React.useEffect(() => {
     const unsubscribe = navigation.addListener('focus', () => {
@@ -95,52 +303,155 @@ export default function BookedMotsScreen({ navigation }: any) {
   const rejectedCount = useMemo(() => bookedMots.filter(a => a.status === 'Rejected').length, [bookedMots]);
   const cancelledCount = useMemo(() => bookedMots.filter(a => a.status === 'Cancelled').length, [bookedMots]);
 
-  // Filtered list based on search and tab
+  // Date constants & helpers
+  const todayDateObj = useMemo(() => new Date(), []);
+  const todayYMD = useMemo(() => toYMD(todayDateObj) || '', [todayDateObj]);
+  const tomorrowYMD = useMemo(() => {
+    const tom = new Date(todayDateObj.getFullYear(), todayDateObj.getMonth(), todayDateObj.getDate() + 1);
+    return toYMD(tom) || '';
+  }, [todayDateObj]);
+  const weekEndYMD = useMemo(() => {
+    const wk = new Date(todayDateObj.getFullYear(), todayDateObj.getMonth(), todayDateObj.getDate() + 7);
+    return toYMD(wk) || '';
+  }, [todayDateObj]);
+
+  const todayCount = useMemo(() => bookedMots.filter(a => toYMD(a.date) === todayYMD).length, [bookedMots, todayYMD]);
+  const tomorrowCount = useMemo(() => bookedMots.filter(a => toYMD(a.date) === tomorrowYMD).length, [bookedMots, tomorrowYMD]);
+  const thisWeekCount = useMemo(() => bookedMots.filter(a => {
+    const ymd = toYMD(a.date);
+    return ymd && ymd >= todayYMD && ymd <= weekEndYMD;
+  }).length, [bookedMots, todayYMD, weekEndYMD]);
+  const customDateCount = useMemo(() => {
+    if (!selectedCustomDate) return 0;
+    return bookedMots.filter(a => toYMD(a.date) === selectedCustomDate).length;
+  }, [bookedMots, selectedCustomDate]);
+
+  // Set of dates with bookings for calendar dots
+  const datesWithBookingsSet = useMemo(() => {
+    const set = new Set<string>();
+    bookedMots.forEach((a) => {
+      const ymd = toYMD(a.date);
+      if (ymd) set.add(ymd);
+    });
+    return set;
+  }, [bookedMots]);
+
+  // Calendar month navigation
+  const handlePrevMonth = () => {
+    setCurrentViewDate((prev) => new Date(prev.getFullYear(), prev.getMonth() - 1, 1));
+  };
+
+  const handleNextMonth = () => {
+    setCurrentViewDate((prev) => new Date(prev.getFullYear(), prev.getMonth() + 1, 1));
+  };
+
+  const handleJumpToToday = () => {
+    const today = new Date();
+    setCurrentViewDate(today);
+    setDateFilter('CUSTOM');
+    setSelectedCustomDate(todayYMD);
+    setCalendarModalVisible(false);
+  };
+
+  // Generate days grid for current viewed month
+  const calendarDays = useMemo(() => {
+    const year = currentViewDate.getFullYear();
+    const month = currentViewDate.getMonth();
+    const firstDayIndex = new Date(year, month, 1).getDay();
+    const lastDate = new Date(year, month + 1, 0).getDate();
+
+    const days: (Date | null)[] = [];
+    for (let i = 0; i < firstDayIndex; i++) {
+      days.push(null);
+    }
+    for (let d = 1; d <= lastDate; d++) {
+      days.push(new Date(year, month, d));
+    }
+    return days;
+  }, [currentViewDate]);
+
+  const filterOptions = [
+    {
+      key: 'ALL' as const,
+      label: 'All',
+      icon: 'clipboard-list-outline',
+      color: theme.colors.secondary,
+      count: bookedMots.length,
+    },
+    {
+      key: 'PENDING' as const,
+      label: 'Pending',
+      icon: 'clock-alert-outline',
+      color: '#F59E0B',
+      count: pendingCount,
+    },
+    {
+      key: 'APPROVED' as const,
+      label: 'Approved',
+      icon: 'check-circle-outline',
+      color: '#10B981',
+      count: approvedCount,
+    },
+    {
+      key: 'REJECTED' as const,
+      label: 'Rejected',
+      icon: 'close-circle-outline',
+      color: '#EF4444',
+      count: rejectedCount,
+    },
+    {
+      key: 'CANCELLED' as const,
+      label: 'Cancelled',
+      icon: 'calendar-remove',
+      color: '#DC2626',
+      count: cancelledCount,
+    },
+  ];
+
+  // Filtered list based on status, date, and search query
   const filteredBookings = useMemo(() => {
     return bookedMots.filter((item) => {
-      // Status filter
+      // 1. Status filter
       if (statusFilter === 'PENDING' && item.status !== 'Pending') return false;
       if (statusFilter === 'APPROVED' && (item.status !== 'Approved' && item.status !== 'Completed')) return false;
       if (statusFilter === 'REJECTED' && item.status !== 'Rejected') return false;
       if (statusFilter === 'CANCELLED' && item.status !== 'Cancelled') return false;
 
-      // Search filter
+      // 2. Date filter
+      const itemYMD = toYMD(item.date);
+      if (dateFilter === 'TODAY') {
+        if (itemYMD !== todayYMD) return false;
+      } else if (dateFilter === 'TOMORROW') {
+        if (itemYMD !== tomorrowYMD) return false;
+      } else if (dateFilter === 'THIS_WEEK') {
+        if (!itemYMD || itemYMD < todayYMD || itemYMD > weekEndYMD) return false;
+      } else if (dateFilter === 'CUSTOM' && selectedCustomDate) {
+        if (itemYMD !== selectedCustomDate) return false;
+      }
+
+      // 3. Search filter: Strictly according to Date, Registration Number, and Customer Name ONLY
       if (searchQuery.trim()) {
-        const query = searchQuery.toLowerCase();
-        const matchesReg = item.registrationNumber?.toLowerCase().includes(query);
-        const matchesCust = item.customerName?.toLowerCase().includes(query);
-        const matchesMake = item.makeModel?.toLowerCase().includes(query);
-        const matchesService = item.serviceName?.toLowerCase().includes(query);
-        return matchesReg || matchesCust || matchesMake || matchesService;
+        const query = searchQuery.trim();
+        const matchesReg = matchesVrn(item.registrationNumber, query);
+        const matchesCust = matchesCustomer(item.customerName, query);
+        const matchesDateVal = matchesDate(item.date, query);
+        return matchesReg || matchesCust || matchesDateVal;
       }
       return true;
     });
-  }, [bookedMots, statusFilter, searchQuery]);
+  }, [bookedMots, statusFilter, dateFilter, selectedCustomDate, searchQuery, todayYMD, tomorrowYMD, weekEndYMD]);
 
-  // Group filtered booked MOTs by customer
-  const groupedBookings = useMemo(() => {
-    return filteredBookings.reduce((acc, alert) => {
-      const custId = alert.customerId || 'unknown';
-      if (!acc[custId]) {
-        const customer = customers.find(c => 
-          String(c.id).toLowerCase() === String(custId).toLowerCase() ||
-          String(c._id).toLowerCase() === String(custId).toLowerCase()
-        );
-
-        acc[custId] = {
-          customerId: custId,
-          customerName: alert.customerName || (customer ? `${customer.firstName} ${customer.lastName}` : 'Customer'),
-          mobile: customer?.mobile || '',
-          email: customer?.email || '',
-          alerts: []
-        };
-      }
-      acc[custId].alerts.push(alert);
-      return acc;
-    }, {} as Record<string, { customerId: string; customerName: string; mobile: string; email: string; alerts: AlertNotification[] }>);
-  }, [filteredBookings, customers]);
-
-  const groupedList = Object.values(groupedBookings);
+  // Individual bookings sorted by appointment date / newest created
+  const sortedBookings = useMemo(() => {
+    return [...filteredBookings].sort((a, b) => {
+      const dateA = a.date ? new Date(a.date).getTime() : 0;
+      const dateB = b.date ? new Date(b.date).getTime() : 0;
+      if (dateB !== dateA) return dateB - dateA;
+      const createA = a.createdAt ? new Date(a.createdAt).getTime() : 0;
+      const createB = b.createdAt ? new Date(b.createdAt).getTime() : 0;
+      return createB - createA;
+    });
+  }, [filteredBookings]);
 
   const onRefresh = async () => {
     setRefreshing(true);
@@ -191,7 +502,7 @@ export default function BookedMotsScreen({ navigation }: any) {
     const alertId = item.id;
     const reg = item.registrationNumber || 'Vehicle';
     const dateStr = formatBookingDate(item.date);
-    const slotStr = getSlotTimeDisplay(item);
+    const slotStr = isMotBooking(item) ? getMotSlotDisplay(item) : 'Workshop Drop-off';
 
     Alert.alert(
       'Cancel Booking?',
@@ -237,7 +548,9 @@ export default function BookedMotsScreen({ navigation }: any) {
         <View style={styles.navTitleContainer}>
           <Text style={[styles.navTitle, { color: theme.colors.text }]}>Booked Appointments</Text>
           <Text style={[styles.navSubtitle, { color: theme.colors.placeholder }]}>
-            {bookedMots.length} total bookings
+            {sortedBookings.length} {sortedBookings.length === 1 ? 'booking' : 'bookings'}
+            {statusFilter !== 'ALL' ? ` • ${getFilterLabel(statusFilter)}` : ''}
+            {dateFilter !== 'ALL' ? ` • ${getDateFilterLabel(dateFilter, selectedCustomDate)}` : ''}
           </Text>
         </View>
         <TouchableOpacity 
@@ -249,127 +562,106 @@ export default function BookedMotsScreen({ navigation }: any) {
         </TouchableOpacity>
       </View>
 
-      {/* Search Bar */}
-      <View style={[styles.searchWrapper, { backgroundColor: theme.colors.card, borderColor: theme.colors.border }]}>
-        <MaterialCommunityIcons name="magnify" size={18} color={theme.colors.placeholder} style={{ marginRight: 8 }} />
-        <TextInput
-          style={[styles.searchInput, { color: theme.colors.text }]}
-          placeholder="Search by VRN, customer or make..."
-          placeholderTextColor={theme.colors.placeholder}
-          value={searchQuery}
-          onChangeText={setSearchQuery}
-          clearButtonMode="while-editing"
-        />
-        {searchQuery.length > 0 && (
-          <TouchableOpacity onPress={() => setSearchQuery('')}>
-            <MaterialCommunityIcons name="close-circle" size={16} color={theme.colors.placeholder} />
-          </TouchableOpacity>
-        )}
+      {/* Search Bar with Filter Icon Button */}
+      <View style={styles.searchFilterRow}>
+        <View style={[styles.searchWrapper, { backgroundColor: theme.colors.card, borderColor: theme.colors.border }]}>
+          <MaterialCommunityIcons name="magnify" size={18} color={theme.colors.placeholder} style={{ marginRight: 8 }} />
+          <TextInput
+            style={[styles.searchInput, { color: theme.colors.text }]}
+            placeholder="Search by date, VRN or customer..."
+            placeholderTextColor={theme.colors.placeholder}
+            value={searchQuery}
+            onChangeText={setSearchQuery}
+            clearButtonMode="while-editing"
+          />
+          {searchQuery.length > 0 && (
+            <TouchableOpacity onPress={() => setSearchQuery('')} hitSlop={{ top: 8, bottom: 8, left: 8, right: 8 }}>
+              <MaterialCommunityIcons name="close-circle" size={16} color={theme.colors.placeholder} />
+            </TouchableOpacity>
+          )}
+        </View>
+
+        <TouchableOpacity
+          style={[
+            styles.filterIconBtn,
+            {
+              backgroundColor: (statusFilter !== 'ALL' || dateFilter !== 'ALL') ? theme.colors.secondary : theme.colors.card,
+              borderColor: (statusFilter !== 'ALL' || dateFilter !== 'ALL') ? theme.colors.secondary : theme.colors.border,
+            }
+          ]}
+          onPress={() => setFilterBottomSheetVisible(true)}
+          activeOpacity={0.7}
+        >
+          <MaterialCommunityIcons
+            name="tune-variant"
+            size={20}
+            color={(statusFilter !== 'ALL' || dateFilter !== 'ALL') ? '#FFFFFF' : theme.colors.text}
+          />
+          {(statusFilter !== 'ALL' || dateFilter !== 'ALL') && (
+            <View style={styles.filterActiveDot} />
+          )}
+        </TouchableOpacity>
       </View>
 
-      {/* Status Filter Tabs */}
-      <View style={styles.filterTabsContainer}>
-        <ScrollView horizontal showsHorizontalScrollIndicator={false} contentContainerStyle={styles.filterTabsScroll}>
-          <TouchableOpacity
-            style={[
-              styles.filterPill,
-              statusFilter === 'ALL'
-                ? { backgroundColor: theme.colors.secondary, borderColor: theme.colors.secondary }
-                : { backgroundColor: theme.colors.card, borderColor: theme.colors.border }
-            ]}
-            onPress={() => setStatusFilter('ALL')}
-            activeOpacity={0.7}
-          >
-            <Text style={[styles.filterPillText, { color: statusFilter === 'ALL' ? '#FFFFFF' : theme.colors.text }]}>
-              All ({bookedMots.length})
-            </Text>
-          </TouchableOpacity>
+      {/* Active Filter Pills (Visible when status or date is filtered) */}
+      {(statusFilter !== 'ALL' || dateFilter !== 'ALL') && (
+        <View style={styles.activeFilterPillRow}>
+          {statusFilter !== 'ALL' && (
+            <TouchableOpacity
+              style={[
+                styles.activeFilterPill,
+                {
+                  backgroundColor: getFilterColor(statusFilter) + '15',
+                  borderColor: getFilterColor(statusFilter),
+                }
+              ]}
+              onPress={() => setFilterBottomSheetVisible(true)}
+              activeOpacity={0.8}
+            >
+              <MaterialCommunityIcons name={getFilterIcon(statusFilter)} size={14} color={getFilterColor(statusFilter)} />
+              <Text style={[styles.activeFilterPillText, { color: getFilterColor(statusFilter) }]}>
+                {getFilterLabel(statusFilter)}
+              </Text>
+              <TouchableOpacity
+                onPress={() => setStatusFilter('ALL')}
+                hitSlop={{ top: 8, bottom: 8, left: 8, right: 8 }}
+                style={styles.clearFilterCross}
+              >
+                <MaterialCommunityIcons name="close" size={14} color={getFilterColor(statusFilter)} />
+              </TouchableOpacity>
+            </TouchableOpacity>
+          )}
 
-          <TouchableOpacity
-            style={[
-              styles.filterPill,
-              statusFilter === 'PENDING'
-                ? { backgroundColor: '#F59E0B', borderColor: '#F59E0B' }
-                : { backgroundColor: theme.colors.card, borderColor: theme.colors.border }
-            ]}
-            onPress={() => setStatusFilter('PENDING')}
-            activeOpacity={0.7}
-          >
-            <MaterialCommunityIcons 
-              name="clock-alert-outline" 
-              size={13} 
-              color={statusFilter === 'PENDING' ? '#FFFFFF' : '#F59E0B'} 
-              style={{ marginRight: 4 }} 
-            />
-            <Text style={[styles.filterPillText, { color: statusFilter === 'PENDING' ? '#FFFFFF' : theme.colors.text }]}>
-              Pending ({pendingCount})
-            </Text>
-          </TouchableOpacity>
-
-          <TouchableOpacity
-            style={[
-              styles.filterPill,
-              statusFilter === 'APPROVED'
-                ? { backgroundColor: '#10B981', borderColor: '#10B981' }
-                : { backgroundColor: theme.colors.card, borderColor: theme.colors.border }
-            ]}
-            onPress={() => setStatusFilter('APPROVED')}
-            activeOpacity={0.7}
-          >
-            <MaterialCommunityIcons 
-              name="check-circle-outline" 
-              size={13} 
-              color={statusFilter === 'APPROVED' ? '#FFFFFF' : '#10B981'} 
-              style={{ marginRight: 4 }} 
-            />
-            <Text style={[styles.filterPillText, { color: statusFilter === 'APPROVED' ? '#FFFFFF' : theme.colors.text }]}>
-              Confirmed ({approvedCount})
-            </Text>
-          </TouchableOpacity>
-
-          <TouchableOpacity
-            style={[
-              styles.filterPill,
-              statusFilter === 'REJECTED'
-                ? { backgroundColor: '#EF4444', borderColor: '#EF4444' }
-                : { backgroundColor: theme.colors.card, borderColor: theme.colors.border }
-            ]}
-            onPress={() => setStatusFilter('REJECTED')}
-            activeOpacity={0.7}
-          >
-            <MaterialCommunityIcons 
-              name="close-circle-outline" 
-              size={13} 
-              color={statusFilter === 'REJECTED' ? '#FFFFFF' : '#EF4444'} 
-              style={{ marginRight: 4 }} 
-            />
-            <Text style={[styles.filterPillText, { color: statusFilter === 'REJECTED' ? '#FFFFFF' : theme.colors.text }]}>
-              Rejected ({rejectedCount})
-            </Text>
-          </TouchableOpacity>
-
-          <TouchableOpacity
-            style={[
-              styles.filterPill,
-              statusFilter === 'CANCELLED'
-                ? { backgroundColor: '#DC2626', borderColor: '#DC2626' }
-                : { backgroundColor: theme.colors.card, borderColor: theme.colors.border }
-            ]}
-            onPress={() => setStatusFilter('CANCELLED')}
-            activeOpacity={0.7}
-          >
-            <MaterialCommunityIcons 
-              name="calendar-remove" 
-              size={13} 
-              color={statusFilter === 'CANCELLED' ? '#FFFFFF' : '#DC2626'} 
-              style={{ marginRight: 4 }} 
-            />
-            <Text style={[styles.filterPillText, { color: statusFilter === 'CANCELLED' ? '#FFFFFF' : theme.colors.text }]}>
-              Cancelled ({cancelledCount})
-            </Text>
-          </TouchableOpacity>
-        </ScrollView>
-      </View>
+          {dateFilter !== 'ALL' && (
+            <TouchableOpacity
+              style={[
+                styles.activeFilterPill,
+                {
+                  backgroundColor: '#0284C715',
+                  borderColor: '#0284C7',
+                }
+              ]}
+              onPress={() => setFilterBottomSheetVisible(true)}
+              activeOpacity={0.8}
+            >
+              <MaterialCommunityIcons name={getDateFilterIcon(dateFilter)} size={14} color="#0284C7" />
+              <Text style={[styles.activeFilterPillText, { color: '#0284C7' }]}>
+                {getDateFilterLabel(dateFilter, selectedCustomDate)}
+              </Text>
+              <TouchableOpacity
+                onPress={() => {
+                  setDateFilter('ALL');
+                  setSelectedCustomDate(null);
+                }}
+                hitSlop={{ top: 8, bottom: 8, left: 8, right: 8 }}
+                style={styles.clearFilterCross}
+              >
+                <MaterialCommunityIcons name="close" size={14} color="#0284C7" />
+              </TouchableOpacity>
+            </TouchableOpacity>
+          )}
+        </View>
+      )}
 
       <ScrollView
         contentContainerStyle={styles.scrollContent}
@@ -378,7 +670,7 @@ export default function BookedMotsScreen({ navigation }: any) {
           <RefreshControl refreshing={refreshing} onRefresh={onRefresh} colors={[theme.colors.secondary]} />
         }
       >
-        {groupedList.length === 0 ? (
+        {sortedBookings.length === 0 ? (
           <View style={[styles.emptyContainer, { backgroundColor: theme.colors.card, borderColor: theme.colors.border }]}>
             <MaterialCommunityIcons name="calendar-blank-outline" size={48} color={theme.colors.placeholder} style={{ marginBottom: 10 }} />
             <Text style={[styles.emptyText, { color: theme.colors.text }]}>No bookings found</Text>
@@ -387,251 +679,246 @@ export default function BookedMotsScreen({ navigation }: any) {
             </Text>
           </View>
         ) : (
-          groupedList.map((group) => {
+          sortedBookings.map((item) => {
+            const isPending = item.status === 'Pending';
+            const isApproved = item.status === 'Approved';
+            const isRejected = item.status === 'Rejected';
+            const isCompleted = item.status === 'Completed';
+            const isCancelled = item.status === 'Cancelled';
+
+            let statusText = 'Acknowledged';
+            let statusColor = '#6B7280';
+            let statusBg = '#6B728015';
+            let statusIcon = 'check';
+
+            if (isCompleted) {
+              statusText = 'Completed';
+              statusColor = '#10B981';
+              statusBg = '#10B98115';
+              statusIcon = 'check-decagram';
+            } else if (isPending) {
+              statusText = 'Pending Approval';
+              statusColor = '#F59E0B';
+              statusBg = '#F59E0B15';
+              statusIcon = 'clock-alert-outline';
+            } else if (isApproved) {
+              statusText = 'Confirmed';
+              statusColor = '#0284C7';
+              statusBg = '#0284C715';
+              statusIcon = 'check-circle';
+            } else if (isRejected) {
+              statusText = 'Rejected';
+              statusColor = '#EF4444';
+              statusBg = '#EF444415';
+              statusIcon = 'close-circle';
+            } else if (isCancelled) {
+              statusText = 'Cancelled';
+              statusColor = '#DC2626';
+              statusBg = '#DC262615';
+              statusIcon = 'calendar-remove';
+            }
+
+            const customer = customers.find(c => 
+              String(c.id).toLowerCase() === String(item.customerId).toLowerCase() ||
+              String(c._id).toLowerCase() === String(item.customerId).toLowerCase()
+            );
+            const custName = item.customerName || (customer ? `${customer.firstName} ${customer.lastName}` : 'Customer');
+            const custPhone = item.customerMobile || customer?.mobile || '';
+            const cleanMake = item.makeModel?.split(' (Slot:')[0]?.split(' at ')[0]?.split(' - Slot:')[0]?.trim() || item.makeModel || 'Vehicle';
+            const isMot = isMotBooking(item);
+            const isDateOnly = !isMot;
+
             return (
               <View
-                key={group.customerId}
-                style={[styles.customerContainerCard, { backgroundColor: theme.colors.card, borderColor: theme.colors.border }]}
+                key={item.id}
+                style={[
+                  styles.bookingCard,
+                  {
+                    backgroundColor: theme.colors.card,
+                    borderColor: isPending ? '#F59E0B60' : theme.colors.border,
+                    borderLeftColor: statusColor,
+                  }
+                ]}
               >
-                {/* Customer Section Header */}
-                <View style={[styles.customerGroupHeader, { borderBottomColor: theme.colors.border }]}>
-                  <View style={styles.customerInfoLeft}>
-                    <View style={[styles.customerAvatar, { backgroundColor: theme.colors.secondary + '15' }]}>
-                      <Text style={[styles.customerAvatarText, { color: theme.colors.secondary }]}>
-                        {group.customerName.charAt(0).toUpperCase()}
-                      </Text>
+                {/* 1. Header: Plate + Vehicle Model + Status Pill */}
+                <View style={styles.bookingCardHeader}>
+                  <View style={styles.vehicleHeaderLeft}>
+                    <View style={styles.plate}>
+                      <Text style={styles.plateText}>{item.registrationNumber || 'VRN'}</Text>
                     </View>
-                    <View>
-                      <Text style={[styles.customerGroupName, { color: theme.colors.text }]}>
-                        {group.customerName}
-                      </Text>
-                      {group.mobile ? (
-                        <TouchableOpacity 
-                          onPress={() => callCustomer(group.mobile)}
-                          style={styles.customerPhoneRow}
-                          activeOpacity={0.7}
-                        >
-                          <MaterialCommunityIcons name="phone-outline" size={12} color={theme.colors.secondary} />
-                          <Text style={[styles.customerPhoneText, { color: theme.colors.secondary }]}>
-                            {group.mobile}
-                          </Text>
-                        </TouchableOpacity>
-                      ) : null}
-                    </View>
+                    <Text style={[styles.vehicleModelText, { color: theme.colors.text }]} numberOfLines={1}>
+                      {cleanMake}
+                    </Text>
                   </View>
-                  
-                  <View style={[styles.badgeCount, { backgroundColor: theme.colors.secondary + '12' }]}>
-                    <Text style={{ fontSize: 11, fontWeight: '700', color: theme.colors.secondary }}>
-                      {group.alerts.length} {group.alerts.length === 1 ? 'Slot' : 'Slots'}
+
+                  <View style={[styles.statusBadge, { backgroundColor: statusBg, borderColor: statusColor + '30' }]}>
+                    <MaterialCommunityIcons name={statusIcon as any} size={11} color={statusColor} style={{ marginRight: 3 }} />
+                    <Text style={[styles.statusText, { color: statusColor }]}>{statusText}</Text>
+                  </View>
+                </View>
+
+                {/* 2. Middle Row: Date & Time & Station info chips */}
+                <View style={styles.infoChipsRow}>
+                  {/* Date chip */}
+                  <View style={[styles.infoChip, { backgroundColor: theme.colors.background, borderColor: theme.colors.border }]}>
+                    <MaterialCommunityIcons name="calendar-month-outline" size={13} color={theme.colors.secondary} />
+                    <Text style={[styles.infoChipText, { color: theme.colors.text }]}>
+                      {formatBookingDate(item.date)}
+                    </Text>
+                  </View>
+
+                  {/* Slot / Drop-off chip */}
+                  {isMot ? (
+                    <View style={[styles.infoChip, { backgroundColor: '#3B82F615', borderColor: '#3B82F640' }]}>
+                      <MaterialCommunityIcons
+                        name="clock-outline"
+                        size={13}
+                        color="#2563EB"
+                      />
+                      <Text style={[styles.infoChipText, { color: '#2563EB', fontWeight: '700' }]}>
+                        {getMotSlotDisplay(item)}
+                      </Text>
+                    </View>
+                  ) : (
+                    <View style={[styles.infoChip, { backgroundColor: theme.colors.background, borderColor: theme.colors.border }]}>
+                      <MaterialCommunityIcons
+                        name="car-clock"
+                        size={13}
+                        color="#6B7280"
+                      />
+                      <Text style={[styles.infoChipText, { color: theme.colors.text }]}>
+                        Workshop Drop-off
+                      </Text>
+                    </View>
+                  )}
+
+                  {/* Bay chip (if station assigned) */}
+                  {item.stationName ? (
+                    <View style={[styles.infoChip, { backgroundColor: '#10B98115', borderColor: '#10B98140' }]}>
+                      <MaterialCommunityIcons name="garage" size={13} color="#059669" />
+                      <Text style={[styles.infoChipText, { color: '#059669', fontWeight: '600' }]} numberOfLines={1}>
+                        {item.stationName}
+                      </Text>
+                    </View>
+                  ) : null}
+                </View>
+
+                {/* 3. Customer & Service Meta Row */}
+                <View style={styles.customerServiceRow}>
+                  <View style={styles.customerMetaBox}>
+                    <MaterialCommunityIcons name="account-outline" size={14} color={theme.colors.placeholder} />
+                    <Text style={[styles.customerMetaName, { color: theme.colors.text }]} numberOfLines={1}>
+                      {custName}
+                    </Text>
+                    {custPhone ? (
+                      <TouchableOpacity
+                        onPress={() => callCustomer(custPhone)}
+                        style={[styles.phoneChipCompact, { backgroundColor: theme.colors.secondary + '12', borderColor: theme.colors.secondary + '30' }]}
+                        activeOpacity={0.7}
+                      >
+                        <MaterialCommunityIcons name="phone" size={11} color={theme.colors.secondary} />
+                        <Text style={[styles.phoneChipTextCompact, { color: theme.colors.secondary }]}>
+                          {custPhone}
+                        </Text>
+                      </TouchableOpacity>
+                    ) : null}
+                  </View>
+
+                  <View style={[styles.serviceTagBadge, { backgroundColor: isMot ? '#8B5CF612' : '#0284C712', borderColor: isMot ? '#8B5CF630' : '#0284C730' }]}>
+                    <MaterialCommunityIcons name={isMot ? 'clipboard-check-outline' : 'wrench-outline'} size={12} color={isMot ? '#8B5CF6' : '#0284C7'} />
+                    <Text style={[styles.serviceTagText, { color: isMot ? '#8B5CF6' : '#0284C7' }]} numberOfLines={1}>
+                      {item.serviceName || (isMot ? 'MOT Test' : 'Workshop Service')}
+                      {item.price ? ` • £${Number(item.price).toFixed(2)}` : ''}
                     </Text>
                   </View>
                 </View>
 
-                {/* Sub-cards for each vehicle booking */}
-                <View style={styles.vehiclesList}>
-                  {group.alerts.map((item, index) => {
-                    const isPending = item.status === 'Pending';
-                    const isApproved = item.status === 'Approved';
-                    const isRejected = item.status === 'Rejected';
-                    const isCompleted = item.status === 'Completed';
-                    const isCancelled = item.status === 'Cancelled';
-
-                    let statusText = 'Acknowledged';
-                    let statusColor = '#6B7280';
-                    let statusBg = '#6B728015';
-                    let statusIcon = 'check';
-
-                    if (isCompleted) {
-                      statusText = 'Completed';
-                      statusColor = '#10B981';
-                      statusBg = '#10B98115';
-                      statusIcon = 'check-decagram';
-                    } else if (isPending) {
-                      statusText = 'Pending Approval';
-                      statusColor = '#F59E0B';
-                      statusBg = '#F59E0B15';
-                      statusIcon = 'clock-alert-outline';
-                    } else if (isApproved) {
-                      statusText = 'Confirmed';
-                      statusColor = '#10B981';
-                      statusBg = '#10B98115';
-                      statusIcon = 'check-circle';
-                    } else if (isRejected) {
-                      statusText = 'Rejected';
-                      statusColor = '#EF4444';
-                      statusBg = '#EF444415';
-                      statusIcon = 'close-circle';
-                    } else if (isCancelled) {
-                      statusText = 'Cancelled';
-                      statusColor = '#DC2626';
-                      statusBg = '#DC262615';
-                      statusIcon = 'calendar-remove';
-                    }
-
-                    return (
-                      <View 
-                        key={item.id}
-                        style={[
-                          styles.subVehicleCard, 
-                          { 
-                            backgroundColor: theme.colors.background, 
-                            borderColor: isPending ? '#F59E0B50' : theme.colors.border,
-                            borderLeftWidth: isPending ? 3.5 : 1,
-                            borderLeftColor: isPending ? '#F59E0B' : theme.colors.border,
-                          }
-                        ]}
-                      >
-                        {/* Top Row: Vehicle VRN + Model + Status Badge */}
-                        <View style={styles.vehicleHeaderRow}>
-                          <View style={styles.vehicleTitleGroup}>
-                            {group.alerts.length > 1 && (
-                              <View style={[styles.slotNumberPill, { backgroundColor: theme.colors.secondary + '15', borderColor: theme.colors.secondary + '40' }]}>
-                                <Text style={[styles.slotNumberPillText, { color: theme.colors.secondary }]}>Slot {index + 1}.</Text>
-                              </View>
-                            )}
-                            <View style={styles.plate}>
-                              <Text style={styles.plateText}>{item.registrationNumber}</Text>
-                            </View>
-                            <Text style={[styles.makeModelText, { color: theme.colors.text }]} numberOfLines={1}>
-                              {item.makeModel?.split(' (Slot:')[0]?.split(' at ')[0] || item.makeModel}
-                            </Text>
-                          </View>
-
-                          <View style={[styles.statusBadge, { backgroundColor: statusBg, borderColor: statusColor + '30' }]}>
-                            <MaterialCommunityIcons name={statusIcon} size={11} color={statusColor} style={{ marginRight: 3 }} />
-                            <Text style={[styles.statusText, { color: statusColor }]}>{statusText}</Text>
-                          </View>
+                {/* 4. Multi-Service Pills (if multiple services booked) */}
+                {Array.isArray(item.services) && item.services.length > 1 && (
+                  <View style={styles.multiServicesRow}>
+                    {item.services.map((s: any, sIdx: number) => {
+                      const sName = typeof s === 'string' ? s : s?.name || '';
+                      return (
+                        <View key={sIdx} style={[styles.multiServicePill, { backgroundColor: theme.colors.secondary + '12' }]}>
+                          <Text style={[styles.multiServicePillText, { color: theme.colors.secondary }]}>{sName}</Text>
                         </View>
+                      );
+                    })}
+                  </View>
+                )}
 
-                        {/* Compact Details Grid */}
-                        <View style={styles.compactDetailsGrid}>
-                          {/* Date & Time */}
-                          <View style={[styles.detailChip, { backgroundColor: theme.colors.card, borderColor: theme.colors.border }]}>
-                            <MaterialCommunityIcons name="calendar-month-outline" size={13} color={theme.colors.secondary} />
-                            <Text style={[styles.detailChipText, { color: theme.colors.text }]}>
-                              {formatBookingDate(item.date)}
-                            </Text>
-                          </View>
+                {/* 5. Rejection Notice Banner */}
+                {isRejected && item.rejectionReason ? (
+                  <View style={styles.compactAlertBanner}>
+                    <MaterialCommunityIcons name="alert-circle-outline" size={13} color="#EF4444" />
+                    <Text style={styles.compactAlertText} numberOfLines={2}>
+                      <Text style={{ fontWeight: '700', color: '#EF4444' }}>Declined: </Text>
+                      {item.rejectionReason}
+                    </Text>
+                  </View>
+                ) : null}
 
-                          {/* Slot Time */}
-                          <View style={[styles.detailChip, { backgroundColor: theme.colors.card, borderColor: theme.colors.border }]}>
-                            <MaterialCommunityIcons name="clock-outline" size={13} color="#3B82F6" />
-                            <Text style={[styles.detailChipText, { color: theme.colors.text }]}>
-                              {group.alerts.length > 1 ? `Slot ${index + 1}. ` : `${getSlotDisplay(item)} • `}{getSlotTimeDisplay(item)}
-                            </Text>
-                          </View>
+                {/* 6. Cancellation Notice Banner */}
+                {isCancelled ? (
+                  <View style={[styles.compactAlertBanner, { backgroundColor: '#DC262610', borderColor: '#DC262625' }]}>
+                    <MaterialCommunityIcons name="calendar-remove" size={13} color="#DC2626" />
+                    <Text style={[styles.compactAlertText, { color: theme.colors.text }]} numberOfLines={2}>
+                      <Text style={{ fontWeight: '700', color: '#DC2626' }}>Cancelled by {item.cancelledBy || 'Customer'}: </Text>
+                      {item.cancellationReason || 'Slot has been released.'}
+                    </Text>
+                  </View>
+                ) : null}
 
-                          {/* Service Name & Price */}
-                          <View style={[styles.detailChip, { backgroundColor: theme.colors.card, borderColor: theme.colors.border }]}>
-                            <MaterialCommunityIcons name="wrench-outline" size={13} color="#8B5CF6" />
-                            <Text style={[styles.detailChipText, { color: theme.colors.text }]} numberOfLines={1}>
-                              {item.serviceName || 'MOT Test'}
-                              {item.price ? ` • £${item.price}` : ''}
-                              {item.duration ? ` (${item.duration}m)` : ''}
-                            </Text>
-                          </View>
+                {/* 7. Action Buttons (Pending or Confirmed) */}
+                {isPending && (
+                  <View style={styles.cardActionsRow}>
+                    <TouchableOpacity
+                      onPress={() => openRejectModal(item.id)}
+                      disabled={loadingAction !== null}
+                      style={[styles.cardActionBtn, styles.cardRejectBtn, { borderColor: '#EF444450' }]}
+                      activeOpacity={0.7}
+                    >
+                      <MaterialCommunityIcons name="close" size={13} color="#EF4444" />
+                      <Text style={styles.cardRejectBtnText}>Reject</Text>
+                    </TouchableOpacity>
 
-                          {/* Bay / Station if present */}
-                          {item.stationName && (
-                            <View style={[styles.detailChip, { backgroundColor: theme.colors.card, borderColor: theme.colors.border }]}>
-                              <MaterialCommunityIcons name="garage" size={13} color="#10B981" />
-                              <Text style={[styles.detailChipText, { color: theme.colors.text }]}>
-                                {item.stationName}
-                              </Text>
-                            </View>
-                          )}
-                        </View>
+                    <TouchableOpacity
+                      onPress={() => handleConfirm(item.id)}
+                      disabled={loadingAction !== null}
+                      style={[styles.cardActionBtn, styles.cardConfirmBtn, { backgroundColor: theme.colors.secondary }]}
+                      activeOpacity={0.7}
+                    >
+                      {loadingAction === item.id ? (
+                        <ActivityIndicator color="#FFFFFF" size="small" />
+                      ) : (
+                        <>
+                          <MaterialCommunityIcons name="check" size={14} color="#FFFFFF" />
+                          <Text style={styles.cardConfirmBtnText}>Confirm Booking</Text>
+                        </>
+                      )}
+                    </TouchableOpacity>
+                  </View>
+                )}
 
-                        {/* Rejection Notice */}
-                        {isRejected && item.rejectionReason && (
-                          <View style={[styles.rejectionNotice, { backgroundColor: '#EF444410', borderColor: '#EF444430' }]}>
-                            <MaterialCommunityIcons name="alert-circle-outline" size={14} color="#EF4444" style={{ marginRight: 6 }} />
-                            <View style={{ flex: 1 }}>
-                              <Text style={{ fontSize: 11, fontWeight: '700', color: '#EF4444' }}>Reason for Rejection:</Text>
-                              <Text style={[styles.rejectionText, { color: theme.colors.text }]}>{item.rejectionReason}</Text>
-                            </View>
-                          </View>
-                        )}
-
-                        {/* Cancellation Notice */}
-                        {isCancelled && (
-                          <View style={[styles.rejectionNotice, { backgroundColor: '#DC262610', borderColor: '#DC262630' }]}>
-                            <MaterialCommunityIcons name="calendar-remove" size={14} color="#DC2626" style={{ marginRight: 6 }} />
-                            <View style={{ flex: 1 }}>
-                              <Text style={{ fontSize: 11, fontWeight: '700', color: '#DC2626' }}>
-                                Cancelled by {item.cancelledBy || 'Customer'}:
-                              </Text>
-                              <Text style={[styles.rejectionText, { color: theme.colors.text }]}>
-                                {item.cancellationReason || 'Slot has been released.'}
-                              </Text>
-                            </View>
-                          </View>
-                        )}
-
-                        {/* Cancel Button for Approved Bookings */}
-                        {isApproved && (
-                          <View style={{ flexDirection: 'row', justifyContent: 'flex-end', marginTop: 8 }}>
-                            <TouchableOpacity
-                              onPress={() => handleAdminCancelBooking(item)}
-                              disabled={loadingAction !== null}
-                              style={{
-                                flexDirection: 'row',
-                                alignItems: 'center',
-                                paddingHorizontal: 10,
-                                paddingVertical: 5,
-                                borderRadius: 6,
-                                borderWidth: 1,
-                                borderColor: '#EF444450',
-                                backgroundColor: '#EF444410',
-                              }}
-                              activeOpacity={0.7}
-                            >
-                              {loadingAction === `cancel_${item.id}` ? (
-                                <ActivityIndicator color="#EF4444" size="small" />
-                              ) : (
-                                <>
-                                  <MaterialCommunityIcons name="calendar-remove" size={13} color="#EF4444" style={{ marginRight: 4 }} />
-                                  <Text style={{ fontSize: 11, fontWeight: '700', color: '#EF4444' }}>Cancel Booking</Text>
-                                </>
-                              )}
-                            </TouchableOpacity>
-                          </View>
-                        )}
-
-                        {/* Compact Action Buttons (If Pending) */}
-                        {isPending && (
-                          <View style={styles.subActionRow}>
-                            <TouchableOpacity
-                              onPress={() => openRejectModal(item.id)}
-                              disabled={loadingAction !== null}
-                              style={[styles.subActionBtn, styles.subRejectBtn, { borderColor: '#EF444440' }]}
-                              activeOpacity={0.7}
-                            >
-                              <MaterialCommunityIcons name="close" size={14} color="#EF4444" style={{ marginRight: 4 }} />
-                              <Text style={{ fontSize: 11.5, fontWeight: '700', color: '#EF4444' }}>Reject</Text>
-                            </TouchableOpacity>
-
-                            <TouchableOpacity
-                              onPress={() => handleConfirm(item.id)}
-                              disabled={loadingAction !== null}
-                              style={[styles.subActionBtn, styles.subConfirmBtn, { backgroundColor: theme.colors.secondary }]}
-                              activeOpacity={0.7}
-                            >
-                              {loadingAction === item.id ? (
-                                <ActivityIndicator color="#FFFFFF" size="small" />
-                              ) : (
-                                <>
-                                  <MaterialCommunityIcons name="check" size={14} color="#FFFFFF" style={{ marginRight: 4 }} />
-                                  <Text style={{ fontSize: 11.5, fontWeight: '700', color: '#FFFFFF' }}>Confirm Booking</Text>
-                                </>
-                              )}
-                            </TouchableOpacity>
-                          </View>
-                        )}
-                      </View>
-                    );
-                  })}
-                </View>
+                {isApproved && (
+                  <View style={[styles.cardActionsRow, { justifyContent: 'flex-end', marginTop: 6 }]}>
+                    <TouchableOpacity
+                      onPress={() => handleAdminCancelBooking(item)}
+                      disabled={loadingAction !== null}
+                      style={styles.cardCancelBookingBtn}
+                      activeOpacity={0.7}
+                    >
+                      {loadingAction === `cancel_${item.id}` ? (
+                        <ActivityIndicator color="#FFFFFF" size="small" />
+                      ) : (
+                        <>
+                          <MaterialCommunityIcons name="calendar-remove" size={12} color="#FFFFFF" />
+                          <Text style={styles.cardCancelBookingText}>Cancel Booking</Text>
+                        </>
+                      )}
+                    </TouchableOpacity>
+                  </View>
+                )}
               </View>
             );
           })
@@ -708,6 +995,345 @@ export default function BookedMotsScreen({ navigation }: any) {
           </View>
         </View>
       </Modal>
+
+      {/* Filter Bottom Sheet Modal */}
+      <Modal
+        visible={filterBottomSheetVisible}
+        transparent={true}
+        animationType="slide"
+        onRequestClose={() => setFilterBottomSheetVisible(false)}
+      >
+        <TouchableOpacity
+          style={styles.bottomSheetBackdrop}
+          activeOpacity={1}
+          onPress={() => setFilterBottomSheetVisible(false)}
+        >
+          <TouchableOpacity activeOpacity={1} style={[styles.bottomSheetContainer, { backgroundColor: theme.colors.card }]}>
+            {/* Sheet Handle */}
+            <View style={styles.bottomSheetHandle} />
+
+            {/* Header */}
+            <View style={styles.bottomSheetHeader}>
+              <Text style={[styles.bottomSheetTitle, { color: theme.colors.text }]}>Filters</Text>
+              <TouchableOpacity
+                onPress={() => setFilterBottomSheetVisible(false)}
+                style={[styles.sheetCloseBtn, { backgroundColor: theme.colors.background }]}
+              >
+                <MaterialCommunityIcons name="close" size={18} color={theme.colors.text} />
+              </TouchableOpacity>
+            </View>
+
+            {/* SECTION 1: FILTER BY STATUS (Tags with rounded border radius, wrapping naturally) */}
+            <View style={styles.sheetSection}>
+              <Text style={[styles.sheetSectionLabel, { color: theme.colors.placeholder }]}>STATUS</Text>
+              <View style={styles.filterTagsWrap}>
+                {filterOptions.map((opt) => {
+                  const isSelected = statusFilter === opt.key;
+                  return (
+                    <TouchableOpacity
+                      key={opt.key}
+                      style={[
+                        styles.filterTag,
+                        {
+                          backgroundColor: isSelected ? opt.color : theme.colors.background,
+                          borderColor: isSelected ? opt.color : theme.colors.border,
+                        }
+                      ]}
+                      onPress={() => setStatusFilter(opt.key)}
+                      activeOpacity={0.7}
+                    >
+                      <MaterialCommunityIcons
+                        name={opt.icon}
+                        size={15}
+                        color={isSelected ? '#FFFFFF' : opt.color}
+                        style={{ marginRight: 6 }}
+                      />
+                      <Text
+                        style={[
+                          styles.filterTagText,
+                          {
+                            color: isSelected ? '#FFFFFF' : theme.colors.text,
+                            fontWeight: isSelected ? '700' : '600',
+                          }
+                        ]}
+                      >
+                        {opt.label}
+                      </Text>
+                      <View
+                        style={[
+                          styles.filterTagBadge,
+                          {
+                            backgroundColor: isSelected ? 'rgba(255, 255, 255, 0.28)' : (opt.color + '18'),
+                          }
+                        ]}
+                      >
+                        <Text
+                          style={[
+                            styles.filterTagBadgeText,
+                            { color: isSelected ? '#FFFFFF' : opt.color }
+                          ]}
+                        >
+                          {opt.count}
+                        </Text>
+                      </View>
+                    </TouchableOpacity>
+                  );
+                })}
+              </View>
+            </View>
+
+            {/* SECTION 2: FILTER BY DATE (Single button to open calendar) */}
+            <View style={[styles.sheetSection, { marginTop: 14 }]}>
+              <Text style={[styles.sheetSectionLabel, { color: theme.colors.placeholder }]}>APPOINTMENT DATE</Text>
+              <TouchableOpacity
+                style={[
+                  styles.calendarOpenBtn,
+                  {
+                    backgroundColor: selectedCustomDate ? theme.colors.secondary + '12' : theme.colors.background,
+                    borderColor: selectedCustomDate ? theme.colors.secondary : theme.colors.border,
+                  }
+                ]}
+                onPress={() => setCalendarModalVisible(true)}
+                activeOpacity={0.7}
+              >
+                <View style={styles.calendarOpenBtnLeft}>
+                  <View style={[
+                    styles.calendarBtnIconBox,
+                    { backgroundColor: selectedCustomDate ? theme.colors.secondary + '20' : theme.colors.card }
+                  ]}>
+                    <MaterialCommunityIcons
+                      name="calendar-month-outline"
+                      size={20}
+                      color={selectedCustomDate ? theme.colors.secondary : theme.colors.secondary}
+                    />
+                  </View>
+                  <View>
+                    <Text style={[
+                      styles.calendarBtnMainText,
+                      {
+                        color: selectedCustomDate ? theme.colors.secondary : theme.colors.text,
+                        fontWeight: selectedCustomDate ? '700' : '600'
+                      }
+                    ]}>
+                      {selectedCustomDate ? formatYMDToDisplay(selectedCustomDate) : 'Pick Date from Calendar'}
+                    </Text>
+                    {selectedCustomDate && (
+                      <Text style={[styles.calendarBtnSubText, { color: theme.colors.placeholder }]}>
+                        {customDateCount} {customDateCount === 1 ? 'appointment' : 'appointments'} on this date
+                      </Text>
+                    )}
+                  </View>
+                </View>
+
+                {selectedCustomDate ? (
+                  <TouchableOpacity
+                    onPress={() => {
+                      setDateFilter('ALL');
+                      setSelectedCustomDate(null);
+                    }}
+                    hitSlop={{ top: 10, bottom: 10, left: 10, right: 10 }}
+                    style={[styles.calendarClearBtn, { backgroundColor: '#EF444415' }]}
+                  >
+                    <MaterialCommunityIcons name="close" size={16} color="#EF4444" />
+                  </TouchableOpacity>
+                ) : (
+                  <MaterialCommunityIcons name="chevron-right" size={20} color={theme.colors.placeholder} />
+                )}
+              </TouchableOpacity>
+            </View>
+
+            {/* Bottom Actions */}
+            <View style={styles.bottomSheetActions}>
+              <TouchableOpacity
+                style={[styles.sheetResetBtn, { borderColor: theme.colors.border }]}
+                onPress={() => {
+                  setStatusFilter('ALL');
+                  setDateFilter('ALL');
+                  setSelectedCustomDate(null);
+                }}
+              >
+                <MaterialCommunityIcons name="restart" size={16} color={theme.colors.placeholder} />
+                <Text style={[styles.sheetResetBtnText, { color: theme.colors.placeholder }]}>Reset All</Text>
+              </TouchableOpacity>
+
+              <TouchableOpacity
+                style={[styles.sheetApplyBtn, { backgroundColor: theme.colors.secondary }]}
+                onPress={() => setFilterBottomSheetVisible(false)}
+              >
+                <Text style={styles.sheetApplyBtnText}>Apply Filters</Text>
+              </TouchableOpacity>
+            </View>
+          </TouchableOpacity>
+        </TouchableOpacity>
+      </Modal>
+
+      {/* Calendar Picker Modal */}
+      <Modal visible={calendarModalVisible} transparent animationType="fade">
+        <TouchableOpacity
+          style={styles.modalOverlay}
+          activeOpacity={1}
+          onPress={() => setCalendarModalVisible(false)}
+        >
+          <TouchableOpacity
+            activeOpacity={1}
+            style={[styles.calendarModalCard, { backgroundColor: theme.colors.card, borderColor: theme.colors.border }]}
+          >
+            {/* Calendar Month & Year Controls */}
+            <View style={styles.calendarHeader}>
+              <TouchableOpacity onPress={handlePrevMonth} style={[styles.calNavBtn, { backgroundColor: theme.colors.background, borderColor: theme.colors.border }]}>
+                <MaterialCommunityIcons name="chevron-left" size={24} color={theme.colors.text} />
+              </TouchableOpacity>
+
+              <View style={styles.calTitleBox}>
+                <Text style={[styles.calendarTitle, { color: theme.colors.text }]}>
+                  {monthNames[currentViewDate.getMonth()]} {currentViewDate.getFullYear()}
+                </Text>
+                <Text style={[styles.calSubTitle, { color: theme.colors.placeholder }]}>
+                  Select date to filter appointments
+                </Text>
+              </View>
+
+              <TouchableOpacity onPress={handleNextMonth} style={[styles.calNavBtn, { backgroundColor: theme.colors.background, borderColor: theme.colors.border }]}>
+                <MaterialCommunityIcons name="chevron-right" size={24} color={theme.colors.text} />
+              </TouchableOpacity>
+            </View>
+
+            {/* Quick Toolbar: Jump to Today */}
+            <View style={styles.calToolbarRow}>
+              <TouchableOpacity
+                style={[styles.todayQuickBtn, { backgroundColor: theme.colors.secondary + '18', borderColor: theme.colors.secondary + '40' }]}
+                onPress={handleJumpToToday}
+              >
+                <MaterialCommunityIcons name="calendar-today" size={14} color={theme.colors.secondary} />
+                <Text style={[styles.todayQuickBtnText, { color: theme.colors.secondary }]}>Select Today</Text>
+              </TouchableOpacity>
+
+              {selectedCustomDate && (
+                <View style={[styles.activeDateTag, { backgroundColor: theme.colors.background, borderColor: theme.colors.border }]}>
+                  <MaterialCommunityIcons name="calendar-check" size={14} color="#10B981" />
+                  <Text style={[styles.activeDateTagText, { color: theme.colors.text }]}>
+                    Selected: <Text style={{ fontWeight: '800', color: theme.colors.secondary }}>{formatYMDToDisplay(selectedCustomDate)}</Text>
+                  </Text>
+                </View>
+              )}
+            </View>
+
+            {/* Weekday labels */}
+            <View style={styles.weekdayRow}>
+              {['Sun', 'Mon', 'Tue', 'Wed', 'Thu', 'Fri', 'Sat'].map((d, index) => (
+                <Text
+                  key={d}
+                  style={[
+                    styles.weekdayText,
+                    { color: index === 0 ? '#EF4444' : theme.colors.placeholder }
+                  ]}
+                >
+                  {d}
+                </Text>
+              ))}
+            </View>
+
+            {/* Days Grid */}
+            <View style={styles.daysGrid}>
+              {calendarDays.map((day, idx) => {
+                if (!day) {
+                  return <View key={`empty-${idx}`} style={styles.dayCell} />;
+                }
+
+                const dateYMD = toYMD(day);
+                if (!dateYMD) return null;
+
+                const isSelected = dateFilter === 'CUSTOM' && selectedCustomDate === dateYMD;
+                const isToday = dateYMD === todayYMD;
+                const hasBookings = datesWithBookingsSet.has(dateYMD);
+                const isSunday = day.getDay() === 0;
+
+                return (
+                  <View key={dateYMD} style={styles.dayCell}>
+                    <TouchableOpacity
+                      onPress={() => {
+                        setDateFilter('CUSTOM');
+                        setSelectedCustomDate(dateYMD);
+                        setCalendarModalVisible(false);
+                      }}
+                      style={[
+                        styles.dayBtn,
+                        {
+                          backgroundColor: isSelected
+                            ? theme.colors.secondary
+                            : isToday
+                            ? theme.colors.secondary + '18'
+                            : hasBookings
+                            ? '#8B5CF618'
+                            : 'transparent',
+                          borderColor: isSelected
+                            ? theme.colors.secondary
+                            : isToday
+                            ? theme.colors.secondary
+                            : hasBookings
+                            ? '#8B5CF6'
+                            : theme.colors.border + '60',
+                          borderWidth: isSelected || isToday || hasBookings ? 1.5 : 1,
+                        }
+                      ]}
+                    >
+                      <Text
+                        style={[
+                          styles.dayText,
+                          {
+                            color: isSelected
+                              ? '#FFFFFF'
+                              : hasBookings
+                              ? '#8B5CF6'
+                              : isSunday
+                              ? '#EF4444'
+                              : isToday
+                              ? theme.colors.secondary
+                              : theme.colors.text,
+                            fontWeight: isSelected || isToday || hasBookings ? '800' : '600',
+                          }
+                        ]}
+                      >
+                        {day.getDate()}
+                      </Text>
+                      {isToday && !isSelected && (
+                        <View style={[styles.todayDot, { backgroundColor: theme.colors.secondary }]} />
+                      )}
+                      {hasBookings && !isSelected && (
+                        <View style={[styles.pastBookingDot, { backgroundColor: '#8B5CF6' }]} />
+                      )}
+                    </TouchableOpacity>
+                  </View>
+                );
+              })}
+            </View>
+
+            {/* Calendar Legend */}
+            <View style={[styles.calendarLegendRow, { borderTopColor: theme.colors.border + '40' }]}>
+              <View style={styles.legendItem}>
+                <View style={[styles.legendDot, { backgroundColor: theme.colors.secondary }]} />
+                <Text style={[styles.legendText, { color: theme.colors.text }]}>Today</Text>
+              </View>
+              <View style={styles.legendItem}>
+                <View style={[styles.legendDot, { backgroundColor: '#8B5CF6' }]} />
+                <Text style={[styles.legendText, { color: '#8B5CF6' }]}>Has Bookings</Text>
+              </View>
+              <View style={styles.legendItem}>
+                <View style={[styles.legendDot, { backgroundColor: theme.colors.border }]} />
+                <Text style={[styles.legendText, { color: theme.colors.placeholder }]}>Empty Day</Text>
+              </View>
+            </View>
+
+            {/* Close Modal Button */}
+            <TouchableOpacity
+              style={[styles.closeCalModalBtn, { backgroundColor: theme.colors.background, borderColor: theme.colors.border }]}
+              onPress={() => setCalendarModalVisible(false)}
+            >
+              <Text style={[styles.closeCalModalBtnText, { color: theme.colors.text }]}>Close Calendar</Text>
+            </TouchableOpacity>
+          </TouchableOpacity>
+        </TouchableOpacity>
+      </Modal>
     </SafeAreaView>
   );
 }
@@ -748,14 +1374,20 @@ const styles = StyleSheet.create({
     alignItems: 'center',
     justifyContent: 'center',
   },
-  searchWrapper: {
+  searchFilterRow: {
     flexDirection: 'row',
     alignItems: 'center',
     marginHorizontal: 16,
     marginTop: 10,
     marginBottom: 8,
+    gap: 8,
+  },
+  searchWrapper: {
+    flex: 1,
+    flexDirection: 'row',
+    alignItems: 'center',
     paddingHorizontal: 12,
-    paddingVertical: 8,
+    paddingVertical: 9,
     borderRadius: 10,
     borderWidth: 1,
   },
@@ -764,23 +1396,342 @@ const styles = StyleSheet.create({
     fontSize: 13,
     padding: 0,
   },
-  filterTabsContainer: {
+  filterIconBtn: {
+    width: 42,
+    height: 42,
+    borderRadius: 10,
+    borderWidth: 1,
+    alignItems: 'center',
+    justifyContent: 'center',
+    position: 'relative',
+  },
+  filterActiveDot: {
+    position: 'absolute',
+    top: 7,
+    right: 7,
+    width: 7,
+    height: 7,
+    borderRadius: 3.5,
+    backgroundColor: '#FFFFFF',
+  },
+  activeFilterPillRow: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    paddingHorizontal: 16,
     marginBottom: 8,
   },
-  filterTabsScroll: {
-    paddingHorizontal: 16,
+  activeFilterPill: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    gap: 6,
+    paddingHorizontal: 10,
+    paddingVertical: 5,
+    borderRadius: 8,
+    borderWidth: 1,
+  },
+  activeFilterPillText: {
+    fontSize: 12,
+    fontWeight: '700',
+  },
+  clearFilterCross: {
+    marginLeft: 4,
+    padding: 2,
+  },
+  bottomSheetBackdrop: {
+    flex: 1,
+    backgroundColor: 'rgba(0,0,0,0.5)',
+    justifyContent: 'flex-end',
+  },
+  bottomSheetContainer: {
+    borderTopLeftRadius: 24,
+    borderTopRightRadius: 24,
+    paddingHorizontal: 20,
+    paddingTop: 12,
+    paddingBottom: Platform.OS === 'ios' ? 36 : 24,
+    shadowColor: '#000',
+    shadowOffset: { width: 0, height: -3 },
+    shadowOpacity: 0.15,
+    shadowRadius: 10,
+    elevation: 10,
+  },
+  bottomSheetHandle: {
+    width: 38,
+    height: 4,
+    borderRadius: 2,
+    backgroundColor: '#9CA3AF50',
+    alignSelf: 'center',
+    marginBottom: 16,
+  },
+  bottomSheetHeader: {
+    flexDirection: 'row',
+    justifyContent: 'space-between',
+    alignItems: 'center',
+    marginBottom: 14,
+  },
+  bottomSheetTitle: {
+    fontSize: 17,
+    fontWeight: '700',
+    letterSpacing: -0.3,
+  },
+  sheetCloseBtn: {
+    width: 32,
+    height: 32,
+    borderRadius: 16,
+    alignItems: 'center',
+    justifyContent: 'center',
+  },
+  sheetSection: {
+    marginBottom: 14,
+  },
+  sheetSectionLabel: {
+    fontSize: 11,
+    fontWeight: '700',
+    letterSpacing: 0.5,
+    marginBottom: 8,
+    textTransform: 'uppercase',
+  },
+  filterTagsWrap: {
+    flexDirection: 'row',
+    flexWrap: 'wrap',
     gap: 8,
   },
-  filterPill: {
+  filterTag: {
     flexDirection: 'row',
     alignItems: 'center',
     paddingHorizontal: 12,
-    paddingVertical: 6,
+    paddingVertical: 7,
     borderRadius: 20,
+    borderWidth: 1.5,
+  },
+  filterTagText: {
+    fontSize: 12.5,
+    marginRight: 6,
+  },
+  filterTagBadge: {
+    paddingHorizontal: 6,
+    paddingVertical: 1.5,
+    borderRadius: 10,
+  },
+  filterTagBadgeText: {
+    fontSize: 10.5,
+    fontWeight: '700',
+  },
+  calendarOpenBtn: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    justifyContent: 'space-between',
+    paddingHorizontal: 12,
+    paddingVertical: 9,
+    borderRadius: 12,
+    borderWidth: 1.5,
+  },
+  calendarOpenBtnLeft: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    gap: 10,
+    flex: 1,
+  },
+  calendarBtnIconBox: {
+    width: 36,
+    height: 36,
+    borderRadius: 9,
+    alignItems: 'center',
+    justifyContent: 'center',
+  },
+  calendarBtnMainText: {
+    fontSize: 13,
+  },
+  calendarBtnSubText: {
+    fontSize: 11,
+    marginTop: 1,
+  },
+  calendarClearBtn: {
+    width: 28,
+    height: 28,
+    borderRadius: 14,
+    alignItems: 'center',
+    justifyContent: 'center',
+  },
+  bottomSheetActions: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    gap: 10,
+    marginTop: 6,
+  },
+  sheetResetBtn: {
+    flex: 1,
+    flexDirection: 'row',
+    alignItems: 'center',
+    justifyContent: 'center',
+    gap: 6,
+    paddingVertical: 11,
+    borderRadius: 10,
     borderWidth: 1,
   },
-  filterPillText: {
+  sheetResetBtnText: {
+    fontSize: 13,
+    fontWeight: '600',
+  },
+  sheetApplyBtn: {
+    flex: 2,
+    alignItems: 'center',
+    justifyContent: 'center',
+    paddingVertical: 11,
+    borderRadius: 10,
+  },
+  sheetApplyBtnText: {
+    color: '#FFFFFF',
+    fontSize: 13.5,
+    fontWeight: '700',
+  },
+  calendarModalCard: {
+    borderRadius: 20,
+    borderWidth: 1,
+    padding: 18,
+    width: '92%',
+    maxWidth: 380,
+    alignSelf: 'center',
+  },
+  calendarHeader: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    justifyContent: 'space-between',
+    marginBottom: 12,
+  },
+  calNavBtn: {
+    width: 36,
+    height: 36,
+    borderRadius: 10,
+    borderWidth: 1,
+    alignItems: 'center',
+    justifyContent: 'center',
+  },
+  calTitleBox: {
+    alignItems: 'center',
+  },
+  calendarTitle: {
+    fontSize: 16,
+    fontWeight: '800',
+    letterSpacing: -0.2,
+  },
+  calSubTitle: {
+    fontSize: 11,
+    marginTop: 1,
+  },
+  calToolbarRow: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    justifyContent: 'space-between',
+    gap: 8,
+    marginBottom: 12,
+    flexWrap: 'wrap',
+  },
+  todayQuickBtn: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    gap: 4,
+    paddingHorizontal: 10,
+    paddingVertical: 6,
+    borderRadius: 8,
+    borderWidth: 1,
+  },
+  todayQuickBtnText: {
+    fontSize: 12,
+    fontWeight: '700',
+  },
+  activeDateTag: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    gap: 5,
+    paddingHorizontal: 10,
+    paddingVertical: 6,
+    borderRadius: 8,
+    borderWidth: 1,
+  },
+  activeDateTagText: {
+    fontSize: 12,
+  },
+  weekdayRow: {
+    flexDirection: 'row',
+    justifyContent: 'space-between',
+    paddingBottom: 6,
+    borderBottomWidth: 1,
+    borderBottomColor: '#E5E7EB20',
+    marginBottom: 8,
+  },
+  weekdayText: {
+    width: '14.28%',
+    textAlign: 'center',
     fontSize: 11.5,
+    fontWeight: '700',
+    textTransform: 'uppercase',
+  },
+  daysGrid: {
+    flexDirection: 'row',
+    flexWrap: 'wrap',
+  },
+  dayCell: {
+    width: '14.28%',
+    aspectRatio: 1,
+    alignItems: 'center',
+    justifyContent: 'center',
+    marginVertical: 2,
+  },
+  dayBtn: {
+    width: 36,
+    height: 36,
+    borderRadius: 18,
+    alignItems: 'center',
+    justifyContent: 'center',
+  },
+  dayText: {
+    fontSize: 13,
+  },
+  todayDot: {
+    width: 4,
+    height: 4,
+    borderRadius: 2,
+    position: 'absolute',
+    bottom: 3,
+  },
+  pastBookingDot: {
+    width: 4,
+    height: 4,
+    borderRadius: 2,
+    position: 'absolute',
+    bottom: 3,
+  },
+  calendarLegendRow: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    justifyContent: 'space-around',
+    paddingTop: 12,
+    marginTop: 8,
+    borderTopWidth: 1,
+  },
+  legendItem: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    gap: 5,
+  },
+  legendDot: {
+    width: 8,
+    height: 8,
+    borderRadius: 4,
+  },
+  legendText: {
+    fontSize: 11,
+    fontWeight: '600',
+  },
+  closeCalModalBtn: {
+    marginTop: 14,
+    paddingVertical: 10,
+    borderRadius: 10,
+    borderWidth: 1,
+    alignItems: 'center',
+  },
+  closeCalModalBtnText: {
+    fontSize: 13,
     fontWeight: '600',
   },
   scrollContent: {
@@ -806,92 +1757,31 @@ const styles = StyleSheet.create({
     fontSize: 12,
     textAlign: 'center',
   },
-  customerContainerCard: {
-    borderWidth: 1,
+  bookingCard: {
     borderRadius: 12,
-    marginBottom: 14,
-    padding: 12,
+    borderWidth: 1,
+    borderLeftWidth: 4,
+    paddingHorizontal: 12,
+    paddingVertical: 10,
+    marginBottom: 10,
     elevation: 2,
     shadowColor: '#000',
     shadowOffset: { width: 0, height: 1 },
     shadowOpacity: 0.05,
     shadowRadius: 3,
   },
-  customerGroupHeader: {
+  bookingCardHeader: {
     flexDirection: 'row',
     justifyContent: 'space-between',
     alignItems: 'center',
-    paddingBottom: 10,
-    borderBottomWidth: 1,
-    marginBottom: 10,
+    marginBottom: 7,
   },
-  customerInfoLeft: {
+  vehicleHeaderLeft: {
     flexDirection: 'row',
     alignItems: 'center',
-    flex: 1,
-  },
-  customerAvatar: {
-    width: 32,
-    height: 32,
-    borderRadius: 16,
-    alignItems: 'center',
-    justifyContent: 'center',
-    marginRight: 10,
-  },
-  customerAvatarText: {
-    fontSize: 14,
-    fontWeight: '700',
-  },
-  customerGroupName: {
-    fontSize: 14.5,
-    fontWeight: '700',
-    letterSpacing: -0.2,
-  },
-  customerPhoneRow: {
-    flexDirection: 'row',
-    alignItems: 'center',
-    gap: 4,
-    marginTop: 1,
-  },
-  customerPhoneText: {
-    fontSize: 11.5,
-    fontWeight: '500',
-  },
-  badgeCount: {
-    paddingHorizontal: 8,
-    paddingVertical: 3,
-    borderRadius: 8,
-  },
-  vehiclesList: {
-    gap: 10,
-  },
-  subVehicleCard: {
-    borderWidth: 1,
-    borderRadius: 8,
-    padding: 10,
-  },
-  vehicleHeaderRow: {
-    flexDirection: 'row',
-    justifyContent: 'space-between',
-    alignItems: 'center',
-    marginBottom: 8,
-  },
-  vehicleTitleGroup: {
-    flexDirection: 'row',
-    alignItems: 'center',
-    flex: 1,
     gap: 8,
+    flex: 1,
     marginRight: 8,
-  },
-  slotNumberPill: {
-    paddingHorizontal: 6,
-    paddingVertical: 2,
-    borderRadius: 4,
-    borderWidth: 1,
-  },
-  slotNumberPillText: {
-    fontSize: 10.5,
-    fontWeight: '700',
   },
   plate: {
     backgroundColor: '#FFD300',
@@ -903,13 +1793,13 @@ const styles = StyleSheet.create({
   },
   plateText: {
     color: '#000',
-    fontWeight: '700',
+    fontWeight: '800',
     fontSize: 11,
     letterSpacing: 0.5,
   },
-  makeModelText: {
-    fontWeight: '600',
-    fontSize: 12.5,
+  vehicleModelText: {
+    fontSize: 13,
+    fontWeight: '700',
     flex: 1,
   },
   statusBadge: {
@@ -924,59 +1814,155 @@ const styles = StyleSheet.create({
     fontSize: 10,
     fontWeight: '700',
   },
-  compactDetailsGrid: {
+  infoChipsRow: {
     flexDirection: 'row',
+    alignItems: 'center',
     flexWrap: 'wrap',
     gap: 6,
-    marginBottom: 6,
+    marginBottom: 7,
   },
-  detailChip: {
+  infoChip: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    gap: 4,
+    paddingHorizontal: 7,
+    paddingVertical: 3,
+    borderRadius: 6,
+    borderWidth: 1,
+  },
+  infoChipText: {
+    fontSize: 11,
+    fontWeight: '600',
+  },
+  customerServiceRow: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    justifyContent: 'space-between',
+    gap: 8,
+    flexWrap: 'wrap',
+    paddingTop: 6,
+    borderTopWidth: 1,
+    borderTopColor: '#E5E7EB20',
+  },
+  customerMetaBox: {
     flexDirection: 'row',
     alignItems: 'center',
     gap: 5,
-    paddingHorizontal: 8,
-    paddingVertical: 4,
-    borderRadius: 6,
-    borderWidth: 1,
+    flex: 1,
+    minWidth: 140,
   },
-  detailChipText: {
-    fontSize: 11,
-    fontWeight: '500',
+  customerMetaName: {
+    fontSize: 12,
+    fontWeight: '600',
   },
-  rejectionNotice: {
-    flexDirection: 'row',
-    alignItems: 'flex-start',
-    padding: 8,
-    borderRadius: 6,
-    borderWidth: 1,
-    marginTop: 6,
-  },
-  rejectionText: {
-    fontSize: 11,
-    marginTop: 1,
-  },
-  subActionRow: {
-    flexDirection: 'row',
-    justifyContent: 'flex-end',
-    gap: 8,
-    marginTop: 8,
-    borderTopWidth: 1,
-    borderTopColor: 'rgba(0,0,0,0.05)',
-    paddingTop: 8,
-  },
-  subActionBtn: {
+  phoneChipCompact: {
     flexDirection: 'row',
     alignItems: 'center',
-    paddingHorizontal: 12,
+    gap: 3,
+    paddingHorizontal: 6,
+    paddingVertical: 2,
+    borderRadius: 5,
+    borderWidth: 0.5,
+    marginLeft: 4,
+  },
+  phoneChipTextCompact: {
+    fontSize: 10.5,
+    fontWeight: '700',
+  },
+  serviceTagBadge: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    gap: 4,
+    paddingHorizontal: 7,
+    paddingVertical: 2.5,
+    borderRadius: 5,
+    borderWidth: 0.5,
+  },
+  serviceTagText: {
+    fontSize: 10.5,
+    fontWeight: '700',
+    color: '#8B5CF6',
+  },
+  multiServicesRow: {
+    flexDirection: 'row',
+    flexWrap: 'wrap',
+    gap: 4,
+    marginTop: 5,
+  },
+  multiServicePill: {
+    paddingHorizontal: 6,
+    paddingVertical: 2,
+    borderRadius: 4,
+  },
+  multiServicePillText: {
+    fontSize: 10,
+    fontWeight: '600',
+  },
+  compactAlertBanner: {
+    flexDirection: 'row',
+    alignItems: 'flex-start',
+    gap: 5,
+    backgroundColor: '#EF444410',
+    borderWidth: 0.5,
+    borderColor: '#EF444430',
+    borderRadius: 6,
+    paddingHorizontal: 8,
+    paddingVertical: 5,
+    marginTop: 6,
+  },
+  compactAlertText: {
+    fontSize: 11,
+    lineHeight: 15,
+    flex: 1,
+  },
+  cardActionsRow: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    gap: 8,
+    marginTop: 8,
+    paddingTop: 6,
+    borderTopWidth: 1,
+    borderTopColor: '#E5E7EB20',
+  },
+  cardActionBtn: {
+    flex: 1,
+    flexDirection: 'row',
+    alignItems: 'center',
+    justifyContent: 'center',
+    gap: 4,
     paddingVertical: 6,
     borderRadius: 6,
   },
-  subRejectBtn: {
+  cardRejectBtn: {
     borderWidth: 1,
     backgroundColor: '#EF444410',
   },
-  subConfirmBtn: {
+  cardRejectBtnText: {
+    color: '#EF4444',
+    fontSize: 11.5,
+    fontWeight: '700',
+  },
+  cardConfirmBtn: {
     elevation: 1,
+  },
+  cardConfirmBtnText: {
+    color: '#FFFFFF',
+    fontSize: 11.5,
+    fontWeight: '700',
+  },
+  cardCancelBookingBtn: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    gap: 4,
+    paddingHorizontal: 10,
+    paddingVertical: 5,
+    borderRadius: 6,
+    backgroundColor: '#EF4444',
+  },
+  cardCancelBookingText: {
+    fontSize: 10.5,
+    fontWeight: '700',
+    color: '#FFFFFF',
   },
   modalOverlay: {
     flex: 1,

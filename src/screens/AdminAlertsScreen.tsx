@@ -27,11 +27,17 @@ const getSlotNumber = (item: any) => {
 };
 
 const getSlotDisplay = (item: any) => {
+  if (item?.isDateOnly || item?.hasMot === false || item?.slotTime === 'Full Day Drop-off' || item?.slotTime === 'Drop-off (Full Day)') {
+    return 'Workshop Drop-off';
+  }
   const num = getSlotNumber(item);
   return num ? `Slot #${num}` : 'MOT Slot';
 };
 
 const getSlotTimeDisplay = (item: any) => {
+  if (item?.isDateOnly || item?.hasMot === false || item?.slotTime === 'Full Day Drop-off' || item?.slotTime === 'Drop-off (Full Day)') {
+    return 'Full-Day Workshop Drop-off (08:00 – 18:00)';
+  }
   if (item.slotTime) return item.slotTime;
   if (item.makeModel) {
     const match = item.makeModel.match(/Slot:\s*([^\n\r]+)/i);
@@ -55,8 +61,8 @@ export default function AdminAlertsScreen() {
   const { theme } = useAppTheme();
   const { alerts, approveAlert, acknowledgeAlert, rejectAlert } = useAppValues();
 
-  // Show only pending alerts
-  const pendingAlerts = alerts.filter((a) => a.status === 'Pending');
+  // Show only pending customer-facing alerts (do not show platform garage registration approval alerts to garage admin)
+  const pendingAlerts = alerts.filter((a) => a.status === 'Pending' && a.type !== 'GARAGE_REGISTRATION');
 
   const handleApprove = async (alertId: string, alertType: string) => {
     setLoadingAction(alertId);
@@ -148,9 +154,9 @@ export default function AdminAlertsScreen() {
               iconColor = theme.colors.warning; // Orange
               typeText = 'Vehicle Marked Sold';
             } else if (item.type === 'BOOKED') {
-              iconName = 'calendar-check';
+              iconName = (item.isDateOnly || item.hasMot === false) ? 'car-clock' : 'calendar-check';
               iconColor = theme.colors.secondary; // Blue
-              typeText = 'MOT Booking Requested';
+              typeText = (item.isDateOnly || item.hasMot === false) ? 'Service Drop-off Requested' : 'MOT Booking Requested';
             }
 
             return (
@@ -171,7 +177,7 @@ export default function AdminAlertsScreen() {
                     Customer <Text style={{ fontWeight: 'bold' }}>{item.customerName}</Text>{' '}
                     {item.type === 'NEW_VEHICLE' && 'wishes to register a new vehicle:'}
                     {item.type === 'SOLD' && 'reported they sold their vehicle:'}
-                    {item.type === 'BOOKED' && 'requested MOT booking for:'}
+                    {item.type === 'BOOKED' && ((item.isDateOnly || item.hasMot === false) ? 'requested service workshop booking for:' : 'requested MOT booking for:')}
                   </Text>
 
                   <View style={styles.vehicleRow}>
@@ -183,13 +189,33 @@ export default function AdminAlertsScreen() {
                     </Text>
                   </View>
 
+                  {/* Multi-service chips if multiple services booked */}
+                  {Array.isArray(item.services) && item.services.length > 1 && (
+                    <View style={{ flexDirection: 'row', flexWrap: 'wrap', gap: 4, marginTop: 6, marginBottom: 2 }}>
+                      {item.services.map((s: any, sIdx: number) => {
+                        const sName = typeof s === 'string' ? s : s?.name || '';
+                        return (
+                          <View key={sIdx} style={{ backgroundColor: theme.colors.secondary + '15', paddingHorizontal: 6, paddingVertical: 2, borderRadius: 4 }}>
+                            <Text style={{ fontSize: 10.5, color: theme.colors.secondary, fontWeight: '600' }}>{sName}</Text>
+                          </View>
+                        );
+                      })}
+                    </View>
+                  )}
+
                   {item.type === 'BOOKED' && (
                     <View style={[styles.slotDetailsCard, { backgroundColor: theme.colors.secondary + '12', borderColor: theme.colors.secondary + '30' }]}>
                       <View style={{ flexDirection: 'row', alignItems: 'center', justifyContent: 'space-between' }}>
                         <View style={{ flexDirection: 'row', alignItems: 'center' }}>
-                          <MaterialCommunityIcons name="calendar-clock" size={16} color={theme.colors.secondary} style={{ marginRight: 6 }} />
+                          <MaterialCommunityIcons
+                            name={(item.isDateOnly || item.hasMot === false) ? "car-clock" : "calendar-clock"}
+                            size={16}
+                            color={theme.colors.secondary}
+                            style={{ marginRight: 6 }}
+                          />
                           <Text style={{ fontSize: 13, fontWeight: 'bold', color: theme.colors.text }}>
-                            Requested Date: {formatBookingDate(item.date)}
+                            {(item.isDateOnly || item.hasMot === false) ? 'Drop-off Date: ' : 'Requested Date: '}
+                            {formatBookingDate(item.date)}
                           </Text>
                         </View>
                         <View style={[styles.slotNumberBadge, { backgroundColor: theme.colors.secondary }]}>
@@ -201,7 +227,8 @@ export default function AdminAlertsScreen() {
                       <View style={{ flexDirection: 'row', alignItems: 'center', marginTop: 6 }}>
                         <MaterialCommunityIcons name="clock-outline" size={14} color={theme.colors.placeholder} style={{ marginRight: 6 }} />
                         <Text style={{ fontSize: 12, color: theme.colors.placeholder }}>
-                          Requested Slot: <Text style={{ color: theme.colors.text, fontWeight: '700' }}>{getSlotTimeDisplay(item)}</Text>
+                          {(item.isDateOnly || item.hasMot === false) ? 'Intake: ' : 'Requested Slot: '}
+                          <Text style={{ color: theme.colors.text, fontWeight: '700' }}>{getSlotTimeDisplay(item)}</Text>
                           {item.stationName ? ` • Bay: ${item.stationName}` : ''}
                         </Text>
                       </View>

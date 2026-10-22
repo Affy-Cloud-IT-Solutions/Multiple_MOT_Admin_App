@@ -12,6 +12,8 @@ import {
   UIManager,
   Switch,
   ActivityIndicator,
+  Modal,
+  KeyboardAvoidingView,
 } from 'react-native';
 import MaterialCommunityIcons from 'react-native-vector-icons/MaterialCommunityIcons';
 import { useAppTheme } from '../context/ThemeContext';
@@ -410,15 +412,13 @@ export default function AdminCustomersScreen({ navigation }: any) {
           </View>
           
           <TouchableOpacity
-            onPress={() => {
-              LayoutAnimation.configureNext(LayoutAnimation.Presets.easeInEaseOut);
-              setShowAddCustomer(!showAddCustomer);
-            }}
+            onPress={() => setShowAddCustomer(true)}
             style={[styles.addButton, { backgroundColor: theme.colors.primary }]}
+            activeOpacity={0.8}
           >
             <MaterialCommunityIcons 
-              name={showAddCustomer ? 'close' : 'account-plus'} 
-              size={24} 
+              name="account-plus" 
+              size={22} 
               color={theme.dark ? theme.colors.background : '#FFFFFF'} 
             />
           </TouchableOpacity>
@@ -477,202 +477,7 @@ export default function AdminCustomersScreen({ navigation }: any) {
       </View>
 
       <ScrollView contentContainerStyle={styles.scrollContent} keyboardShouldPersistTaps="handled">
-        {/* Add Customer Form */}
-        {showAddCustomer && (
-          <View style={[styles.formCard, { backgroundColor: theme.colors.card, borderColor: theme.colors.border }]}>
-            <View style={styles.formHeader}>
-              <MaterialCommunityIcons name="account-plus" size={24} color={theme.colors.primary} />
-              <Text style={[styles.formTitle, { color: theme.colors.text }]}>New Customer</Text>
-            </View>
 
-            <View style={styles.formRow}>
-              <View style={styles.formField}>
-                <Text style={[styles.label, { color: theme.colors.text }]}>First Name</Text>
-                <TextInput
-                  value={firstName}
-                  onChangeText={setFirstName}
-                  placeholder="John"
-                  placeholderTextColor={theme.colors.placeholder}
-                  style={[styles.formInput, { color: theme.colors.text, borderColor: theme.colors.border }]}
-                />
-              </View>
-              <View style={styles.formField}>
-                <Text style={[styles.label, { color: theme.colors.text }]}>Last Name</Text>
-                <TextInput
-                  value={lastName}
-                  onChangeText={setLastName}
-                  placeholder="Doe"
-                  placeholderTextColor={theme.colors.placeholder}
-                  style={[styles.formInput, { color: theme.colors.text, borderColor: theme.colors.border }]}
-                />
-              </View>
-            </View>
-
-            <View style={styles.iconInput}>
-              <MaterialCommunityIcons name="email" size={20} color={theme.colors.placeholder} />
-              <TextInput
-                value={email}
-                onChangeText={setEmail}
-                placeholder="Email Address"
-                placeholderTextColor={theme.colors.placeholder}
-                keyboardType="email-address"
-                autoCapitalize="none"
-                style={[styles.iconInputField, { color: theme.colors.text }]}
-              />
-            </View>
-
-            <View style={styles.iconInput}>
-              <MaterialCommunityIcons name="phone" size={20} color={theme.colors.placeholder} />
-              <TextInput
-                value={mobile}
-                onChangeText={setMobile}
-                placeholder="Mobile Number"
-                placeholderTextColor={theme.colors.placeholder}
-                keyboardType="phone-pad"
-                style={[styles.iconInputField, { color: theme.colors.text }]}
-              />
-            </View>
-
-            <View style={styles.iconInput}>
-              <MaterialCommunityIcons name="home" size={20} color={theme.colors.placeholder} />
-              <TextInput
-                value={address}
-                onChangeText={setAddress}
-                placeholder="Address (Optional)"
-                placeholderTextColor={theme.colors.placeholder}
-                style={[styles.iconInputField, { color: theme.colors.text }]}
-              />
-            </View>
-
-            <View style={{ flexDirection: 'row', justifyContent: 'space-between', alignItems: 'center', marginVertical: 10, paddingHorizontal: 4 }}>
-              <View style={{ flexDirection: 'row', alignItems: 'center' }}>
-                <MaterialCommunityIcons name="car" size={20} color={theme.colors.placeholder} style={{ marginRight: 8 }} />
-                <Text style={{ fontSize: 14, fontWeight: '600', color: theme.colors.text }}>Include Vehicle Details?</Text>
-              </View>
-              <Switch
-                value={addVehicleNow}
-                onValueChange={(val) => {
-                  LayoutAnimation.configureNext(LayoutAnimation.Presets.easeInEaseOut);
-                  setAddVehicleNow(val);
-                }}
-                trackColor={{ false: theme.colors.border, true: theme.colors.primary }}
-                thumbColor={addVehicleNow ? (theme.dark ? theme.colors.background : '#FFFFFF') : theme.colors.placeholder}
-              />
-            </View>
-
-            {addVehicleNow && (
-              <View style={{ marginTop: 4, padding: 12, borderWidth: 1, borderColor: theme.colors.border, borderRadius: 8, backgroundColor: theme.dark ? '#1C1C1E' : '#F2F2F7', marginBottom: 12 }}>
-                <Text style={{ fontSize: 13, fontWeight: 'bold', color: theme.colors.text, marginBottom: 10 }}>Vehicle Details</Text>
-                
-                {/* Plate input & lookup row */}
-                <View style={{ flexDirection: 'row', alignItems: 'center', marginBottom: 12 }}>
-                  <View style={{ flexDirection: 'row', flex: 1, height: 40, backgroundColor: '#FFD300', borderWidth: 1.5, borderColor: '#000000', borderRadius: 6, overflow: 'hidden', alignItems: 'center' }}>
-                    <View style={{ width: 28, height: '100%', backgroundColor: '#0A4E9B', justifyContent: 'center', alignItems: 'center' }}>
-                      <Text style={{ color: '#FFFFFF', fontWeight: 'bold', fontSize: 8 }}>UK</Text>
-                    </View>
-                    <TextInput
-                      value={newCustRegNo}
-                      onChangeText={(txt) => setNewCustRegNo(txt.toUpperCase())}
-                      placeholder="REG PLATE"
-                      placeholderTextColor="#808080"
-                      autoCapitalize="characters"
-                      maxLength={8}
-                      style={{ flex: 1, fontSize: 15, fontWeight: 'bold', color: '#000000', textAlign: 'center', height: '100%', padding: 0 }}
-                    />
-                  </View>
-                  <TouchableOpacity
-                    onPress={handleLookupPlate}
-                    disabled={isSearchingPlate}
-                    style={{ marginLeft: 8, height: 40, paddingHorizontal: 12, backgroundColor: theme.colors.secondary, borderRadius: 6, justifyContent: 'center', alignItems: 'center', flexDirection: 'row' }}
-                  >
-                    {isSearchingPlate ? (
-                      <ActivityIndicator size="small" color={theme.dark ? theme.colors.background : '#FFFFFF'} />
-                    ) : (
-                      <>
-                        <MaterialCommunityIcons name="magnify" size={16} color={theme.dark ? theme.colors.background : '#FFFFFF'} style={{ marginRight: 4 }} />
-                        <Text style={{ color: theme.dark ? theme.colors.background : '#FFFFFF', fontWeight: 'bold', fontSize: 12 }}>LOOKUP</Text>
-                      </>
-                    )}
-                  </TouchableOpacity>
-                </View>
-
-                {/* Make and Model fields */}
-                <View style={styles.formRow}>
-                  <View style={styles.formField}>
-                    <Text style={[styles.label, { color: theme.colors.text, fontSize: 11 }]}>Make / Brand</Text>
-                    <SearchableDropdown
-                      placeholder="Make"
-                      selectedValue={newCustMake}
-                      onValueChange={(val) => {
-                        setNewCustMake(val);
-                        setNewCustModel('');
-                      }}
-                      fetchItems={fetchMakesList}
-                    />
-                  </View>
-                  <View style={styles.formField}>
-                    <Text style={[styles.label, { color: theme.colors.text, fontSize: 11 }]}>Model</Text>
-                    <SearchableDropdown
-                      placeholder="Model"
-                      selectedValue={newCustModel}
-                      onValueChange={setNewCustModel}
-                      fetchItems={fetchModelsListForMake(newCustMake)}
-                      disabled={!newCustMake}
-                    />
-                  </View>
-                </View>
-
-                {/* Year and MOT Expiry */}
-                <View style={styles.formRow}>
-                  <View style={styles.formField}>
-                    <Text style={[styles.label, { color: theme.colors.text, fontSize: 11 }]}>Year (YYYY)</Text>
-                    <TextInput
-                      value={newCustYear}
-                      onChangeText={setNewCustYear}
-                      placeholder="e.g. 2018"
-                      placeholderTextColor={theme.colors.placeholder}
-                      keyboardType="numeric"
-                      maxLength={4}
-                      style={[styles.subFormInput, { color: theme.colors.text, borderColor: theme.colors.border }]}
-                    />
-                  </View>
-                  <View style={styles.formField}>
-                    <Text style={[styles.label, { color: theme.colors.text, fontSize: 11 }]}>MOT Expiry (YYYY-MM-DD)</Text>
-                    <TextInput
-                      value={newCustExpiry}
-                      onChangeText={(text) => setNewCustExpiry(formatDateInput(text))}
-                      placeholder="e.g. 2027-07-12"
-                      placeholderTextColor={theme.colors.placeholder}
-                      keyboardType="numeric"
-                      maxLength={10}
-                      style={[styles.subFormInput, { color: theme.colors.text, borderColor: theme.colors.border }]}
-                    />
-                  </View>
-                </View>
-
-                {/* Last Service Date */}
-                <View style={[styles.formRow, { marginBottom: 0 }]}>
-                  <View style={styles.formField}>
-                    <Text style={[styles.label, { color: theme.colors.text, fontSize: 11 }]}>Last Service (Optional, YYYY-MM-DD)</Text>
-                    <TextInput
-                      value={newCustServiceDate}
-                      onChangeText={(text) => setNewCustServiceDate(formatDateInput(text))}
-                      placeholder="e.g. 2026-07-13"
-                      placeholderTextColor={theme.colors.placeholder}
-                      keyboardType="numeric"
-                      maxLength={10}
-                      style={[styles.subFormInput, { color: theme.colors.text, borderColor: theme.colors.border }]}
-                    />
-                  </View>
-                </View>
-              </View>
-            )}
-
-            <TouchableOpacity onPress={handleCreateCustomer} style={[styles.submitButton, { backgroundColor: theme.colors.primary }]}>
-              <Text style={[styles.submitButtonText, { color: theme.dark ? theme.colors.background : '#FFFFFF' }]}>Create Customer</Text>
-            </TouchableOpacity>
-          </View>
-        )}
 
         {/* Customer List */}
         {/* <Text style={[styles.directoryTitle, { color: theme.colors.text }]}>
@@ -800,7 +605,7 @@ export default function AdminCustomersScreen({ navigation }: any) {
                             if (existingBooking) {
                               Alert.alert(
                                 'Vehicle Already Booked',
-                                `${singleVeh.registrationNumber} already has an upcoming MOT booking (${existingBooking.status === 'Approved' ? 'Confirmed' : 'Pending'}) for ${new Date(existingBooking.date).toLocaleDateString('en-GB', { day: 'numeric', month: 'short' })} at ${existingBooking.slotTime || 'Slot'}.\n\nWould you like to manage/reschedule this booking?`,
+                                `${singleVeh.registrationNumber} already has an upcoming booking (${existingBooking.status === 'Approved' ? 'Confirmed' : 'Pending'}) for ${new Date(existingBooking.date).toLocaleDateString('en-GB', { day: 'numeric', month: 'short' })} at ${existingBooking.slotTime || 'Slot'}.\n\nWould you like to manage/reschedule this booking?`,
                                 [
                                   { text: 'Cancel', style: 'cancel' },
                                   {
@@ -833,7 +638,7 @@ export default function AdminCustomersScreen({ navigation }: any) {
                       >
                         <MaterialCommunityIcons name="calendar-plus" size={18} color={theme.colors.primary} />
                         <Text style={{ color: theme.colors.primary, fontWeight: 'bold', fontSize: 12, marginLeft: 6 }} numberOfLines={1}>
-                          Book MOT
+                          Book Service
                         </Text>
                       </TouchableOpacity>
                     </View>
@@ -841,7 +646,7 @@ export default function AdminCustomersScreen({ navigation }: any) {
                     {isBookingMotForCustId === c.id && (
                       <View style={[styles.vehicleForm, { backgroundColor: theme.colors.background, borderColor: theme.colors.border, marginBottom: 12 }]}>
                         <Text style={{ fontWeight: 'bold', fontSize: 13, color: theme.colors.text, marginBottom: 10 }}>
-                          Select Vehicle for MOT Booking:
+                          Select Vehicle to Book Service:
                         </Text>
                         {customerVehicles.filter(v => v.status === 'Active').map(v => {
                           const today = new Date();
@@ -1133,6 +938,242 @@ export default function AdminCustomersScreen({ navigation }: any) {
           })
         )}
       </ScrollView>
+
+      {/* Add New Customer Bottom Sheet Modal */}
+      <Modal
+        visible={showAddCustomer}
+        animationType="slide"
+        transparent={true}
+        onRequestClose={() => setShowAddCustomer(false)}
+      >
+        <KeyboardAvoidingView
+          behavior={Platform.OS === 'ios' ? 'padding' : undefined}
+          style={styles.modalBackdrop}
+        >
+          <TouchableOpacity
+            style={styles.modalDismissArea}
+            activeOpacity={1}
+            onPress={() => setShowAddCustomer(false)}
+          />
+          <View style={[styles.sheetContent, { backgroundColor: theme.colors.card, borderTopColor: theme.colors.border }]}>
+            {/* Drag Handle */}
+            <View style={styles.sheetHandle} />
+
+            {/* Modal Header */}
+            <View style={[styles.modalHeaderRow, { borderBottomColor: theme.colors.border }]}>
+              <View style={{ flexDirection: 'row', alignItems: 'center', flex: 1 }}>
+                <View style={[styles.headerIconCircle, { backgroundColor: theme.colors.primary + '18' }]}>
+                  <MaterialCommunityIcons name="account-plus" size={20} color={theme.colors.primary} />
+                </View>
+                <View style={{ marginLeft: 10 }}>
+                  <Text style={[styles.modalTitle, { color: theme.colors.text }]}>Add New Customer</Text>
+                  <Text style={[styles.modalSubtitle, { color: theme.colors.placeholder }]}>Register customer & optional vehicle</Text>
+                </View>
+              </View>
+              <TouchableOpacity
+                onPress={() => setShowAddCustomer(false)}
+                style={[styles.modalCloseBtn, { backgroundColor: theme.colors.border + '40' }]}
+              >
+                <MaterialCommunityIcons name="close" size={20} color={theme.colors.text} />
+              </TouchableOpacity>
+            </View>
+
+            {/* Modal Form Scroll Area */}
+            <ScrollView
+              showsVerticalScrollIndicator={false}
+              keyboardShouldPersistTaps="handled"
+              contentContainerStyle={{ paddingBottom: 32 }}
+            >
+              <View style={styles.formRow}>
+                <View style={styles.formField}>
+                  <Text style={[styles.label, { color: theme.colors.text }]}>First Name</Text>
+                  <TextInput
+                    value={firstName}
+                    onChangeText={setFirstName}
+                    placeholder="John"
+                    placeholderTextColor={theme.colors.placeholder}
+                    style={[styles.formInput, { color: theme.colors.text, borderColor: theme.colors.border }]}
+                  />
+                </View>
+                <View style={styles.formField}>
+                  <Text style={[styles.label, { color: theme.colors.text }]}>Last Name</Text>
+                  <TextInput
+                    value={lastName}
+                    onChangeText={setLastName}
+                    placeholder="Doe"
+                    placeholderTextColor={theme.colors.placeholder}
+                    style={[styles.formInput, { color: theme.colors.text, borderColor: theme.colors.border }]}
+                  />
+                </View>
+              </View>
+
+              <View style={[styles.iconInput, { borderColor: theme.colors.border }]}>
+                <MaterialCommunityIcons name="email" size={20} color={theme.colors.placeholder} />
+                <TextInput
+                  value={email}
+                  onChangeText={setEmail}
+                  placeholder="Email Address"
+                  placeholderTextColor={theme.colors.placeholder}
+                  keyboardType="email-address"
+                  autoCapitalize="none"
+                  style={[styles.iconInputField, { color: theme.colors.text }]}
+                />
+              </View>
+
+              <View style={[styles.iconInput, { borderColor: theme.colors.border }]}>
+                <MaterialCommunityIcons name="phone" size={20} color={theme.colors.placeholder} />
+                <TextInput
+                  value={mobile}
+                  onChangeText={setMobile}
+                  placeholder="Mobile Number"
+                  placeholderTextColor={theme.colors.placeholder}
+                  keyboardType="phone-pad"
+                  style={[styles.iconInputField, { color: theme.colors.text }]}
+                />
+              </View>
+
+              <View style={[styles.iconInput, { borderColor: theme.colors.border }]}>
+                <MaterialCommunityIcons name="home" size={20} color={theme.colors.placeholder} />
+                <TextInput
+                  value={address}
+                  onChangeText={setAddress}
+                  placeholder="Address (Optional)"
+                  placeholderTextColor={theme.colors.placeholder}
+                  style={[styles.iconInputField, { color: theme.colors.text }]}
+                />
+              </View>
+
+              <View style={{ flexDirection: 'row', justifyContent: 'space-between', alignItems: 'center', marginVertical: 10, paddingHorizontal: 4 }}>
+                <View style={{ flexDirection: 'row', alignItems: 'center' }}>
+                  <MaterialCommunityIcons name="car" size={20} color={theme.colors.placeholder} style={{ marginRight: 8 }} />
+                  <Text style={{ fontSize: 14, fontWeight: '600', color: theme.colors.text }}>Include Vehicle Details?</Text>
+                </View>
+                <Switch
+                  value={addVehicleNow}
+                  onValueChange={(val) => {
+                    LayoutAnimation.configureNext(LayoutAnimation.Presets.easeInEaseOut);
+                    setAddVehicleNow(val);
+                  }}
+                  trackColor={{ false: theme.colors.border, true: theme.colors.primary }}
+                  thumbColor={addVehicleNow ? (theme.dark ? theme.colors.background : '#FFFFFF') : theme.colors.placeholder}
+                />
+              </View>
+
+              {addVehicleNow && (
+                <View style={{ marginTop: 4, padding: 12, borderWidth: 1, borderColor: theme.colors.border, borderRadius: 8, backgroundColor: theme.dark ? '#1C1C1E' : '#F2F2F7', marginBottom: 12 }}>
+                  <Text style={{ fontSize: 13, fontWeight: 'bold', color: theme.colors.text, marginBottom: 10 }}>Vehicle Details</Text>
+                  
+                  {/* Plate input & lookup row */}
+                  <View style={{ flexDirection: 'row', alignItems: 'center', marginBottom: 12 }}>
+                    <View style={{ flexDirection: 'row', flex: 1, height: 40, backgroundColor: '#FFD300', borderWidth: 1.5, borderColor: '#000000', borderRadius: 6, overflow: 'hidden', alignItems: 'center' }}>
+                      <View style={{ width: 28, height: '100%', backgroundColor: '#0A4E9B', justifyContent: 'center', alignItems: 'center' }}>
+                        <Text style={{ color: '#FFFFFF', fontWeight: 'bold', fontSize: 8 }}>UK</Text>
+                      </View>
+                      <TextInput
+                        value={newCustRegNo}
+                        onChangeText={(txt) => setNewCustRegNo(txt.toUpperCase())}
+                        placeholder="REG PLATE"
+                        placeholderTextColor="#808080"
+                        autoCapitalize="characters"
+                        maxLength={8}
+                        style={{ flex: 1, fontSize: 15, fontWeight: 'bold', color: '#000000', textAlign: 'center', height: '100%', padding: 0 }}
+                      />
+                    </View>
+                    <TouchableOpacity
+                      onPress={handleLookupPlate}
+                      disabled={isSearchingPlate}
+                      style={{ marginLeft: 8, height: 40, paddingHorizontal: 12, backgroundColor: theme.colors.secondary, borderRadius: 6, justifyContent: 'center', alignItems: 'center', flexDirection: 'row' }}
+                    >
+                      {isSearchingPlate ? (
+                        <ActivityIndicator size="small" color={theme.dark ? theme.colors.background : '#FFFFFF'} />
+                      ) : (
+                        <>
+                          <MaterialCommunityIcons name="magnify" size={16} color={theme.dark ? theme.colors.background : '#FFFFFF'} style={{ marginRight: 4 }} />
+                          <Text style={{ color: theme.dark ? theme.colors.background : '#FFFFFF', fontWeight: 'bold', fontSize: 12 }}>LOOKUP</Text>
+                        </>
+                      )}
+                    </TouchableOpacity>
+                  </View>
+
+                  {/* Make and Model fields */}
+                  <View style={styles.formRow}>
+                    <View style={styles.formField}>
+                      <Text style={[styles.label, { color: theme.colors.text, fontSize: 11 }]}>Make / Brand</Text>
+                      <SearchableDropdown
+                        placeholder="Make"
+                        selectedValue={newCustMake}
+                        onValueChange={(val) => {
+                          setNewCustMake(val);
+                          setNewCustModel('');
+                        }}
+                        fetchItems={fetchMakesList}
+                      />
+                    </View>
+                    <View style={styles.formField}>
+                      <Text style={[styles.label, { color: theme.colors.text, fontSize: 11 }]}>Model</Text>
+                      <SearchableDropdown
+                        placeholder="Model"
+                        selectedValue={newCustModel}
+                        onValueChange={setNewCustModel}
+                        fetchItems={fetchModelsListForMake(newCustMake)}
+                        disabled={!newCustMake}
+                      />
+                    </View>
+                  </View>
+
+                  {/* Year and MOT Expiry */}
+                  <View style={styles.formRow}>
+                    <View style={styles.formField}>
+                      <Text style={[styles.label, { color: theme.colors.text, fontSize: 11 }]}>Year (YYYY)</Text>
+                      <TextInput
+                        value={newCustYear}
+                        onChangeText={setNewCustYear}
+                        placeholder="e.g. 2018"
+                        placeholderTextColor={theme.colors.placeholder}
+                        keyboardType="numeric"
+                        maxLength={4}
+                        style={[styles.subFormInput, { color: theme.colors.text, borderColor: theme.colors.border }]}
+                      />
+                    </View>
+                    <View style={styles.formField}>
+                      <Text style={[styles.label, { color: theme.colors.text, fontSize: 11 }]}>MOT Expiry (YYYY-MM-DD)</Text>
+                      <TextInput
+                        value={newCustExpiry}
+                        onChangeText={(text) => setNewCustExpiry(formatDateInput(text))}
+                        placeholder="e.g. 2027-07-12"
+                        placeholderTextColor={theme.colors.placeholder}
+                        keyboardType="numeric"
+                        maxLength={10}
+                        style={[styles.subFormInput, { color: theme.colors.text, borderColor: theme.colors.border }]}
+                      />
+                    </View>
+                  </View>
+
+                  {/* Last Service Date */}
+                  <View style={[styles.formRow, { marginBottom: 0 }]}>
+                    <View style={styles.formField}>
+                      <Text style={[styles.label, { color: theme.colors.text, fontSize: 11 }]}>Last Service (Optional, YYYY-MM-DD)</Text>
+                      <TextInput
+                        value={newCustServiceDate}
+                        onChangeText={(text) => setNewCustServiceDate(formatDateInput(text))}
+                        placeholder="e.g. 2026-07-13"
+                        placeholderTextColor={theme.colors.placeholder}
+                        keyboardType="numeric"
+                        maxLength={10}
+                        style={[styles.subFormInput, { color: theme.colors.text, borderColor: theme.colors.border }]}
+                      />
+                    </View>
+                  </View>
+                </View>
+              )}
+
+              <TouchableOpacity onPress={handleCreateCustomer} style={[styles.submitButton, { backgroundColor: theme.colors.primary, marginTop: 14 }]}>
+                <Text style={[styles.submitButtonText, { color: theme.dark ? theme.colors.background : '#FFFFFF' }]}>Create Customer</Text>
+              </TouchableOpacity>
+            </ScrollView>
+          </View>
+        </KeyboardAvoidingView>
+      </Modal>
     </View>
   );
 }
@@ -1443,5 +1484,65 @@ const styles = StyleSheet.create({
     flexDirection: 'row',
     alignItems: 'center',
     paddingVertical: 8,
+  },
+  modalBackdrop: {
+    flex: 1,
+    backgroundColor: 'rgba(0, 0, 0, 0.55)',
+    justifyContent: 'flex-end',
+  },
+  modalDismissArea: {
+    flex: 1,
+  },
+  sheetContent: {
+    borderTopLeftRadius: 24,
+    borderTopRightRadius: 24,
+    borderTopWidth: 1,
+    paddingTop: 10,
+    paddingHorizontal: 16,
+    maxHeight: '88%',
+    shadowColor: '#000',
+    shadowOffset: { width: 0, height: -4 },
+    shadowOpacity: 0.15,
+    shadowRadius: 10,
+    elevation: 20,
+  },
+  sheetHandle: {
+    width: 44,
+    height: 4,
+    borderRadius: 2,
+    backgroundColor: '#94A3B8',
+    alignSelf: 'center',
+    marginBottom: 12,
+  },
+  modalHeaderRow: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    justifyContent: 'space-between',
+    paddingBottom: 12,
+    borderBottomWidth: 1,
+    marginBottom: 12,
+  },
+  headerIconCircle: {
+    width: 38,
+    height: 38,
+    borderRadius: 19,
+    justifyContent: 'center',
+    alignItems: 'center',
+  },
+  modalTitle: {
+    fontSize: 16,
+    fontWeight: '800',
+    letterSpacing: -0.2,
+  },
+  modalSubtitle: {
+    fontSize: 11.5,
+    marginTop: 2,
+  },
+  modalCloseBtn: {
+    width: 32,
+    height: 32,
+    borderRadius: 16,
+    justifyContent: 'center',
+    alignItems: 'center',
   },
 });

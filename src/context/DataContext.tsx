@@ -34,9 +34,11 @@ export interface Vehicle {
 
 export interface AlertNotification {
   id: string;
-  type: 'NEW_VEHICLE' | 'SOLD' | 'BOOKED';
+  type: 'NEW_VEHICLE' | 'SOLD' | 'BOOKED' | 'GARAGE_REGISTRATION' | string;
   customerName: string;
   customerId: string;
+  customerEmail?: string;
+  customerMobile?: string;
   registrationNumber: string;
   makeModel: string;
   date: string;
@@ -44,6 +46,9 @@ export interface AlertNotification {
   rejectionReason?: string;
   garageId?: string;
   serviceName?: string;
+  services?: { name: string; category?: string; price?: number; duration?: number }[];
+  hasMot?: boolean;
+  isDateOnly?: boolean;
   price?: number;
   duration?: number;
   slotTime?: string;
@@ -54,6 +59,8 @@ export interface AlertNotification {
   cancellationReason?: string;
   cancelledBy?: string;
   cancelledAt?: string;
+  createdAt?: string;
+  updatedAt?: string;
 }
 
 export interface AuditLog {
@@ -86,6 +93,9 @@ export interface Garage {
   services?: any[];
   workingDays?: string[];
   slots?: string[];
+  locationConfigured?: boolean;
+  servicesConfigured?: boolean;
+  documentsConfigured?: boolean;
   verificationStatus?: 'Pending' | 'Verified' | 'Rejected' | 'Expired';
   rejectionReason?: string;
   verificationDocuments?: { id?: string; _id?: string; name: string; fileUrl: string; documentType?: string; status?: 'Pending' | 'Verified' | 'Rejected'; rejectionReason?: string; verifiedAt?: string; uploadDate?: string }[];
@@ -116,7 +126,7 @@ interface DataContextType {
   setToken: (token: string | null) => void;
   user: UserProfile | null;
   setUser: (user: UserProfile | null) => void;
-  refreshData: () => Promise<void>;
+  refreshData: (activeToken?: string | null) => Promise<void>;
   addCustomer: (customer: Omit<Customer, 'id' | 'createdDate'>) => Promise<string>;
   addVehicle: (vehicle: Omit<Vehicle, 'id'>) => Promise<void>;
   updateVehicleStatus: (vehicleId: string, status: 'Active' | 'Sold' | 'Scrapped' | 'Pending') => Promise<void>;
@@ -128,13 +138,17 @@ interface DataContextType {
   createStaffAccount: (name: string, email: string, password: string) => Promise<void>;
   fetchStaffList: () => Promise<any[]>;
   deleteStaffAccount: (staffId: string) => Promise<void>;
-  rescheduleBooking: (alertId: string, date: string, slot: string) => Promise<void>;
+  rescheduleBooking: (alertId: string, date: string, slot?: string) => Promise<void>;
   cancelBooking: (alertId: string, reason?: string) => Promise<void>;
   lookupVehicle: (vrn: string) => Promise<any>;
   fetchGarages: () => Promise<Garage[]>;
   updateGarageStatus: (garageId: string, status: string, verificationStatus?: string, rejectionReason?: string) => Promise<void>;
   updateGarageDocumentStatus: (garageId: string, docId: string, status: 'Verified' | 'Rejected' | 'Pending', rejectionReason?: string) => Promise<any>;
   updateGarageProfile: (garageId: string, updates: Partial<Garage>) => Promise<any>;
+  currentGarage: Garage | null;
+  fetchCurrentGarage: () => Promise<Garage | null>;
+  uploadGarageDocument: (garageId: string, documentName: string, fileUrl: string, documentType?: string) => Promise<any>;
+  submitCurrentGarageForReview: () => Promise<any>;
   fetchGarageServices: (garageId: string) => Promise<any>;
   fetchServiceCatalogTemplates: () => Promise<{ categories: string[]; templates: any[] }>;
   addGarageService: (garageId: string, serviceData: any) => Promise<any>;
@@ -145,7 +159,9 @@ interface DataContextType {
 
 const DataContext = createContext<DataContextType | undefined>(undefined);
 
-export const BASE_URL = 'https://api.ondoorcarservice.com/api';
+// Local development backend (port 5000 reverse-tunneled to connected Android device via adb reverse)
+export const BASE_URL = 'http://localhost:5000/api';
+// export const BASE_URL = 'https://api.ondoorcarservice.com/api';
 
 const decodeToken = (tokenStr: string | null) => {
   if (!tokenStr) return null;
@@ -195,6 +211,7 @@ export const DataProvider = ({ children }: { children: ReactNode }) => {
   const [alerts, setAlerts] = useState<AlertNotification[]>([]);
   const [audits, setAudits] = useState<AuditLog[]>([]);
   const [garages, setGarages] = useState<Garage[]>([]);
+  const [currentGarage, setCurrentGarage] = useState<Garage | null>(null);
   const [token, setTokenState] = useState<string | null>(null);
   const [user, setUserState] = useState<UserProfile | null>(null);
 
@@ -252,32 +269,47 @@ export const DataProvider = ({ children }: { children: ReactNode }) => {
         }
         setAlerts([]); // Super Admin has no personal garage action alerts
       } else if (role === 'staff' || role === 'garage_admin') {
-        const [customersRes, vehiclesRes, auditsRes, alertsRes] = await Promise.all([
+        const activeGarageId = decoded?.garageId || user?.garageId;
+        const fetchPromises: Promise<Response>[] = [
           fetch(`${BASE_URL}/customers`, { headers }),
           fetch(`${BASE_URL}/vehicles`, { headers }),
           fetch(`${BASE_URL}/audit`, { headers }),
           fetch(`${BASE_URL}/alerts`, { headers }),
-        ]);
+        ];
 
-        if (customersRes.ok) {
+        if (activeGarageId) {
+          fetchPromises.push(fetch(`${BASE_URL}/garages/${activeGarageId}`, { headers }));
+        }
+
+        const results = await Promise.all(fetchPromises);
+        const customersRes = results[0];
+        const vehiclesRes = results[1];
+        const auditsRes = results[2];
+        const alertsRes = results[3];
+        const garageRes = results[4];
+
+        if (customersRes && customersRes.ok) {
           const customersData = await customersRes.json();
           setCustomers(customersData);
         }
-        if (vehiclesRes.ok) {
+        if (vehiclesRes && vehiclesRes.ok) {
           const vehiclesData = await vehiclesRes.json();
           setVehicles(vehiclesData);
         }
-        if (auditsRes.ok) {
+        if (auditsRes && auditsRes.ok) {
           const auditsData = await auditsRes.json();
           setAudits(auditsData);
         }
-        if (alertsRes.ok) {
+        if (alertsRes && alertsRes.ok) {
           const alertsData = await alertsRes.json();
-          const garageId = decoded?.garageId;
-          const filteredAlerts = garageId
-            ? alertsData.filter((a: any) => !a.garageId || String(a.garageId) === String(garageId))
+          const filteredAlerts = activeGarageId
+            ? alertsData.filter((a: any) => !a.garageId || String(a.garageId) === String(activeGarageId))
             : alertsData;
           setAlerts(filteredAlerts);
+        }
+        if (garageRes && garageRes.ok) {
+          const garageData = await garageRes.json();
+          setCurrentGarage(garageData);
         }
       } else {
         // Customer: only fetch their own customer profile (which includes vehicles) and their alerts
@@ -538,7 +570,7 @@ export const DataProvider = ({ children }: { children: ReactNode }) => {
     }
   };
 
-  const rescheduleBooking = async (alertId: string, date: string, slot: string): Promise<void> => {
+  const rescheduleBooking = async (alertId: string, date: string, slot?: string): Promise<void> => {
     try {
       const response = await fetch(`${BASE_URL}/alerts/${alertId}/reschedule`, {
         method: 'PUT',
@@ -706,6 +738,69 @@ export const DataProvider = ({ children }: { children: ReactNode }) => {
     }
   };
 
+  const fetchCurrentGarage = async (): Promise<Garage | null> => {
+    const garageId = user?.garageId || (decodeToken(token)?.garageId);
+    if (!garageId) return null;
+    try {
+      const res = await fetch(`${BASE_URL}/garages/${garageId}`, {
+        headers: token ? { 'Authorization': `Bearer ${token}` } : {}
+      });
+      if (res.ok) {
+        const data = await res.json();
+        setCurrentGarage(data);
+        return data;
+      }
+    } catch (e) {
+      console.error('[DATA CONTEXT] fetchCurrentGarage error:', e);
+    }
+    return null;
+  };
+
+  const uploadGarageDocument = async (garageId: string, documentName: string, fileUrl: string, documentType?: string) => {
+    try {
+      const response = await fetch(`${BASE_URL}/garages/${garageId}/upload-documents`, {
+        method: 'POST',
+        headers: {
+          'Content-Type': 'application/json',
+          'Authorization': `Bearer ${token}`
+        },
+        body: JSON.stringify({ documentName, fileUrl, documentType })
+      });
+      const data = await response.json();
+      if (!response.ok) {
+        throw new Error(data.error || 'Failed to upload document');
+      }
+      await fetchCurrentGarage();
+      return data;
+    } catch (error) {
+      console.error('[DATA CONTEXT] uploadGarageDocument error:', error);
+      throw error;
+    }
+  };
+
+  const submitCurrentGarageForReview = async () => {
+    try {
+      const garageId = user?.garageId || (decodeToken(token)?.garageId);
+      if (!garageId) throw new Error('No garage associated with this account');
+      const response = await fetch(`${BASE_URL}/garages/${garageId}/submit-for-review`, {
+        method: 'POST',
+        headers: {
+          'Content-Type': 'application/json',
+          'Authorization': `Bearer ${token}`
+        }
+      });
+      const data = await response.json();
+      if (!response.ok) {
+        throw new Error(data.error || 'Failed to submit garage for review');
+      }
+      await fetchCurrentGarage();
+      return data;
+    } catch (error) {
+      console.error('[DATA CONTEXT] submitCurrentGarageForReview error:', error);
+      throw error;
+    }
+  };
+
   const fetchGarageServices = async (garageId: string): Promise<any> => {
     try {
       const response = await fetch(`${BASE_URL}/garages/${garageId}/services`, {
@@ -863,6 +958,10 @@ export const DataProvider = ({ children }: { children: ReactNode }) => {
         updateGarageStatus,
         updateGarageDocumentStatus,
         updateGarageProfile,
+        currentGarage,
+        fetchCurrentGarage,
+        uploadGarageDocument,
+        submitCurrentGarageForReview,
         fetchGarageServices,
         fetchServiceCatalogTemplates,
         addGarageService,

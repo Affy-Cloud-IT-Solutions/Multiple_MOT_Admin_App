@@ -13,6 +13,8 @@ import {
   Switch,
   TouchableWithoutFeedback,
   Dimensions,
+  Platform,
+  KeyboardAvoidingView,
 } from 'react-native';
 import MaterialCommunityIcons from 'react-native-vector-icons/MaterialCommunityIcons';
 import { useFocusEffect } from '@react-navigation/native';
@@ -20,7 +22,7 @@ import { SafeAreaView } from 'react-native-safe-area-context';
 import { useAppTheme } from '../context/ThemeContext';
 import { useAppValues } from '../context/DataContext';
 
-const { width } = Dimensions.get('window');
+const { width, height } = Dimensions.get('window');
 
 interface ServiceItem {
   id?: string;
@@ -142,10 +144,6 @@ export default function AdminServicesScreen({ navigation }: any) {
 
   // Open Modal for Add
   const handleOpenAdd = () => {
-    if (isSuperAdmin) {
-      Alert.alert('Restricted', 'Super Admin cannot add custom services for a garage. Only Garage Admins and Staff can add custom services for their garage.');
-      return;
-    }
     setOpenMenuId(null);
     setEditingService(null);
     setFormName('');
@@ -172,13 +170,9 @@ export default function AdminServicesScreen({ navigation }: any) {
 
   // Save Service (Create or Update)
   const handleSaveService = async () => {
-    if (isSuperAdmin && !editingService) {
-      Alert.alert('Restricted', 'Super Admin cannot add custom services for a garage. Only Garage Admins and Staff can manage services.');
-      return;
-    }
-    const targetGId = selectedGarageId || user?.garageId;
+    const targetGId = selectedGarageId || user?.garageId || (garages[0]?._id || garages[0]?.id);
     if (!targetGId) {
-      Alert.alert('Error', 'Garage ID missing.');
+      Alert.alert('Error', 'Garage ID missing. Please select or verify your garage.');
       return;
     }
 
@@ -313,35 +307,40 @@ export default function AdminServicesScreen({ navigation }: any) {
 
   return (
     <SafeAreaView style={[styles.container, { backgroundColor: theme.colors.background }]} edges={['top']}>
-      <TouchableWithoutFeedback onPress={() => setOpenMenuId(null)}>
-        <View style={{ flex: 1 }}>
-          {/* Top Navbar: Back + Title + Count Badge + Smaller "Add Service" Button */}
-          <View style={[styles.navbar, { backgroundColor: theme.colors.card, borderColor: theme.colors.border }]}>
-            {navigation.canGoBack && navigation.canGoBack() ? (
-              <TouchableOpacity
-                onPress={() => navigation.goBack()}
-                style={styles.backBtn}
-                activeOpacity={0.7}
-              >
-                <MaterialCommunityIcons name="arrow-left" size={22} color={theme.colors.text} />
-              </TouchableOpacity>
-            ) : null}
+      <View style={{ flex: 1 }}>
+        {/* Transparent backdrop to dismiss 3-dot menu only when open */}
+        {openMenuId !== null && (
+          <TouchableOpacity
+            style={StyleSheet.absoluteFill}
+            activeOpacity={1}
+            onPress={() => setOpenMenuId(null)}
+          />
+        )}
+        {/* Top Navbar: Back + Title + Count Badge + Smaller "Add Service" Button */}
+        <View style={[styles.navbar, { backgroundColor: theme.colors.card, borderColor: theme.colors.border }]}>
+          {navigation.canGoBack && navigation.canGoBack() ? (
+            <TouchableOpacity
+              onPress={() => navigation.goBack()}
+              style={styles.backBtn}
+              activeOpacity={0.7}
+            >
+              <MaterialCommunityIcons name="arrow-left" size={22} color={theme.colors.text} />
+            </TouchableOpacity>
+          ) : null}
 
-            <View style={styles.navTitleGroup}>
-              <Text style={[styles.navTitle, { color: theme.colors.text }]}>Services</Text>
-            </View>
-
-            {!isSuperAdmin && (
-              <TouchableOpacity
-                style={[styles.smallAddBtn, { backgroundColor: theme.colors.primary }]}
-                onPress={handleOpenAdd}
-                activeOpacity={0.8}
-              >
-                <MaterialCommunityIcons name="plus" size={15} color="#FFFFFF" />
-                <Text style={styles.smallAddBtnText}>Add Service</Text>
-              </TouchableOpacity>
-            )}
+          <View style={styles.navTitleGroup}>
+            <Text style={[styles.navTitle, { color: theme.colors.text }]}>Services</Text>
           </View>
+
+          <TouchableOpacity
+            style={[styles.smallAddBtn, { backgroundColor: theme.colors.primary }]}
+            onPress={handleOpenAdd}
+            activeOpacity={0.8}
+          >
+            <MaterialCommunityIcons name="plus" size={15} color="#FFFFFF" />
+            <Text style={styles.smallAddBtnText}>Add Service</Text>
+          </TouchableOpacity>
+        </View>
 
           {/* Search & Filter Bar */}
           <View style={[styles.searchFilterContainer, { backgroundColor: theme.colors.card, borderColor: theme.colors.border }]}>
@@ -422,15 +421,13 @@ export default function AdminServicesScreen({ navigation }: any) {
                     : 'No services created yet. Tap "+ Add Service" to add your first garage service.'}
                 </Text>
 
-                {!isSuperAdmin && (
-                  <TouchableOpacity
-                    style={[styles.smallAddBtn, { backgroundColor: theme.colors.primary, paddingHorizontal: 16, paddingVertical: 8 }]}
-                    onPress={handleOpenAdd}
-                  >
-                    <MaterialCommunityIcons name="plus" size={15} color="#FFFFFF" />
-                    <Text style={styles.smallAddBtnText}>Add Custom Service</Text>
-                  </TouchableOpacity>
-                )}
+                <TouchableOpacity
+                  style={[styles.smallAddBtn, { backgroundColor: theme.colors.primary, paddingHorizontal: 16, paddingVertical: 8 }]}
+                  onPress={handleOpenAdd}
+                >
+                  <MaterialCommunityIcons name="plus" size={15} color="#FFFFFF" />
+                  <Text style={styles.smallAddBtnText}>Add Custom Service</Text>
+                </TouchableOpacity>
               </View>
             ) : (
               filteredServices.map((service) => {
@@ -556,7 +553,6 @@ export default function AdminServicesScreen({ navigation }: any) {
             )}
           </ScrollView>
         </View>
-      </TouchableWithoutFeedback>
 
       {/* ─── CATEGORY FILTER BOTTOM SHEET ─── */}
       <Modal
@@ -1149,12 +1145,11 @@ const styles = StyleSheet.create({
     flex: 1,
     backgroundColor: 'rgba(0,0,0,0.6)',
     justifyContent: 'center',
-    alignItems: 'center',
     padding: 16,
   },
   modalCard: {
     width: '100%',
-    maxHeight: '85%',
+    maxHeight: Math.min(height * 0.88, 620),
     borderRadius: 16,
     borderWidth: 1,
     overflow: 'hidden',

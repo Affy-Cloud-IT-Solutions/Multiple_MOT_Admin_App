@@ -355,6 +355,14 @@ export default function ProfileScreen({ navigation }: any) {
       {user && (user.role === 'garage_admin' || user.role === 'staff') && (
         <Section title="Garage Operations & Tools" theme={theme}>
           <MenuRow
+            icon="shield-check-outline"
+            iconColor="#10B981"
+            title="Location, Photos & MOT Documents"
+            subtitle="Configure GPS map pin, facility photos & legal verification"
+            onPress={() => navigation.navigate('GarageSetup')}
+            theme={theme}
+          />
+          <MenuRow
             icon="car-wrench"
             iconColor="#0284C7"
             title="Services & Pricing"
