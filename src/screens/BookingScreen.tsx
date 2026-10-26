@@ -228,7 +228,9 @@ export default function BookingScreen({ route, navigation }: any) {
       await addAlert({
         type: 'BOOKED',
         customerName: `${customer.firstName} ${customer.lastName}`,
-        customerId: customer.id,
+        customerId: customer.id || customer._id,
+        customerEmail: customer.email || '',
+        customerMobile: customer.mobile || '',
         garageId: user?.garageId,
         slotTime: selectedSlot?.time || selectedTime,
         duration: selectedSlot?.slotDuration || 45,

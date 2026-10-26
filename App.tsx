@@ -8,12 +8,13 @@ import RootNavigator from './src/navigation/RootNavigator';
 import './src/utils/AlertManager'; // Register global Alert override
 import CustomAlertModal from './src/components/CustomAlertModal';
 import Toast from 'react-native-toast-message';
+import { navigationRef } from './src/navigation/NavigationService';
 
 function AppContent() {
   const { theme, isDarkMode } = useAppTheme();
 
   return (
-    <NavigationContainer theme={theme as any}>
+    <NavigationContainer ref={navigationRef} theme={theme as any}>
       <StatusBar
         barStyle={isDarkMode ? 'light-content' : 'dark-content'}
         backgroundColor={theme.colors.card}

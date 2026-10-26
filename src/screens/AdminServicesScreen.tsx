@@ -1,4 +1,4 @@
-import React, { useState, useEffect, useCallback, useMemo } from 'react';
+import React, { useState, useEffect, useCallback, useMemo, useRef } from 'react';
 import {
   View,
   StyleSheet,
@@ -66,6 +66,8 @@ export default function AdminServicesScreen({ navigation }: any) {
   const {
     user,
     garages,
+    serviceCategories,
+    fetchServiceCategories,
     fetchGarageServices,
     addGarageService,
     updateGarageService,
@@ -73,6 +75,30 @@ export default function AdminServicesScreen({ navigation }: any) {
   } = useAppValues();
 
   const isSuperAdmin = user?.role === 'admin';
+
+  // Dynamic Categories from Super Admin master collection
+  const availableCategories = useMemo(() => {
+    if (serviceCategories && serviceCategories.length > 0) {
+      return serviceCategories.map(c => c.name);
+    }
+    return ['MOT', 'Servicing', 'Tyres', 'Repairs'];
+  }, [serviceCategories]);
+
+  const allCategoryTabs = useMemo(() => {
+    return ['All', ...availableCategories];
+  }, [availableCategories]);
+
+  const getCategoryMeta = useCallback((catName: string) => {
+    const found = serviceCategories?.find(c => c.name.toLowerCase() === catName.toLowerCase());
+    if (found) {
+      return {
+        bg: found.iconBg || '#1677FF15',
+        text: found.iconColor || '#1677FF',
+        icon: found.icon || 'wrench',
+      };
+    }
+    return CATEGORY_COLORS[catName] || { bg: '#F1F5F9', text: '#64748B', icon: 'wrench' };
+  }, [serviceCategories]);
 
   // Selected Garage resolution
   const myGarageId = user?.garageId || (garages.length > 0 ? garages[0]._id || garages[0].id : '');
@@ -103,15 +129,22 @@ export default function AdminServicesScreen({ navigation }: any) {
   const [savingService, setSavingService] = useState(false);
 
   // Fetch Services for active garage
-  const loadServices = useCallback(async () => {
-    const targetGId = selectedGarageId || user?.garageId || (garages[0]?._id || garages[0]?.id);
+  const isFetchingRef = useRef(false);
+
+  const loadServices = useCallback(async (targetId?: string, isManualRefresh = false) => {
+    const targetGId = targetId || selectedGarageId || user?.garageId || (garages[0]?._id || garages[0]?.id);
     if (!targetGId) {
       setLoading(false);
       return;
     }
 
+    if (isFetchingRef.current) return;
+    isFetchingRef.current = true;
+
     try {
-      setLoading(true);
+      if (!isManualRefresh) {
+        setLoading(true);
+      }
       const data = await fetchGarageServices(targetGId);
       const list = Array.isArray(data.services) ? data.services : (Array.isArray(data) ? data : []);
       setServices(list);
@@ -120,13 +153,22 @@ export default function AdminServicesScreen({ navigation }: any) {
     } finally {
       setLoading(false);
       setRefreshing(false);
+      isFetchingRef.current = false;
     }
   }, [selectedGarageId, user?.garageId, garages, fetchGarageServices]);
 
+  const loadServicesRef = useRef(loadServices);
+  useEffect(() => {
+    loadServicesRef.current = loadServices;
+  }, [loadServices]);
+
   useFocusEffect(
     useCallback(() => {
-      loadServices();
-    }, [loadServices])
+      const targetGId = selectedGarageId || user?.garageId || (garages[0]?._id || garages[0]?.id);
+      if (targetGId) {
+        loadServicesRef.current(targetGId);
+      }
+    }, [selectedGarageId, user?.garageId])
   );
 
   useEffect(() => {
@@ -139,7 +181,7 @@ export default function AdminServicesScreen({ navigation }: any) {
   const onRefresh = () => {
     setRefreshing(true);
     setOpenMenuId(null);
-    loadServices();
+    loadServices(undefined, true);
   };
 
   // Open Modal for Add
@@ -147,7 +189,7 @@ export default function AdminServicesScreen({ navigation }: any) {
     setOpenMenuId(null);
     setEditingService(null);
     setFormName('');
-    setFormCategory('Servicing');
+    setFormCategory(availableCategories[0] || 'Servicing');
     setFormPrice('45.00');
     setFormDuration('45');
     setFormDescription('');
@@ -332,14 +374,27 @@ export default function AdminServicesScreen({ navigation }: any) {
             <Text style={[styles.navTitle, { color: theme.colors.text }]}>Services</Text>
           </View>
 
-          <TouchableOpacity
-            style={[styles.smallAddBtn, { backgroundColor: theme.colors.primary }]}
-            onPress={handleOpenAdd}
-            activeOpacity={0.8}
-          >
-            <MaterialCommunityIcons name="plus" size={15} color="#FFFFFF" />
-            <Text style={styles.smallAddBtnText}>Add Service</Text>
-          </TouchableOpacity>
+          <View style={{ flexDirection: 'row', alignItems: 'center', gap: 6 }}>
+            {isSuperAdmin && (
+              <TouchableOpacity
+                style={[styles.smallAddBtn, { backgroundColor: '#10B98118', borderWidth: 1, borderColor: '#10B98150' }]}
+                onPress={() => navigation.navigate('SuperAdminCategories')}
+                activeOpacity={0.8}
+              >
+                <MaterialCommunityIcons name="shape-plus" size={14} color="#10B981" />
+                <Text style={[styles.smallAddBtnText, { color: '#10B981' }]}>Categories</Text>
+              </TouchableOpacity>
+            )}
+
+            <TouchableOpacity
+              style={[styles.smallAddBtn, { backgroundColor: theme.colors.primary }]}
+              onPress={handleOpenAdd}
+              activeOpacity={0.8}
+            >
+              <MaterialCommunityIcons name="plus" size={15} color="#FFFFFF" />
+              <Text style={styles.smallAddBtnText}>Add Service</Text>
+            </TouchableOpacity>
+          </View>
         </View>
 
           {/* Search & Filter Bar */}
@@ -587,9 +642,9 @@ export default function AdminServicesScreen({ navigation }: any) {
             {/* Category Options List */}
             <ScrollView style={{ maxHeight: 380 }} showsVerticalScrollIndicator={false}>
               <View style={styles.categoryOptionsGrid}>
-                {STANDARD_CATEGORIES.map((cat) => {
+                {allCategoryTabs.map((cat) => {
                   const isSelected = activeCategory === cat;
-                  const catInfo = CATEGORY_COLORS[cat] || { bg: '#F1F5F9', text: '#64748B', icon: 'tag-outline' };
+                  const catInfo = getCategoryMeta(cat);
 
                   return (
                     <TouchableOpacity
@@ -679,24 +734,49 @@ export default function AdminServicesScreen({ navigation }: any) {
               />
 
               {/* Category Selection */}
-              <Text style={[styles.fieldLabel, { color: theme.colors.text, marginTop: 14 }]}>Category *</Text>
-              <ScrollView horizontal showsHorizontalScrollIndicator={false} style={{ marginBottom: 4 }}>
-                {STANDARD_CATEGORIES.filter(c => c !== 'All').map((cat) => (
+              <View style={{ flexDirection: 'row', alignItems: 'center', justifyContent: 'space-between', marginTop: 14, marginBottom: 6 }}>
+                <Text style={[styles.fieldLabel, { color: theme.colors.text, marginBottom: 0 }]}>Category *</Text>
+                {isSuperAdmin && (
                   <TouchableOpacity
-                    key={cat}
-                    style={[
-                      styles.catSelectPill,
-                      formCategory === cat
-                        ? { backgroundColor: theme.colors.primary, borderColor: theme.colors.primary }
-                        : { backgroundColor: isDarkMode ? '#1E293B' : '#F1F5F9', borderColor: theme.colors.border }
-                    ]}
-                    onPress={() => setFormCategory(cat)}
+                    onPress={() => {
+                      setModalVisible(false);
+                      navigation.navigate('SuperAdminCategories');
+                    }}
+                    style={{ flexDirection: 'row', alignItems: 'center' }}
                   >
-                    <Text style={{ color: formCategory === cat ? '#FFFFFF' : theme.colors.text, fontSize: 12, fontWeight: '600' }}>
-                      {cat}
-                    </Text>
+                    <MaterialCommunityIcons name="cog-outline" size={13} color={theme.colors.primary} style={{ marginRight: 2 }} />
+                    <Text style={{ fontSize: 11, color: theme.colors.primary, fontWeight: '700' }}>Manage Categories</Text>
                   </TouchableOpacity>
-                ))}
+                )}
+              </View>
+              <ScrollView horizontal showsHorizontalScrollIndicator={false} style={{ marginBottom: 4 }}>
+                {availableCategories.map((cat) => {
+                  const meta = getCategoryMeta(cat);
+                  const isSelected = formCategory.toLowerCase() === cat.toLowerCase();
+                  return (
+                    <TouchableOpacity
+                      key={cat}
+                      style={[
+                        styles.catSelectPill,
+                        { flexDirection: 'row', alignItems: 'center' },
+                        isSelected
+                          ? { backgroundColor: theme.colors.primary, borderColor: theme.colors.primary }
+                          : { backgroundColor: isDarkMode ? '#1E293B' : '#F1F5F9', borderColor: theme.colors.border }
+                      ]}
+                      onPress={() => setFormCategory(cat)}
+                    >
+                      <MaterialCommunityIcons
+                        name={meta.icon as any}
+                        size={14}
+                        color={isSelected ? '#FFFFFF' : meta.text}
+                        style={{ marginRight: 5 }}
+                      />
+                      <Text style={{ color: isSelected ? '#FFFFFF' : theme.colors.text, fontSize: 12, fontWeight: '700' }}>
+                        {cat}
+                      </Text>
+                    </TouchableOpacity>
+                  );
+                })}
               </ScrollView>
 
               {/* Price (£) & Duration (Mins) Row */}

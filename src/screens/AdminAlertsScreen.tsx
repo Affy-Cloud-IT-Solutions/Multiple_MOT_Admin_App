@@ -1,5 +1,5 @@
 import React, { useState } from 'react';
-import { View, StyleSheet, ScrollView, Text, TouchableOpacity, Alert, Modal, TextInput, ActivityIndicator } from 'react-native';
+import { View, StyleSheet, ScrollView, Text, TouchableOpacity, Alert, Modal, TextInput, ActivityIndicator, Linking } from 'react-native';
 import MaterialCommunityIcons from 'react-native-vector-icons/MaterialCommunityIcons';
 import { useAppTheme } from '../context/ThemeContext';
 import { useAppValues } from '../context/DataContext';
@@ -59,7 +59,7 @@ const formatBookingDate = (dateVal: any) => {
 
 export default function AdminAlertsScreen() {
   const { theme } = useAppTheme();
-  const { alerts, approveAlert, acknowledgeAlert, rejectAlert } = useAppValues();
+  const { alerts, customers = [], approveAlert, acknowledgeAlert, rejectAlert } = useAppValues();
 
   // Show only pending customer-facing alerts (do not show platform garage registration approval alerts to garage admin)
   const pendingAlerts = alerts.filter((a) => a.status === 'Pending' && a.type !== 'GARAGE_REGISTRATION');
@@ -159,6 +159,13 @@ export default function AdminAlertsScreen() {
               typeText = (item.isDateOnly || item.hasMot === false) ? 'Service Drop-off Requested' : 'MOT Booking Requested';
             }
 
+            const customer = customers.find(c => 
+              (c.id && item.customerId && String(c.id).toLowerCase() === String(item.customerId).toLowerCase()) ||
+              (c._id && item.customerId && String(c._id).toLowerCase() === String(item.customerId).toLowerCase())
+            );
+            const custPhone = item.customerMobile || customer?.mobile || '';
+            const custEmail = item.customerEmail || customer?.email || '';
+
             return (
               <View
                 key={item.id}
@@ -179,6 +186,31 @@ export default function AdminAlertsScreen() {
                     {item.type === 'SOLD' && 'reported they sold their vehicle:'}
                     {item.type === 'BOOKED' && ((item.isDateOnly || item.hasMot === false) ? 'requested service workshop booking for:' : 'requested MOT booking for:')}
                   </Text>
+
+                  {(custPhone || custEmail) ? (
+                    <View style={{ flexDirection: 'row', alignItems: 'center', flexWrap: 'wrap', gap: 6, marginTop: 4, marginBottom: 6 }}>
+                      {custPhone ? (
+                        <TouchableOpacity
+                          onPress={() => Linking.openURL(`tel:${custPhone}`)}
+                          style={{ flexDirection: 'row', alignItems: 'center', backgroundColor: theme.colors.secondary + '15', paddingHorizontal: 7, paddingVertical: 2.5, borderRadius: 6, borderWidth: 1, borderColor: theme.colors.secondary + '30' }}
+                          activeOpacity={0.7}
+                        >
+                          <MaterialCommunityIcons name="phone" size={11} color={theme.colors.secondary} style={{ marginRight: 4 }} />
+                          <Text style={{ fontSize: 11, fontWeight: '700', color: theme.colors.secondary }}>{custPhone}</Text>
+                        </TouchableOpacity>
+                      ) : null}
+                      {custEmail ? (
+                        <TouchableOpacity
+                          onPress={() => Linking.openURL(`mailto:${custEmail}`)}
+                          style={{ flexDirection: 'row', alignItems: 'center', backgroundColor: '#10B98115', paddingHorizontal: 7, paddingVertical: 2.5, borderRadius: 6, borderWidth: 1, borderColor: '#10B98130' }}
+                          activeOpacity={0.7}
+                        >
+                          <MaterialCommunityIcons name="email-outline" size={11} color="#059669" style={{ marginRight: 4 }} />
+                          <Text style={{ fontSize: 11, fontWeight: '600', color: '#059669' }}>{custEmail}</Text>
+                        </TouchableOpacity>
+                      ) : null}
+                    </View>
+                  ) : null}
 
                   <View style={styles.vehicleRow}>
                     <View style={styles.plate}>

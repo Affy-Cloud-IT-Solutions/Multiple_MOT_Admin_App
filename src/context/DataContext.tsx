@@ -1,6 +1,7 @@
-import React, { createContext, useContext, useState, useEffect, ReactNode } from 'react';
-import { Platform } from 'react-native';
+import React, { createContext, useContext, useState, useEffect, useCallback, useRef, ReactNode } from 'react';
+import { Alert, Platform } from 'react-native';
 import AsyncStorage from '@react-native-async-storage/async-storage';
+import { resetToLogin } from '../navigation/NavigationService';
 
 export interface Customer {
   id: string;
@@ -34,9 +35,10 @@ export interface Vehicle {
 
 export interface AlertNotification {
   id: string;
+  _id?: string;
   type: 'NEW_VEHICLE' | 'SOLD' | 'BOOKED' | 'GARAGE_REGISTRATION' | string;
   customerName: string;
-  customerId: string;
+  customerId?: string;
   customerEmail?: string;
   customerMobile?: string;
   registrationNumber: string;
@@ -116,14 +118,37 @@ export interface UserProfile {
   garageId?: string;
 }
 
+export interface ServiceCategory {
+  id?: string;
+  _id?: string;
+  name: string;
+  description?: string;
+  icon: string;
+  iconBg: string;
+  iconColor: string;
+  sortOrder?: number;
+  isActive?: boolean;
+  isDefault?: boolean;
+}
+
 interface DataContextType {
   customers: Customer[];
   vehicles: Vehicle[];
   alerts: AlertNotification[];
   audits: AuditLog[];
   garages: Garage[];
+  serviceCategories: ServiceCategory[];
+  fetchServiceCategories: () => Promise<ServiceCategory[]>;
+  createServiceCategory: (catData: Partial<ServiceCategory>) => Promise<ServiceCategory>;
+  deleteServiceCategory: (categoryId: string) => Promise<void>;
   token: string | null;
+  refreshToken: string | null;
   setToken: (token: string | null) => void;
+  setRefreshToken: (token: string | null) => void;
+  setTokens: (accessToken: string | null, refreshToken: string | null) => void;
+  refreshAccessToken: () => Promise<string | null>;
+  authFetch: (url: string, options?: RequestInit) => Promise<Response>;
+  logout: () => Promise<void>;
   user: UserProfile | null;
   setUser: (user: UserProfile | null) => void;
   refreshData: (activeToken?: string | null) => Promise<void>;
@@ -212,19 +237,195 @@ export const DataProvider = ({ children }: { children: ReactNode }) => {
   const [audits, setAudits] = useState<AuditLog[]>([]);
   const [garages, setGarages] = useState<Garage[]>([]);
   const [currentGarage, setCurrentGarage] = useState<Garage | null>(null);
+  const [serviceCategories, setServiceCategories] = useState<ServiceCategory[]>([]);
   const [token, setTokenState] = useState<string | null>(null);
+  const [refreshToken, setRefreshTokenState] = useState<string | null>(null);
   const [user, setUserState] = useState<UserProfile | null>(null);
 
-  const setUser = (newUser: UserProfile | null) => {
+  const setRefreshToken = useCallback((newRefreshToken: string | null) => {
+    setRefreshTokenState(newRefreshToken);
+    if (newRefreshToken) {
+      AsyncStorage.setItem('user_refresh_token', newRefreshToken).catch(err => console.error(err));
+    } else {
+      AsyncStorage.removeItem('user_refresh_token').catch(err => console.error(err));
+    }
+  }, []);
+
+  const setToken = useCallback((newToken: string | null) => {
+    setTokenState(newToken);
+    if (newToken) {
+      AsyncStorage.setItem('user_token', newToken).catch(err => console.error(err));
+    } else {
+      AsyncStorage.removeItem('user_token').catch(err => console.error(err));
+      AsyncStorage.removeItem('user_refresh_token').catch(err => console.error(err));
+      AsyncStorage.removeItem('user_profile').catch(err => console.error(err));
+      setRefreshTokenState(null);
+      setUserState(null);
+      setCustomers([]);
+      setVehicles([]);
+      setAudits([]);
+      setAlerts([]);
+      setGarages([]);
+      setCurrentGarage(null);
+    }
+  }, []);
+
+  const setTokens = useCallback((newToken: string | null, newRefreshToken: string | null) => {
+    setTokenState(newToken);
+    setRefreshTokenState(newRefreshToken);
+    if (newToken) {
+      AsyncStorage.setItem('user_token', newToken).catch(err => console.error(err));
+    } else {
+      AsyncStorage.removeItem('user_token').catch(err => console.error(err));
+    }
+    if (newRefreshToken) {
+      AsyncStorage.setItem('user_refresh_token', newRefreshToken).catch(err => console.error(err));
+    } else {
+      AsyncStorage.removeItem('user_refresh_token').catch(err => console.error(err));
+    }
+    if (!newToken && !newRefreshToken) {
+      AsyncStorage.removeItem('user_profile').catch(err => console.error(err));
+      setUserState(null);
+      setCustomers([]);
+      setVehicles([]);
+      setAudits([]);
+      setAlerts([]);
+      setGarages([]);
+      setCurrentGarage(null);
+    }
+  }, []);
+
+  const setUser = useCallback((newUser: UserProfile | null) => {
     setUserState(newUser);
     if (newUser) {
       AsyncStorage.setItem('user_profile', JSON.stringify(newUser)).catch(err => console.error(err));
     } else {
       AsyncStorage.removeItem('user_profile').catch(err => console.error(err));
     }
-  };
+  }, []);
 
-  const refreshData = async (activeToken?: string | null) => {
+  // Mutex/singleton to prevent multiple concurrent refresh calls
+  const refreshPromiseRef = useRef<Promise<string | null> | null>(null);
+
+  const handleSessionExpired = useCallback(() => {
+    console.warn('[AUTH] Session expired. Clearing session and navigating to login.');
+    setTokens(null, null);
+    setUser(null);
+    resetToLogin();
+    Alert.alert(
+      'Session Expired',
+      'Your session has expired. Please log in again to continue.'
+    );
+  }, [setTokens, setUser]);
+
+  const refreshAccessToken = useCallback(async (): Promise<string | null> => {
+    if (refreshPromiseRef.current) {
+      return refreshPromiseRef.current;
+    }
+
+    const refreshTask = (async (): Promise<string | null> => {
+      try {
+        let currentRefreshToken = refreshToken;
+        if (!currentRefreshToken) {
+          currentRefreshToken = await AsyncStorage.getItem('user_refresh_token');
+        }
+
+        if (!currentRefreshToken) {
+          console.warn('[AUTH] No refresh token found. Cannot refresh session.');
+          return null;
+        }
+
+        console.log('[AUTH] Calling refresh token endpoint...');
+        const res = await fetch(`${BASE_URL}/auth/refresh-token`, {
+          method: 'POST',
+          headers: { 'Content-Type': 'application/json' },
+          body: JSON.stringify({ refreshToken: currentRefreshToken })
+        });
+
+        const data = await res.json();
+        if (res.ok && (data.accessToken || data.token)) {
+          const newAccessToken = data.accessToken || data.token;
+          const newRefreshToken = data.refreshToken || currentRefreshToken;
+
+          console.log('[AUTH] Access token refreshed successfully.');
+          setTokens(newAccessToken, newRefreshToken);
+          if (data.user) {
+            setUserState(prev => ({ ...prev, ...data.user }));
+            AsyncStorage.setItem('user_profile', JSON.stringify(data.user)).catch(e => console.error(e));
+          }
+          return newAccessToken;
+        } else {
+          console.warn('[AUTH] Refresh token rejected by server:', data.error);
+          return null;
+        }
+      } catch (err) {
+        console.error('[AUTH] Exception while refreshing token:', err);
+        return null;
+      } finally {
+        refreshPromiseRef.current = null;
+      }
+    })();
+
+    refreshPromiseRef.current = refreshTask;
+    return refreshTask;
+  }, [refreshToken, setTokens]);
+
+  const authFetch = useCallback(async (url: string, options: RequestInit = {}): Promise<Response> => {
+    const rawHeaders: Record<string, string> = {};
+    if (options.headers) {
+      if (options.headers instanceof Headers) {
+        options.headers.forEach((value, key) => { rawHeaders[key] = value; });
+      } else if (Array.isArray(options.headers)) {
+        options.headers.forEach(([k, v]) => { rawHeaders[k] = v; });
+      } else {
+        Object.assign(rawHeaders, options.headers);
+      }
+    }
+
+    let activeToken = token;
+    if (!activeToken) {
+      activeToken = await AsyncStorage.getItem('user_token');
+    }
+
+    if (activeToken && !rawHeaders['Authorization']) {
+      rawHeaders['Authorization'] = `Bearer ${activeToken}`;
+    }
+
+    let response = await fetch(url, { ...options, headers: rawHeaders });
+
+    if (response.status === 401) {
+      console.log(`[AUTH] 401 Unauthorized for ${url}. Attempting access token refresh...`);
+      const newAccessToken = await refreshAccessToken();
+      if (newAccessToken) {
+        rawHeaders['Authorization'] = `Bearer ${newAccessToken}`;
+        response = await fetch(url, { ...options, headers: rawHeaders });
+      } else {
+        console.warn(`[AUTH] Failed to refresh token for ${url}. Triggering session expiration.`);
+        handleSessionExpired();
+      }
+    }
+
+    return response;
+  }, [token, refreshAccessToken, handleSessionExpired]);
+
+  const logout = useCallback(async () => {
+    try {
+      const activeRefreshToken = refreshToken || await AsyncStorage.getItem('user_refresh_token');
+      if (activeRefreshToken) {
+        await fetch(`${BASE_URL}/auth/logout`, {
+          method: 'POST',
+          headers: { 'Content-Type': 'application/json' },
+          body: JSON.stringify({ refreshToken: activeRefreshToken })
+        }).catch(err => console.warn('Logout request warning:', err));
+      }
+    } finally {
+      setTokens(null, null);
+      setUser(null);
+      resetToLogin();
+    }
+  }, [refreshToken, setTokens, setUser]);
+
+  const refreshData = useCallback(async (activeToken?: string | null) => {
     const currentToken = activeToken !== undefined ? activeToken : token;
     if (!currentToken) {
       console.log('[DATA CONTEXT] Skipping data fetch: No token provided.');
@@ -232,9 +433,6 @@ export const DataProvider = ({ children }: { children: ReactNode }) => {
     }
     try {
       console.log(`[DATA CONTEXT] Fetching data from: ${BASE_URL}`);
-      const headers = {
-        'Authorization': `Bearer ${currentToken}`
-      };
 
       const decoded = decodeToken(currentToken);
       const role = decoded?.role || 'customer';
@@ -245,10 +443,10 @@ export const DataProvider = ({ children }: { children: ReactNode }) => {
       if (role === 'admin') {
         // Super Admin: fetches all garages, all platform customers, all vehicles, and all audit logs (no garage alerts/reminders)
         const [garagesRes, customersRes, vehiclesRes, auditsRes] = await Promise.all([
-          fetch(`${BASE_URL}/garages`, { headers }),
-          fetch(`${BASE_URL}/customers`, { headers }),
-          fetch(`${BASE_URL}/vehicles`, { headers }),
-          fetch(`${BASE_URL}/audit`, { headers }),
+          authFetch(`${BASE_URL}/garages`),
+          authFetch(`${BASE_URL}/customers`),
+          authFetch(`${BASE_URL}/vehicles`),
+          authFetch(`${BASE_URL}/audit`),
         ]);
 
         if (garagesRes.ok) {
@@ -271,14 +469,14 @@ export const DataProvider = ({ children }: { children: ReactNode }) => {
       } else if (role === 'staff' || role === 'garage_admin') {
         const activeGarageId = decoded?.garageId || user?.garageId;
         const fetchPromises: Promise<Response>[] = [
-          fetch(`${BASE_URL}/customers`, { headers }),
-          fetch(`${BASE_URL}/vehicles`, { headers }),
-          fetch(`${BASE_URL}/audit`, { headers }),
-          fetch(`${BASE_URL}/alerts`, { headers }),
+          authFetch(`${BASE_URL}/customers`),
+          authFetch(`${BASE_URL}/vehicles`),
+          authFetch(`${BASE_URL}/audit`),
+          authFetch(`${BASE_URL}/alerts`),
         ];
 
         if (activeGarageId) {
-          fetchPromises.push(fetch(`${BASE_URL}/garages/${activeGarageId}`, { headers }));
+          fetchPromises.push(authFetch(`${BASE_URL}/garages/${activeGarageId}`));
         }
 
         const results = await Promise.all(fetchPromises);
@@ -314,10 +512,10 @@ export const DataProvider = ({ children }: { children: ReactNode }) => {
       } else {
         // Customer: only fetch their own customer profile (which includes vehicles) and their alerts
         const promises = [
-          fetch(`${BASE_URL}/alerts`, { headers })
+          authFetch(`${BASE_URL}/alerts`)
         ];
         if (customerId) {
-          promises.push(fetch(`${BASE_URL}/customers/${customerId}`, { headers }));
+          promises.push(authFetch(`${BASE_URL}/customers/${customerId}`));
         }
 
         const [alertsRes, customerRes] = await Promise.all(promises);
@@ -336,24 +534,34 @@ export const DataProvider = ({ children }: { children: ReactNode }) => {
     } catch (error) {
       console.error('[DATA CONTEXT] Error fetching backend data:', error);
     }
-  };
+  }, [token, user?.garageId, authFetch]);
 
-  const setToken = (newToken: string | null) => {
-    setTokenState(newToken);
-    if (newToken) {
-      AsyncStorage.setItem('user_token', newToken).catch(err => console.error(err));
-    } else {
-      AsyncStorage.removeItem('user_token').catch(err => console.error(err));
-      AsyncStorage.removeItem('user_profile').catch(err => console.error(err));
-      setCustomers([]);
-      setVehicles([]);
-      setAudits([]);
-      setAlerts([]);
-      setGarages([]);
-    }
-  };
+  // Read stored tokens on mount
+  useEffect(() => {
+    const initTokens = async () => {
+      try {
+        const storedToken = await AsyncStorage.getItem('user_token');
+        const storedRefreshToken = await AsyncStorage.getItem('user_refresh_token');
+        const storedUserJson = await AsyncStorage.getItem('user_profile');
+
+        if (storedToken && !token) {
+          setTokenState(storedToken);
+        }
+        if (storedRefreshToken && !refreshToken) {
+          setRefreshTokenState(storedRefreshToken);
+        }
+        if (storedUserJson && !user) {
+          setUserState(JSON.parse(storedUserJson));
+        }
+      } catch (e) {
+        console.warn('Error reading stored tokens in DataContext:', e);
+      }
+    };
+    initTokens();
+  }, []);
 
   useEffect(() => {
+    fetchServiceCategories();
     if (token) {
       refreshData();
     }
@@ -634,23 +842,104 @@ export const DataProvider = ({ children }: { children: ReactNode }) => {
   };
 
   const lookupVehicle = async (vrn: string): Promise<any> => {
+    let timeoutId: any = null;
     try {
       const headers: Record<string, string> = {};
       if (token) {
         headers['Authorization'] = `Bearer ${token}`;
       }
+      const controller = new AbortController();
+      timeoutId = setTimeout(() => controller.abort(), 12000);
+
       const response = await fetch(`${BASE_URL}/vehicles/dvla/${encodeURIComponent(vrn)}`, {
         method: 'GET',
-        headers
+        headers,
+        signal: controller.signal
       });
-      const data = await response.json();
+      clearTimeout(timeoutId);
+
+      let data: any = {};
+      try {
+        data = await response.json();
+      } catch (jsonErr) {
+        // If server returned non-JSON (like 502/503/504 HTML error page)
+        const busyErr: any = new Error('Government DVSA API is busy, please check again.');
+        busyErr.isBusy = true;
+        throw busyErr;
+      }
+
       if (!response.ok) {
-        throw new Error(data.error || 'Failed to lookup vehicle');
+        // 404 Not Found or explicit VRN invalid -> Vehicle genuinely not found in DVSA registry
+        if (
+          response.status === 404 ||
+          (response.status === 400 && data.error && (
+            data.error.toLowerCase().includes('not found') ||
+            data.error.toLowerCase().includes('invalid uk registration') ||
+            data.error.toLowerCase().includes('invalid')
+          ))
+        ) {
+          const notFoundErr: any = new Error('Vehicle details not found. Please check the registration plate and try again.');
+          notFoundErr.isNotFound = true;
+          throw notFoundErr;
+        }
+
+        // ANY 5xx status (500, 502, 503, 504) or DVSA/busy/unavailable error message -> DVSA is busy
+        if (
+          response.status >= 500 ||
+          (data.error && (
+            data.error.toLowerCase().includes('busy') ||
+            data.error.toLowerCase().includes('dvsa') ||
+            data.error.toLowerCase().includes('unavailable') ||
+            data.error.toLowerCase().includes('timeout') ||
+            data.error.toLowerCase().includes('temporarily')
+          ))
+        ) {
+          const busyErr: any = new Error('Government DVSA API is busy, please check again.');
+          busyErr.isBusy = true;
+          throw busyErr;
+        }
+
+        const notFoundErr: any = new Error(data.error || 'Vehicle details not found. Please check the registration plate and try again.');
+        notFoundErr.isNotFound = true;
+        throw notFoundErr;
       }
       return data;
-    } catch (error) {
+    } catch (error: any) {
+      if (timeoutId) clearTimeout(timeoutId);
       console.error('[DATA CONTEXT] lookupVehicle error:', error);
-      throw error;
+      if (error.isNotFound || error.isBusy) {
+        throw error;
+      }
+
+      const errMsg = (error?.message || '').toLowerCase();
+      const errName = (error?.name || '').toLowerCase();
+      const isNetworkFailure =
+        errName === 'aborterror' ||
+        errMsg.includes('network request failed') ||
+        errMsg.includes('network') ||
+        errMsg.includes('timeout') ||
+        errMsg.includes('timed out') ||
+        errMsg.includes('socket') ||
+        errMsg.includes('connection') ||
+        errMsg.includes('connect') ||
+        errMsg.includes('fetch') ||
+        errMsg.includes('offline') ||
+        errMsg.includes('abort') ||
+        errMsg.includes('failed to fetch') ||
+        errMsg.includes('econnrefused') ||
+        errMsg.includes('etimedout') ||
+        errMsg.includes('json');
+
+      if (isNetworkFailure) {
+        const busyErr: any = new Error('Government DVSA API is busy, please check again.');
+        busyErr.isBusy = true;
+        throw busyErr;
+      }
+
+      // Default safe fallback for DVSA live lookup failures
+      const busyErr: any = new Error('Government DVSA API is busy, please check again.');
+      busyErr.isBusy = true;
+      throw busyErr;
     }
   };
 
@@ -801,11 +1090,9 @@ export const DataProvider = ({ children }: { children: ReactNode }) => {
     }
   };
 
-  const fetchGarageServices = async (garageId: string): Promise<any> => {
+  const fetchGarageServices = useCallback(async (garageId: string): Promise<any> => {
     try {
-      const response = await fetch(`${BASE_URL}/garages/${garageId}/services`, {
-        headers: token ? { 'Authorization': `Bearer ${token}` } : {}
-      });
+      const response = await authFetch(`${BASE_URL}/garages/${garageId}/services`);
       const data = await response.json();
       if (!response.ok) {
         throw new Error(data.error || 'Failed to fetch services');
@@ -815,7 +1102,7 @@ export const DataProvider = ({ children }: { children: ReactNode }) => {
       console.error('[DATA CONTEXT] fetchGarageServices error:', error);
       throw error;
     }
-  };
+  }, [authFetch]);
 
   const fetchServiceCatalogTemplates = async (): Promise<{ categories: string[]; templates: any[] }> => {
     try {
@@ -927,6 +1214,59 @@ export const DataProvider = ({ children }: { children: ReactNode }) => {
     }
   };
 
+  const fetchServiceCategories = useCallback(async (): Promise<ServiceCategory[]> => {
+    try {
+      const response = await authFetch(`${BASE_URL}/service-categories`);
+      if (response.ok) {
+        const data = await response.json();
+        const list = Array.isArray(data.categories) ? data.categories : [];
+        setServiceCategories(list);
+        return list;
+      }
+      return [];
+    } catch (error) {
+      console.error('[DATA CONTEXT] fetchServiceCategories error:', error);
+      return [];
+    }
+  }, [authFetch]);
+
+  const createServiceCategory = useCallback(async (catData: Partial<ServiceCategory>): Promise<ServiceCategory> => {
+    try {
+      const response = await authFetch(`${BASE_URL}/service-categories`, {
+        method: 'POST',
+        headers: {
+          'Content-Type': 'application/json',
+        },
+        body: JSON.stringify(catData),
+      });
+      const data = await response.json();
+      if (!response.ok) {
+        throw new Error(data.error || 'Failed to create service category');
+      }
+      await fetchServiceCategories();
+      return data.category;
+    } catch (error) {
+      console.error('[DATA CONTEXT] createServiceCategory error:', error);
+      throw error;
+    }
+  }, [authFetch, fetchServiceCategories]);
+
+  const deleteServiceCategory = useCallback(async (categoryId: string): Promise<void> => {
+    try {
+      const response = await authFetch(`${BASE_URL}/service-categories/${categoryId}`, {
+        method: 'DELETE',
+      });
+      const data = await response.json();
+      if (!response.ok) {
+        throw new Error(data.error || 'Failed to delete service category');
+      }
+      await fetchServiceCategories();
+    } catch (error) {
+      console.error('[DATA CONTEXT] deleteServiceCategory error:', error);
+      throw error;
+    }
+  }, [authFetch, fetchServiceCategories]);
+
   return (
     <DataContext.Provider
       value={{
@@ -935,8 +1275,18 @@ export const DataProvider = ({ children }: { children: ReactNode }) => {
         alerts,
         audits,
         garages,
+        serviceCategories,
+        fetchServiceCategories,
+        createServiceCategory,
+        deleteServiceCategory,
         token,
+        refreshToken,
         setToken,
+        setRefreshToken,
+        setTokens,
+        refreshAccessToken,
+        authFetch,
+        logout,
         user,
         setUser,
         refreshData,

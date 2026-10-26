@@ -28,7 +28,7 @@ import {
 
 export default function LoginScreen({ navigation }: any) {
   const { theme } = useAppTheme();
-  const { setToken, setUser } = useAppValues();
+  const { setToken, setTokens, setUser } = useAppValues();
   const [email, setEmail] = useState('');
   const [password, setPassword] = useState('');
   const [showPassword, setShowPassword] = useState(false);
@@ -53,17 +53,51 @@ export default function LoginScreen({ navigation }: any) {
       setLoading(true);
       try {
         const storedToken = await AsyncStorage.getItem('user_token');
+        const storedRefreshToken = await AsyncStorage.getItem('user_refresh_token');
         const storedUserJson = await AsyncStorage.getItem('user_profile');
-        if (storedToken && storedUserJson) {
+
+        if (storedRefreshToken && storedUserJson) {
           const storedUser = JSON.parse(storedUserJson);
-          setToken(storedToken);
-          setUser(storedUser);
-          
-          if (storedUser.role === 'admin' || storedUser.role === 'staff' || storedUser.role === 'garage_admin') {
-            navigation.replace('Main');
-          } else {
-            setToken(null);
-            setUser(null);
+          console.log('[LOGIN] Verifying persisted session with refresh token...');
+          try {
+            const refRes = await fetch(`${BASE_URL}/auth/refresh-token`, {
+              method: 'POST',
+              headers: { 'Content-Type': 'application/json' },
+              body: JSON.stringify({ refreshToken: storedRefreshToken })
+            });
+
+            if (refRes.ok) {
+              const refData = await refRes.json();
+              const newAccessToken = refData.accessToken || refData.token;
+              const newRefreshToken = refData.refreshToken || storedRefreshToken;
+              const activeUser = refData.user || storedUser;
+
+              console.log('[LOGIN] Session verified and refreshed successfully.');
+              setTokens(newAccessToken, newRefreshToken);
+              setUser(activeUser);
+
+              if (activeUser.role === 'admin' || activeUser.role === 'staff' || activeUser.role === 'garage_admin') {
+                navigation.replace('Main');
+                return;
+              } else {
+                setTokens(null, null);
+                setUser(null);
+              }
+            } else {
+              console.warn('[LOGIN] Stored refresh token is expired or invalid. Staying on Login.');
+              setTokens(null, null);
+              setUser(null);
+            }
+          } catch (netErr) {
+            console.warn('[LOGIN] Network error during session refresh check:', netErr);
+            if (storedToken) {
+              setTokens(storedToken, storedRefreshToken);
+              setUser(storedUser);
+              if (storedUser.role === 'admin' || storedUser.role === 'staff' || storedUser.role === 'garage_admin') {
+                navigation.replace('Main');
+                return;
+              }
+            }
           }
         }
       } catch (err) {
@@ -234,8 +268,8 @@ export default function LoginScreen({ navigation }: any) {
       setGarageInfo(null);
       setRejectedDocuments([]);
 
-      // Save token and user details to context
-      setToken(data.token);
+      // Save tokens and user details to context
+      setTokens(data.accessToken || data.token, data.refreshToken || null);
       setUser(data.user);
 
       // Navigate based on actual backend user role
@@ -243,7 +277,7 @@ export default function LoginScreen({ navigation }: any) {
         navigation.replace('Main');
       } else {
         Alert.alert('Access Denied', 'This app is strictly for staff and admins.');
-        setToken(null);
+        setTokens(null, null);
         setUser(null);
       }
     } catch (error) {

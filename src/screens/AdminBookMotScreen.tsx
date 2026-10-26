@@ -99,7 +99,7 @@ const getServiceCatStyle = (category?: string, name?: string) => {
 
 export default function AdminBookMotScreen({ route, navigation }: any) {
   const { theme } = useAppTheme();
-  const { addAlert, addAudit, refreshData, user, vehicles = [], alerts = [], garages = [], fetchGarageServices } = useAppValues();
+  const { addAlert, addAudit, rescheduleBooking, refreshData, user, vehicles = [], alerts = [], garages = [], fetchGarageServices } = useAppValues();
 
   // Selected customer and vehicle passed from AdminCustomersScreen
   const customer = route?.params?.customer || {
@@ -134,6 +134,7 @@ export default function AdminBookMotScreen({ route, navigation }: any) {
 
   // Check if selected vehicle already has an active upcoming MOT booking
   const existingBooking = React.useMemo(() => {
+    if (route?.params?.booking) return route.params.booking;
     if (!selectedVehicle?.registrationNumber) return null;
     const today = new Date();
     today.setHours(0, 0, 0, 0);
@@ -152,7 +153,7 @@ export default function AdminBookMotScreen({ route, navigation }: any) {
       }
       return true;
     });
-  }, [alerts, selectedVehicle]);
+  }, [alerts, selectedVehicle, route?.params?.booking]);
 
   const [selectedDate, setSelectedDate] = useState('');
   const [selectedTime, setSelectedTime] = useState('');
@@ -440,32 +441,42 @@ export default function AdminBookMotScreen({ route, navigation }: any) {
       const servicePrice = totalServicePrice;
       const serviceDuration = totalServiceDuration;
 
-      // Add BOOKED alert notification directly with Approved status
-      await addAlert({
-        type: 'BOOKED',
-        customerName: `${customer.firstName} ${customer.lastName}`,
-        customerId: customer.id,
-        customerEmail: customer.email,
-        customerMobile: customer.mobile,
-        garageId: user?.garageId,
-        serviceName: serviceTitle,
-        services: selectedServices.map(s => ({
-          name: s.name,
-          category: s.category || '',
-          price: s.price,
-          duration: s.duration,
-        })),
-        hasMot,
-        isDateOnly,
-        price: servicePrice,
-        duration: serviceDuration,
-        slotTime: finalSlotTime,
-        slotNumber: slotNum,
-        registrationNumber: selectedVehicle.registrationNumber,
-        makeModel: `${selectedVehicle.make} ${selectedVehicle.model} - ${serviceTitle} (${finalSlotTime})`,
-        status: 'Approved',
-        date: selectedDate,
-      });
+      const targetCustId = customer.id || customer._id || selectedVehicle.customerId;
+
+      if (existingBooking) {
+        await rescheduleBooking(
+          existingBooking.id || existingBooking._id,
+          selectedDate,
+          hasMot ? finalSlotTime : ''
+        );
+      } else {
+        // Add BOOKED alert notification directly with Approved status
+        await addAlert({
+          type: 'BOOKED',
+          customerName: `${customer.firstName} ${customer.lastName}`,
+          customerId: targetCustId,
+          customerEmail: customer.email,
+          customerMobile: customer.mobile,
+          garageId: user?.garageId,
+          serviceName: serviceTitle,
+          services: selectedServices.map(s => ({
+            name: s.name,
+            category: s.category || '',
+            price: s.price,
+            duration: s.duration,
+          })),
+          hasMot,
+          isDateOnly,
+          price: servicePrice,
+          duration: serviceDuration,
+          slotTime: finalSlotTime,
+          slotNumber: slotNum,
+          registrationNumber: selectedVehicle.registrationNumber,
+          makeModel: `${selectedVehicle.make} ${selectedVehicle.model} - ${serviceTitle} (${finalSlotTime})`,
+          status: 'Approved',
+          date: selectedDate,
+        });
+      }
 
       // Log to audit history
       await addAudit(

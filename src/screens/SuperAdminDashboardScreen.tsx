@@ -217,6 +217,34 @@ export default function SuperAdminDashboardScreen({ navigation }: any) {
         </View>
       </View>
 
+      {/* Service Categories Quick Action Card */}
+      <TouchableOpacity
+        style={[
+          styles.categoryManageCard,
+          { backgroundColor: theme.colors.card, borderColor: theme.colors.border }
+        ]}
+        activeOpacity={0.8}
+        onPress={() => navigation.navigate('SuperAdminCategories')}
+      >
+        <View style={[styles.catIconWrap, { backgroundColor: '#1677FF18' }]}>
+          <MaterialCommunityIcons name="shape-plus" size={24} color="#1677FF" />
+        </View>
+        <View style={{ flex: 1, marginLeft: 12 }}>
+          <View style={{ flexDirection: 'row', alignItems: 'center', gap: 6 }}>
+            <Text style={[styles.catManageTitle, { color: theme.colors.text }]}>
+              Manage Service Categories
+            </Text>
+            <View style={{ backgroundColor: '#10B98118', paddingHorizontal: 6, paddingVertical: 1.5, borderRadius: 4 }}>
+              <Text style={{ color: '#10B981', fontSize: 10, fontWeight: '700' }}>Master</Text>
+            </View>
+          </View>
+          <Text style={[styles.catManageSubtitle, { color: theme.colors.placeholder }]}>
+            Create & delete service categories (MOT, Servicing, Tyres, Repairs...)
+          </Text>
+        </View>
+        <MaterialCommunityIcons name="chevron-right" size={22} color={theme.colors.placeholder} />
+      </TouchableOpacity>
+
       {/* Pending Garages Section */}
       {pendingGarages.length > 0 && (
         <View style={styles.section}>
@@ -632,5 +660,30 @@ const styles = StyleSheet.create({
   metricText: {
     fontSize: 11.5,
     fontWeight: '600',
+  },
+  categoryManageCard: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    padding: 14,
+    borderRadius: 12,
+    borderWidth: 1,
+    marginTop: 14,
+    marginBottom: 6,
+  },
+  catIconWrap: {
+    width: 44,
+    height: 44,
+    borderRadius: 10,
+    alignItems: 'center',
+    justifyContent: 'center',
+  },
+  catManageTitle: {
+    fontSize: 14,
+    fontWeight: '700',
+  },
+  catManageSubtitle: {
+    fontSize: 11.5,
+    marginTop: 2,
+    lineHeight: 16,
   },
 });

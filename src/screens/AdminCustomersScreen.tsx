@@ -179,7 +179,15 @@ export default function AdminCustomersScreen({ navigation }: any) {
       }
     } catch (err: any) {
       console.error('[AdminCustomersScreen] lookup error:', err);
-      Alert.alert('Lookup Failed', err.message || 'Failed to fetch details from DVLA registry');
+      const isBusy = err.isBusy || (err.message && (
+        err.message.toLowerCase().includes('busy') ||
+        err.message.toLowerCase().includes('taking too long')
+      ));
+      if (isBusy) {
+        Alert.alert('Government API Busy', 'Government DVSA API is busy, please check again.');
+      } else {
+        Alert.alert('Vehicle Not Found', err.message || 'Vehicle details not found. Please enter them manually.');
+      }
     } finally {
       setIsSearchingPlate(false);
     }

@@ -13,10 +13,11 @@ import {
   LayoutAnimation,
   Platform,
   UIManager,
+  Linking,
 } from 'react-native';
 import MaterialCommunityIcons from 'react-native-vector-icons/MaterialCommunityIcons';
 import { useAppTheme } from '../context/ThemeContext';
-import { useAppValues } from '../context/DataContext';
+import { useAppValues, BASE_URL } from '../context/DataContext';
 import { SafeAreaView } from 'react-native-safe-area-context';
 import { validateMotExpiryDate } from '../utils/validationUtils';
 
@@ -26,16 +27,52 @@ if (Platform.OS === 'android' && UIManager.setLayoutAnimationEnabledExperimental
 
 export default function CustomerDetailScreen({ route, navigation }: any) {
   const { theme } = useAppTheme();
-  const { customers, vehicles, alerts, audits, rescheduleBooking, refreshData } = useAppValues();
+  const { customers, vehicles, alerts, audits, rescheduleBooking, refreshData, token } = useAppValues();
 
-  const { customerId } = route.params;
+  const customerId = route.params?.customerId || route.params?.customer?.id || route.params?.customer?._id;
+  const passedCustomer = route.params?.customer || null;
 
   const [activeTab, setActiveTab] = useState<'vehicles' | 'bookings' | 'history'>('vehicles');
   const [refreshing, setRefreshing] = useState(false);
+  const [fetchedCustomer, setFetchedCustomer] = useState<any>(null);
+  const [loadingCustomer, setLoadingCustomer] = useState(false);
 
+  const localCustomer = customers.find((c) => 
+    String(c.id).toLowerCase() === String(customerId || '').toLowerCase() ||
+    String(c._id || '').toLowerCase() === String(customerId || '').toLowerCase()
+  );
 
+  const customer = passedCustomer || localCustomer || fetchedCustomer;
 
-  const customer = customers.find((c) => c.id === customerId);
+  useEffect(() => {
+    let isMounted = true;
+    if (!passedCustomer && !localCustomer && customerId) {
+      setLoadingCustomer(true);
+      fetch(`${BASE_URL}/customers/${customerId}`, {
+        headers: token ? { 'Authorization': `Bearer ${token}` } : {}
+      })
+        .then(res => res.json())
+        .then(data => {
+          if (isMounted && data && !data.error) {
+            setFetchedCustomer(data);
+          }
+        })
+        .catch(err => console.error('Error fetching customer details in Admin:', err))
+        .finally(() => {
+          if (isMounted) setLoadingCustomer(false);
+        });
+    }
+    return () => { isMounted = false; };
+  }, [customerId, passedCustomer, localCustomer, token]);
+
+  if (loadingCustomer && !customer) {
+    return (
+      <SafeAreaView style={[styles.container, { backgroundColor: theme.colors.background, justifyContent: 'center', alignItems: 'center' }]}>
+        <ActivityIndicator size="large" color={theme.colors.primary} />
+        <Text style={{ marginTop: 10, color: theme.colors.text }}>Loading customer details...</Text>
+      </SafeAreaView>
+    );
+  }
 
   if (!customer) {
     return (
@@ -104,22 +141,35 @@ export default function CustomerDetailScreen({ route, navigation }: any) {
         <View style={styles.profileMetaRow}>
           <View style={[styles.avatar, { backgroundColor: theme.colors.secondary }]}>
             <Text style={styles.avatarText}>
-              {customer.firstName[0]}{customer.lastName[0]}
+              {(customer.firstName?.[0] || customer.name?.[0] || 'C').toUpperCase()}
+              {(customer.lastName?.[0] || '').toUpperCase()}
             </Text>
           </View>
           <View style={styles.profileMetaInfo}>
             <Text style={[styles.profileName, { color: theme.colors.text }]}>
-              {customer.firstName} {customer.lastName}
+              {customer.firstName || customer.name ? `${customer.firstName || ''} ${customer.lastName || ''}`.trim() : 'Customer'}
             </Text>
             <View style={styles.contactCol}>
-              <View style={styles.contactItem}>
-                <MaterialCommunityIcons name="email" size={13} color={theme.colors.placeholder} />
-                <Text style={[styles.contactText, { color: theme.colors.placeholder }]}>{customer.email}</Text>
-              </View>
-              <View style={styles.contactItem}>
-                <MaterialCommunityIcons name="phone" size={13} color={theme.colors.placeholder} />
-                <Text style={[styles.contactText, { color: theme.colors.placeholder }]}>{customer.mobile}</Text>
-              </View>
+              <TouchableOpacity
+                onPress={() => customer.email && Linking.openURL(`mailto:${customer.email}`)}
+                style={styles.contactItem}
+                disabled={!customer.email}
+              >
+                <MaterialCommunityIcons name="email" size={13} color={theme.colors.secondary} />
+                <Text style={[styles.contactText, { color: customer.email ? theme.colors.secondary : theme.colors.placeholder }]}>
+                  {customer.email || 'No email provided'}
+                </Text>
+              </TouchableOpacity>
+              <TouchableOpacity
+                onPress={() => (customer.mobile || customer.phone) && Linking.openURL(`tel:${customer.mobile || customer.phone}`)}
+                style={styles.contactItem}
+                disabled={!customer.mobile && !customer.phone}
+              >
+                <MaterialCommunityIcons name="phone" size={13} color={theme.colors.secondary} />
+                <Text style={[styles.contactText, { color: (customer.mobile || customer.phone) ? theme.colors.secondary : theme.colors.placeholder }]}>
+                  {customer.mobile || customer.phone || 'No phone provided'}
+                </Text>
+              </TouchableOpacity>
               <View style={styles.contactItem}>
                 <MaterialCommunityIcons name="calendar-account" size={13} color={theme.colors.placeholder} />
                 <Text style={[styles.contactText, { color: theme.colors.placeholder }]}>

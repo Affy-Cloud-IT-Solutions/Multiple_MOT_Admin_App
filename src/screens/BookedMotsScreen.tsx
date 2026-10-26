@@ -883,6 +883,38 @@ export default function BookedMotsScreen({ navigation }: any) {
                     </TouchableOpacity>
 
                     <TouchableOpacity
+                      onPress={() => {
+                        navigation.navigate('AdminBookMot', {
+                          customer: customer || {
+                            id: item.customerId,
+                            _id: item.customerId,
+                            firstName: custName.split(' ')[0] || 'Customer',
+                            lastName: custName.split(' ').slice(1).join(' ') || '',
+                            email: item.customerEmail || '',
+                            mobile: custPhone || '',
+                          },
+                          vehicle: {
+                            registrationNumber: item.registrationNumber,
+                            make: cleanMake.split(' ')[0] || 'Vehicle',
+                            model: cleanMake.split(' ').slice(1).join(' ') || '',
+                            customerId: item.customerId,
+                          },
+                          serviceName: item.serviceName,
+                          bookedDate: item.date,
+                          slotTime: item.slotTime,
+                          isReschedule: true,
+                          bookingId: item.id || item._id,
+                        });
+                      }}
+                      disabled={loadingAction !== null}
+                      style={[styles.cardActionBtn, { borderColor: theme.colors.secondary + '60', backgroundColor: theme.colors.secondary + '12' }]}
+                      activeOpacity={0.7}
+                    >
+                      <MaterialCommunityIcons name="calendar-clock" size={13} color={theme.colors.secondary} />
+                      <Text style={[styles.cardConfirmBtnText, { color: theme.colors.secondary }]}>Reschedule</Text>
+                    </TouchableOpacity>
+
+                    <TouchableOpacity
                       onPress={() => handleConfirm(item.id)}
                       disabled={loadingAction !== null}
                       style={[styles.cardActionBtn, styles.cardConfirmBtn, { backgroundColor: theme.colors.secondary }]}
@@ -902,6 +934,38 @@ export default function BookedMotsScreen({ navigation }: any) {
 
                 {isApproved && (
                   <View style={[styles.cardActionsRow, { justifyContent: 'flex-end', marginTop: 6 }]}>
+                    <TouchableOpacity
+                      onPress={() => {
+                        navigation.navigate('AdminBookMot', {
+                          customer: customer || {
+                            id: item.customerId,
+                            _id: item.customerId,
+                            firstName: custName.split(' ')[0] || 'Customer',
+                            lastName: custName.split(' ').slice(1).join(' ') || '',
+                            email: item.customerEmail || '',
+                            mobile: custPhone || '',
+                          },
+                          vehicle: {
+                            registrationNumber: item.registrationNumber,
+                            make: cleanMake.split(' ')[0] || 'Vehicle',
+                            model: cleanMake.split(' ').slice(1).join(' ') || '',
+                            customerId: item.customerId,
+                          },
+                          serviceName: item.serviceName,
+                          bookedDate: item.date,
+                          slotTime: item.slotTime,
+                          isReschedule: true,
+                          bookingId: item.id || item._id,
+                        });
+                      }}
+                      disabled={loadingAction !== null}
+                      style={[styles.cardActionBtn, { borderColor: theme.colors.secondary + '60', backgroundColor: theme.colors.secondary + '12', marginRight: 8 }]}
+                      activeOpacity={0.7}
+                    >
+                      <MaterialCommunityIcons name="calendar-clock" size={13} color={theme.colors.secondary} style={{ marginRight: 4 }} />
+                      <Text style={{ fontSize: 12, fontWeight: '700', color: theme.colors.secondary }}>Reschedule</Text>
+                    </TouchableOpacity>
+
                     <TouchableOpacity
                       onPress={() => handleAdminCancelBooking(item)}
                       disabled={loadingAction !== null}

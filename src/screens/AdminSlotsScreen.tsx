@@ -53,8 +53,10 @@ interface SlotItem {
   slotDuration?: number;
   totalCapacity: number;
   bookedCount: number;
+  blockedCount?: number;
   availableCount: number;
   isBlocked: boolean;
+  isPartiallyBlocked?: boolean;
   status: 'Available' | 'Full' | 'Blocked';
   bookings: SlotBooking[];
 }
@@ -556,21 +558,13 @@ export default function AdminSlotsScreen({ navigation }: any) {
     }
   };
 
-  // Toggle slot block / unblock
-  const handleToggleSlotBlock = async (slot: SlotItem) => {
-    if (isSelectedDateInPast) {
-      Alert.alert('Past Date', 'Past slots cannot be blocked or unblocked.');
-      return;
-    }
+  // Helper to execute block/unblock API call
+  const executeSlotBlock = async (slot: SlotItem, action: 'block' | 'unblock', count?: number, unblockAll?: boolean) => {
     if (!garageId) return;
     setProcessingSlot(slot.time);
 
-    const isCurrentlyBlocked = slot.isBlocked;
-    const endpoint = isCurrentlyBlocked ? 'unblock-slot' : 'block-slot';
-    const actionName = isCurrentlyBlocked ? 'unblock' : 'block';
-
     try {
-      const res = await fetch(`${BASE_URL}/garages/${garageId}/${endpoint}`, {
+      const res = await fetch(`${BASE_URL}/garages/${garageId}/${action === 'block' ? 'block-slot' : 'unblock-slot'}`, {
         method: 'POST',
         headers: {
           'Content-Type': 'application/json',
@@ -579,20 +573,113 @@ export default function AdminSlotsScreen({ navigation }: any) {
         body: JSON.stringify({
           date: selectedDate,
           slot: slot.time,
+          count,
+          unblockAll,
         }),
       });
 
       if (res.ok) {
-        Alert.alert('Success', `Slot ${slot.time} successfully ${actionName}ed for ${selectedDate}.`);
         fetchSlots();
       } else {
         const err = await res.json();
-        Alert.alert('Error', err.error || `Could not ${actionName} slot.`);
+        Alert.alert('Error', err.error || `Could not ${action} slot.`);
       }
     } catch (e: any) {
-      Alert.alert('Error', e?.message || `Failed to ${actionName} slot.`);
+      Alert.alert('Error', e?.message || `Failed to ${action} slot.`);
     } finally {
       setProcessingSlot(null);
+    }
+  };
+
+  // Toggle or manage slot block / unblock (supports single and multi-bay setups)
+  const handleToggleSlotBlock = async (slot: SlotItem) => {
+    if (isSelectedDateInPast) {
+      Alert.alert('Past Date', 'Past slots cannot be blocked or unblocked.');
+      return;
+    }
+    if (!garageId) return;
+
+    const totalCapacity = slot.totalCapacity || 1;
+    const blockedCount = slot.blockedCount !== undefined ? slot.blockedCount : (slot.isBlocked ? totalCapacity : 0);
+
+    // If garage has only 1 bay, use straightforward single-click toggle
+    if (totalCapacity <= 1) {
+      const isCurrentlyBlocked = slot.isBlocked;
+      executeSlotBlock(slot, isCurrentlyBlocked ? 'unblock' : 'block');
+      return;
+    }
+
+    // Multi-bay setup (totalCapacity >= 2, e.g. 2 bays: block 1/2 then 2/2)
+    if (blockedCount === 0) {
+      // 0 bays blocked: Option to block 1 bay (1/N) or all bays (N/N)
+      Alert.alert(
+        `Manage Slot ${slot.time}`,
+        `This slot has ${totalCapacity} MOT bays. Choose how many bays to block:`,
+        [
+          { text: 'Cancel', style: 'cancel' },
+          {
+            text: `Block 1 Bay (1/${totalCapacity})`,
+            onPress: () => executeSlotBlock(slot, 'block', 1),
+          },
+          {
+            text: `Block All Bays (${totalCapacity}/${totalCapacity})`,
+            style: 'destructive',
+            onPress: () => executeSlotBlock(slot, 'block', totalCapacity),
+          },
+        ]
+      );
+    } else if (blockedCount < totalCapacity) {
+      // Partially blocked (e.g. 1/2 blocked)
+      const nextBlockCount = blockedCount + 1;
+      const buttons: any[] = [
+        { text: 'Cancel', style: 'cancel' },
+        {
+          text: `Block Bay (${nextBlockCount}/${totalCapacity})`,
+          onPress: () => executeSlotBlock(slot, 'block', nextBlockCount),
+        },
+      ];
+
+      // If more than 2 bays, allow jumping straight to blocking all
+      if (nextBlockCount < totalCapacity) {
+        buttons.push({
+          text: `Block All (${totalCapacity}/${totalCapacity})`,
+          style: 'destructive',
+          onPress: () => executeSlotBlock(slot, 'block', totalCapacity),
+        });
+      }
+
+      buttons.push({
+        text: 'Unblock 1 Bay',
+        onPress: () => executeSlotBlock(slot, 'unblock', 1),
+      });
+
+      buttons.push({
+        text: 'Unblock All Bays',
+        onPress: () => executeSlotBlock(slot, 'unblock', undefined, true),
+      });
+
+      Alert.alert(
+        `Manage Slot ${slot.time}`,
+        `Currently ${blockedCount} of ${totalCapacity} bays are blocked. Remaining ${slot.availableCount} bay(s) are available for bookings.`,
+        buttons
+      );
+    } else {
+      // All bays blocked (e.g. 2/2 blocked)
+      Alert.alert(
+        `Manage Slot ${slot.time}`,
+        `All ${totalCapacity} bays are currently blocked (${totalCapacity}/${totalCapacity}).`,
+        [
+          { text: 'Cancel', style: 'cancel' },
+          {
+            text: `Unblock 1 Bay (1/${totalCapacity} Open)`,
+            onPress: () => executeSlotBlock(slot, 'unblock', 1),
+          },
+          {
+            text: 'Unblock All Bays (All Open)',
+            onPress: () => executeSlotBlock(slot, 'unblock', undefined, true),
+          },
+        ]
+      );
     }
   };
 
@@ -705,7 +792,7 @@ export default function AdminSlotsScreen({ navigation }: any) {
                   <View style={[styles.metricCardModern, { backgroundColor: theme.colors.background, borderColor: '#6366F135' }]}>
                     <View style={styles.metricCardHeader}>
                       <View style={[styles.metricIconBox, { backgroundColor: '#6366F115' }]}>
-                        <MaterialCommunityIcons name="clipboard-list-outline" size={16} color="#6366F1" />
+                        <MaterialCommunityIcons name="clipboard-list-outline" size={13} color="#6366F1" />
                       </View>
                       <View style={[styles.metricDotIndicator, { backgroundColor: '#6366F1' }]} />
                     </View>
@@ -721,7 +808,7 @@ export default function AdminSlotsScreen({ navigation }: any) {
                   <View style={[styles.metricCardModern, { backgroundColor: theme.colors.background, borderColor: '#0284C735' }]}>
                     <View style={styles.metricCardHeader}>
                       <View style={[styles.metricIconBox, { backgroundColor: '#0284C715' }]}>
-                        <MaterialCommunityIcons name="shield-check" size={16} color="#0284C7" />
+                        <MaterialCommunityIcons name="shield-check" size={13} color="#0284C7" />
                       </View>
                       <View style={[styles.metricDotIndicator, { backgroundColor: '#0284C7' }]} />
                     </View>
@@ -737,7 +824,7 @@ export default function AdminSlotsScreen({ navigation }: any) {
                   <View style={[styles.metricCardModern, { backgroundColor: theme.colors.background, borderColor: '#D9770635' }]}>
                     <View style={styles.metricCardHeader}>
                       <View style={[styles.metricIconBox, { backgroundColor: '#D9770615' }]}>
-                        <MaterialCommunityIcons name="car-clock" size={16} color="#D97706" />
+                        <MaterialCommunityIcons name="car-clock" size={13} color="#D97706" />
                       </View>
                       <View style={[styles.metricDotIndicator, { backgroundColor: '#D97706' }]} />
                     </View>
@@ -755,12 +842,12 @@ export default function AdminSlotsScreen({ navigation }: any) {
                   <View style={[styles.metricCardModern, { backgroundColor: theme.colors.background, borderColor: '#0284C735' }]}>
                     <View style={styles.metricCardHeader}>
                       <View style={[styles.metricIconBox, { backgroundColor: '#0284C715' }]}>
-                        <MaterialCommunityIcons name="car-clock" size={16} color="#0284C7" />
+                        <MaterialCommunityIcons name="car-clock" size={13} color="#0284C7" />
                       </View>
                       <View style={[styles.metricDotIndicator, { backgroundColor: '#0284C7' }]} />
                     </View>
                     <Text style={[styles.metricValueModern, { color: '#0284C7' }]}>
-                      {totalBookedToday} <Text style={{ fontSize: 13, fontWeight: '500', color: theme.colors.placeholder }}>/ {totalCapacityToday}</Text>
+                      {totalBookedToday} <Text style={{ fontSize: 10.5, fontWeight: '500', color: theme.colors.placeholder }}>/ {totalCapacityToday}</Text>
                     </Text>
                     <Text style={[styles.metricLabelModern, { color: theme.colors.placeholder }]}>
                       Slots Booked
@@ -771,7 +858,7 @@ export default function AdminSlotsScreen({ navigation }: any) {
                   <View style={[styles.metricCardModern, { backgroundColor: theme.colors.background, borderColor: '#10B98135' }]}>
                     <View style={styles.metricCardHeader}>
                       <View style={[styles.metricIconBox, { backgroundColor: '#10B98115' }]}>
-                        <MaterialCommunityIcons name="check-circle-outline" size={16} color="#10B981" />
+                        <MaterialCommunityIcons name="check-circle-outline" size={13} color="#10B981" />
                       </View>
                       <View style={[styles.metricDotIndicator, { backgroundColor: '#10B981' }]} />
                     </View>
@@ -787,7 +874,7 @@ export default function AdminSlotsScreen({ navigation }: any) {
                   <View style={[styles.metricCardModern, { backgroundColor: theme.colors.background, borderColor: '#8B5CF635' }]}>
                     <View style={styles.metricCardHeader}>
                       <View style={[styles.metricIconBox, { backgroundColor: '#8B5CF615' }]}>
-                        <MaterialCommunityIcons name="garage" size={16} color="#8B5CF6" />
+                        <MaterialCommunityIcons name="garage" size={13} color="#8B5CF6" />
                       </View>
                       <View style={[styles.metricDotIndicator, { backgroundColor: '#8B5CF6' }]} />
                     </View>
@@ -832,14 +919,14 @@ export default function AdminSlotsScreen({ navigation }: any) {
                     ]}>
                       <MaterialCommunityIcons
                         name={isDateOnlyBooking ? "car-clock" : "clock-outline"}
-                        size={14}
+                        size={11}
                         color={isDateOnlyBooking ? "#D97706" : "#6366F1"}
                       />
                       <Text style={[
                         styles.slotTimeBadgeText,
                         isDateOnlyBooking ? { color: "#D97706" } : {}
                       ]}>
-                        {isDateOnlyBooking ? 'Full Day Drop-Off' : (b.slotTime || 'MOT Slot')}
+                        {isDateOnlyBooking ? 'Drop-Off' : (b.slotTime || 'MOT Slot')}
                       </Text>
                     </View>
 
@@ -851,26 +938,39 @@ export default function AdminSlotsScreen({ navigation }: any) {
                     {/* Bay Tag or Drop-off pill */}
                     {!isDateOnlyBooking ? (
                       <View style={[styles.bayBadge, { backgroundColor: theme.colors.primary + '15' }]}>
-                        <MaterialCommunityIcons name="garage" size={13} color={theme.colors.primary} />
+                        <MaterialCommunityIcons name="garage" size={11} color={theme.colors.primary} />
                         <Text style={[styles.bayBadgeText, { color: theme.colors.primary }]}>
                           {b.stationName || `Bay ${(idx % Math.max(1, approvedStationsCount)) + 1}`}
                         </Text>
                       </View>
                     ) : (
                       <View style={[styles.bayBadge, { backgroundColor: '#10B98115' }]}>
-                        <MaterialCommunityIcons name="wrench-outline" size={13} color="#10B981" />
+                        <MaterialCommunityIcons name="wrench-outline" size={11} color="#10B981" />
                         <Text style={[styles.bayBadgeText, { color: '#10B981' }]}>
                           Workshop
                         </Text>
                       </View>
                     )}
+
+                    {/* Status Pill */}
+                    <View style={[styles.bookingStatusPill, {
+                      backgroundColor: b.status === 'Completed' ? '#10B98118' : b.status === 'Approved' ? '#0284C718' : '#F59E0B18',
+                    }]}>
+                      <Text style={{
+                        color: b.status === 'Completed' ? '#10B981' : b.status === 'Approved' ? '#0284C7' : '#F59E0B',
+                        fontSize: 9.5,
+                        fontWeight: '700'
+                      }}>
+                        {b.status || 'Pending'}
+                      </Text>
+                    </View>
                   </View>
 
                   {/* Customer Details */}
                   <View style={styles.customerRow}>
                     <MaterialCommunityIcons
                       name={b.status === 'Completed' ? 'check-decagram' : b.status === 'Approved' ? 'account-check' : 'account-clock-outline'}
-                      size={16}
+                      size={13}
                       color={b.status === 'Completed' ? '#10B981' : b.status === 'Approved' ? theme.colors.text : '#F59E0B'}
                     />
                     <Text
@@ -889,43 +989,28 @@ export default function AdminSlotsScreen({ navigation }: any) {
                         style={styles.phoneChip}
                         onPress={() => Linking.openURL(`tel:${b.customerMobile}`)}
                       >
-                        <MaterialCommunityIcons name="phone" size={12} color="#10B981" />
+                        <MaterialCommunityIcons name="phone" size={10} color="#10B981" />
                         <Text style={styles.phoneChipText}>{b.customerMobile}</Text>
                       </TouchableOpacity>
                     ) : null}
-                    <View style={{
-                      backgroundColor: b.status === 'Completed' ? '#10B98118' : b.status === 'Approved' ? '#0284C718' : '#F59E0B18',
-                      paddingHorizontal: 6,
-                      paddingVertical: 2,
-                      borderRadius: 4,
-                      marginLeft: 6
-                    }}>
-                      <Text style={{
-                        color: b.status === 'Completed' ? '#10B981' : b.status === 'Approved' ? '#0284C7' : '#F59E0B',
-                        fontSize: 10,
-                        fontWeight: '700'
-                      }}>
-                        {b.status || 'Pending'}
-                      </Text>
-                    </View>
                   </View>
 
                   {/* Vehicle Make/Model & Service */}
                   <View style={styles.vehicleDetailsRow}>
-                    <MaterialCommunityIcons name="car-info" size={14} color={theme.colors.placeholder} />
-                    <Text style={[styles.vehicleModelText, { color: theme.colors.placeholder }]}>
+                    <MaterialCommunityIcons name="car-info" size={12} color={theme.colors.placeholder} />
+                    <Text style={[styles.vehicleModelText, { color: theme.colors.placeholder }]} numberOfLines={1}>
                       {b.makeModel ? b.makeModel.split(' - ')[0] : 'Vehicle'} • {b.serviceName || (isDateOnlyBooking ? 'Workshop Service' : 'MOT Test')}
                     </Text>
                   </View>
 
                   {/* Multiple Services tags if more than 1 service booked */}
                   {Array.isArray(b.services) && b.services.length > 1 && (
-                    <View style={{ flexDirection: 'row', flexWrap: 'wrap', gap: 4, marginTop: 4 }}>
+                    <View style={{ flexDirection: 'row', flexWrap: 'wrap', gap: 3, marginTop: 3 }}>
                       {b.services.map((s: any, sIdx: number) => {
                         const name = typeof s === 'string' ? s : s?.name || '';
                         return (
-                          <View key={sIdx} style={{ backgroundColor: theme.colors.primary + '15', paddingHorizontal: 6, paddingVertical: 2, borderRadius: 4 }}>
-                            <Text style={{ fontSize: 10, color: theme.colors.primary, fontWeight: '600' }}>{name}</Text>
+                          <View key={sIdx} style={{ backgroundColor: theme.colors.primary + '15', paddingHorizontal: 5, paddingVertical: 1, borderRadius: 3 }}>
+                            <Text style={{ fontSize: 9, color: theme.colors.primary, fontWeight: '600' }}>{name}</Text>
                           </View>
                         );
                       })}
@@ -980,8 +1065,11 @@ export default function AdminSlotsScreen({ navigation }: any) {
             {(slotData?.slots || []).map((slot) => {
               const isProcessing = processingSlot === slot.time;
               const isBlocked = slot.isBlocked;
+              const isPartiallyBlocked = Boolean(slot.isPartiallyBlocked || ((slot.blockedCount || 0) > 0 && !isBlocked));
               const isFull = slot.status === 'Full';
               const hasBookings = slot.bookedCount > 0;
+              const blockedCount = slot.blockedCount !== undefined ? slot.blockedCount : (isBlocked ? slot.totalCapacity : 0);
+              const totalBays = slot.totalCapacity || 1;
 
               return (
                 <View
@@ -992,6 +1080,8 @@ export default function AdminSlotsScreen({ navigation }: any) {
                       backgroundColor: theme.colors.card,
                       borderColor: isBlocked
                         ? '#9CA3AF50'
+                        : isPartiallyBlocked
+                        ? '#F59E0B60'
                         : isFull
                         ? '#EF444460'
                         : hasBookings
@@ -1004,9 +1094,12 @@ export default function AdminSlotsScreen({ navigation }: any) {
                   {/* Card Top: Time & Status Badge */}
                   <View style={styles.gridCardTop}>
                     <View style={styles.timeTag}>
-                      <MaterialCommunityIcons name="clock-outline" size={13} color={theme.colors.primary} />
+                      <MaterialCommunityIcons name="clock-outline" size={11} color={theme.colors.primary} />
                       <Text style={[styles.gridTimeText, { color: theme.colors.text }]}>
                         {slot.time}
+                      </Text>
+                      <Text style={[styles.gridMinTag, { color: theme.colors.placeholder }]}>
+                        45m
                       </Text>
                     </View>
 
@@ -1017,6 +1110,8 @@ export default function AdminSlotsScreen({ navigation }: any) {
                         {
                           backgroundColor: isBlocked
                             ? '#6B728020'
+                            : isPartiallyBlocked
+                            ? '#FEF3C7'
                             : isFull
                             ? '#EF444420'
                             : hasBookings
@@ -1031,6 +1126,8 @@ export default function AdminSlotsScreen({ navigation }: any) {
                           {
                             color: isBlocked
                               ? '#6B7280'
+                              : isPartiallyBlocked
+                              ? '#D97706'
                               : isFull
                               ? '#EF4444'
                               : hasBookings
@@ -1040,7 +1137,9 @@ export default function AdminSlotsScreen({ navigation }: any) {
                         ]}
                       >
                         {isBlocked
-                          ? 'Blocked'
+                          ? (totalBays > 1 ? `${totalBays}/${totalBays} Blocked` : 'Blocked')
+                          : isPartiallyBlocked
+                          ? `${blockedCount}/${totalBays} Blocked`
                           : isFull
                           ? 'Full'
                           : `${slot.availableCount} Free`}
@@ -1048,18 +1147,15 @@ export default function AdminSlotsScreen({ navigation }: any) {
                     </View>
                   </View>
 
-                  {/* Card Sub-time: 45 min interval e.g. 08:30 - 09:15 */}
-                  <Text style={[styles.gridDurationText, { color: theme.colors.placeholder }]}>
-                    {slot.slotLabel || `${slot.time} (45 mins)`}
-                  </Text>
-
                   {/* Card Middle: Capacity & Bookings details */}
                   <View style={styles.gridCardMiddle}>
                     <View style={styles.capacityRow}>
                       <Text style={[styles.capacityText, { color: theme.colors.text }]}>
                         {isBlocked
-                          ? 'Bay Closed'
-                          : `${slot.bookedCount}/${slot.totalCapacity} Booked`}
+                          ? (totalBays > 1 ? `All ${totalBays} Bays Blocked` : 'Bay Closed')
+                          : isPartiallyBlocked
+                          ? `${slot.bookedCount} Booked • ${blockedCount}/${totalBays} Blocked`
+                          : `${slot.bookedCount}/${totalBays} Booked`}
                       </Text>
                     </View>
 
@@ -1076,12 +1172,11 @@ export default function AdminSlotsScreen({ navigation }: any) {
                                 styles.gridCustName,
                                 {
                                   color: b.status === 'Approved' ? theme.colors.text : '#F59E0B',
-                                  fontWeight: '600',
                                 },
                               ]}
                               numberOfLines={1}
                             >
-                              {b.customerName || 'Customer'}{b.status !== 'Approved' ? ' (Pending)' : ''}
+                              {b.customerName || 'Customer'}
                             </Text>
                           </View>
                         ))}
@@ -1089,17 +1184,21 @@ export default function AdminSlotsScreen({ navigation }: any) {
                     ) : (
                       <View style={styles.freeBayIndicator}>
                         <MaterialCommunityIcons
-                          name={isBlocked ? 'lock-outline' : 'check-circle'}
-                          size={13}
-                          color={isBlocked ? '#6B7280' : '#10B981'}
+                          name={isBlocked ? 'lock-outline' : isPartiallyBlocked ? 'alert-circle-outline' : 'check-circle'}
+                          size={11}
+                          color={isBlocked ? '#6B7280' : isPartiallyBlocked ? '#D97706' : '#10B981'}
                         />
                         <Text
                           style={[
                             styles.freeBayText,
-                            { color: isBlocked ? '#6B7280' : '#10B981' },
+                            { color: isBlocked ? '#6B7280' : isPartiallyBlocked ? '#D97706' : '#10B981' },
                           ]}
                         >
-                          {isBlocked ? 'Not Taking MOTs' : 'All Bays Open'}
+                          {isBlocked
+                            ? 'Closed'
+                            : isPartiallyBlocked
+                            ? `${slot.availableCount} Bay(s) Open`
+                            : 'Bays Open'}
                         </Text>
                       </View>
                     )}
@@ -1109,9 +1208,9 @@ export default function AdminSlotsScreen({ navigation }: any) {
                   <View style={styles.gridCardBottom}>
                     {isSelectedDateInPast ? (
                       <View style={[styles.gridActionBtn, { backgroundColor: '#6B728015', borderColor: '#6B728030' }]}>
-                        <MaterialCommunityIcons name="lock-clock" size={12} color="#6B7280" />
+                        <MaterialCommunityIcons name="lock-clock" size={10} color="#6B7280" />
                         <Text style={[styles.gridActionBtnText, { color: '#6B7280' }]}>
-                          Past Slot
+                          Past
                         </Text>
                       </View>
                     ) : (
@@ -1119,29 +1218,48 @@ export default function AdminSlotsScreen({ navigation }: any) {
                         style={[
                           styles.gridActionBtn,
                           {
-                            backgroundColor: isBlocked ? '#10B98115' : '#EF444415',
-                            borderColor: isBlocked ? '#10B981' : '#EF4444',
+                            backgroundColor: isBlocked
+                              ? '#10B98115'
+                              : isPartiallyBlocked
+                              ? '#FEF3C7'
+                              : '#EF444415',
+                            borderColor: isBlocked
+                              ? '#10B981'
+                              : isPartiallyBlocked
+                              ? '#F59E0B'
+                              : '#EF4444',
                           },
                         ]}
                         disabled={isProcessing}
                         onPress={() => handleToggleSlotBlock(slot)}
                       >
                         {isProcessing ? (
-                          <ActivityIndicator size="small" color={isBlocked ? '#10B981' : '#EF4444'} />
+                          <ActivityIndicator
+                            size="small"
+                            color={isBlocked ? '#10B981' : isPartiallyBlocked ? '#D97706' : '#EF4444'}
+                          />
                         ) : (
                           <>
                             <MaterialCommunityIcons
-                              name={isBlocked ? 'lock-open-outline' : 'lock-outline'}
-                              size={12}
-                              color={isBlocked ? '#10B981' : '#EF4444'}
+                              name={isBlocked ? 'lock-open-outline' : isPartiallyBlocked ? 'lock-clock' : 'lock-outline'}
+                              size={10}
+                              color={isBlocked ? '#10B981' : isPartiallyBlocked ? '#D97706' : '#EF4444'}
                             />
                             <Text
                               style={[
                                 styles.gridActionBtnText,
-                                { color: isBlocked ? '#10B981' : '#EF4444' },
+                                {
+                                  color: isBlocked ? '#10B981' : isPartiallyBlocked ? '#D97706' : '#EF4444',
+                                },
                               ]}
                             >
-                              {isBlocked ? 'Unblock' : 'Block'}
+                              {totalBays > 1
+                                ? (isBlocked
+                                    ? `Unblock (${totalBays}/${totalBays})`
+                                    : isPartiallyBlocked
+                                    ? `Block (${blockedCount}/${totalBays})`
+                                    : `Block (0/${totalBays})`)
+                                : (isBlocked ? 'Unblock' : 'Block')}
                             </Text>
                           </>
                         )}
@@ -2198,200 +2316,206 @@ const styles = StyleSheet.create({
     lineHeight: 17,
   },
   bookingSummaryCard: {
-    marginHorizontal: 20,
-    borderRadius: 14,
+    marginHorizontal: 16,
+    borderRadius: 12,
     borderWidth: 1,
-    padding: 16,
-    marginBottom: 16,
+    padding: 11,
+    marginBottom: 12,
   },
   summaryTopRow: {
     flexDirection: 'row',
     justifyContent: 'space-between',
     alignItems: 'center',
-    marginBottom: 12,
+    marginBottom: 8,
   },
   summaryTitleBox: {
     flexDirection: 'row',
     alignItems: 'center',
-    gap: 8,
+    gap: 6,
   },
   summaryCardTitle: {
-    fontSize: 16,
+    fontSize: 14.5,
     fontWeight: '700',
   },
   bookingCountBadge: {
-    paddingHorizontal: 8,
-    paddingVertical: 3,
-    borderRadius: 6,
+    paddingHorizontal: 7,
+    paddingVertical: 2,
+    borderRadius: 5,
   },
   bookingCountBadgeText: {
-    fontSize: 12,
+    fontSize: 11,
     fontWeight: '700',
   },
   metricGrid: {
     flexDirection: 'row',
-    gap: 8,
-    marginBottom: 14,
+    gap: 6,
+    marginBottom: 10,
   },
   metricCardModern: {
     flex: 1,
-    padding: 10,
-    borderRadius: 12,
-    borderWidth: 1.5,
+    padding: 8,
+    borderRadius: 8,
+    borderWidth: 1.2,
     justifyContent: 'space-between',
   },
   metricCardHeader: {
     flexDirection: 'row',
     alignItems: 'center',
     justifyContent: 'space-between',
-    marginBottom: 6,
+    marginBottom: 4,
   },
   metricIconBox: {
-    width: 28,
-    height: 28,
-    borderRadius: 7,
+    width: 22,
+    height: 22,
+    borderRadius: 5,
     alignItems: 'center',
     justifyContent: 'center',
   },
   metricDotIndicator: {
-    width: 6,
-    height: 6,
-    borderRadius: 3,
+    width: 5,
+    height: 5,
+    borderRadius: 2.5,
   },
   metricValueModern: {
-    fontSize: 20,
+    fontSize: 16,
     fontWeight: '800',
-    letterSpacing: -0.3,
-    marginBottom: 2,
+    letterSpacing: -0.2,
+    marginBottom: 1,
   },
   metricLabelModern: {
-    fontSize: 10,
+    fontSize: 9,
     fontWeight: '700',
-    letterSpacing: 0.2,
+    letterSpacing: 0.1,
     textTransform: 'uppercase',
   },
   metricBox: {
     flex: 1,
-    padding: 10,
-    borderRadius: 10,
+    padding: 8,
+    borderRadius: 8,
     borderWidth: 1,
     alignItems: 'center',
   },
   metricBoxValue: {
-    fontSize: 16,
+    fontSize: 15,
     fontWeight: '700',
-    marginBottom: 2,
+    marginBottom: 1,
   },
   metricBoxLabel: {
-    fontSize: 10,
+    fontSize: 9,
     fontWeight: '600',
     textTransform: 'uppercase',
   },
   whoseBookingsSection: {
-    paddingTop: 10,
+    paddingTop: 8,
     borderTopWidth: 1,
     borderTopColor: '#E5E7EB25',
   },
   whoseBookingsTitle: {
-    fontSize: 13.5,
+    fontSize: 12.5,
     fontWeight: '700',
-    marginBottom: 10,
+    marginBottom: 6,
   },
   emptyBookingBox: {
     flexDirection: 'row',
     alignItems: 'center',
-    gap: 10,
-    padding: 12,
+    gap: 8,
+    padding: 10,
     borderRadius: 8,
   },
   emptyBookingText: {
-    fontSize: 12,
+    fontSize: 11.5,
     flex: 1,
-    lineHeight: 16,
+    lineHeight: 15,
   },
   bookingItemCard: {
-    borderRadius: 10,
+    borderRadius: 8,
     borderWidth: 1,
-    padding: 12,
-    marginBottom: 8,
+    padding: 8,
+    marginBottom: 6,
   },
   bookingItemHeader: {
-    flexDirection: 'row',
-    alignItems: 'center',
-    gap: 8,
-    marginBottom: 8,
-  },
-  slotTimeBadge: {
-    flexDirection: 'row',
-    alignItems: 'center',
-    gap: 4,
-    backgroundColor: '#6366F115',
-    paddingHorizontal: 7,
-    paddingVertical: 3,
-    borderRadius: 5,
-  },
-  slotTimeBadgeText: {
-    fontSize: 11.5,
-    fontWeight: '700',
-    color: '#6366F1',
-  },
-  regPlateBadge: {
-    backgroundColor: '#FACC15',
-    paddingHorizontal: 7,
-    paddingVertical: 2,
-    borderRadius: 4,
-  },
-  regPlateText: {
-    color: '#000000',
-    fontWeight: '800',
-    fontSize: 11.5,
-    letterSpacing: 0.5,
-  },
-  bayBadge: {
-    flexDirection: 'row',
-    alignItems: 'center',
-    gap: 4,
-    paddingHorizontal: 6,
-    paddingVertical: 2,
-    borderRadius: 4,
-    marginLeft: 'auto',
-  },
-  bayBadgeText: {
-    fontSize: 10.5,
-    fontWeight: '600',
-  },
-  customerRow: {
     flexDirection: 'row',
     alignItems: 'center',
     gap: 6,
     marginBottom: 4,
   },
+  slotTimeBadge: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    gap: 3,
+    backgroundColor: '#6366F115',
+    paddingHorizontal: 5,
+    paddingVertical: 2,
+    borderRadius: 4,
+  },
+  slotTimeBadgeText: {
+    fontSize: 10.5,
+    fontWeight: '700',
+    color: '#6366F1',
+  },
+  regPlateBadge: {
+    backgroundColor: '#FACC15',
+    paddingHorizontal: 5,
+    paddingVertical: 1.5,
+    borderRadius: 3,
+  },
+  regPlateText: {
+    color: '#000000',
+    fontWeight: '800',
+    fontSize: 10.5,
+    letterSpacing: 0.4,
+  },
+  bayBadge: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    gap: 3,
+    paddingHorizontal: 5,
+    paddingVertical: 1.5,
+    borderRadius: 3,
+    marginLeft: 'auto',
+  },
+  bayBadgeText: {
+    fontSize: 9.5,
+    fontWeight: '600',
+  },
+  bookingStatusPill: {
+    paddingHorizontal: 5,
+    paddingVertical: 1.5,
+    borderRadius: 3,
+    marginLeft: 4,
+  },
+  customerRow: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    gap: 4,
+    marginBottom: 2,
+  },
   customerNameText: {
-    fontSize: 13.5,
+    fontSize: 12,
     fontWeight: '600',
   },
   phoneChip: {
     flexDirection: 'row',
     alignItems: 'center',
-    gap: 3,
+    gap: 2,
     backgroundColor: '#10B98115',
-    paddingHorizontal: 6,
-    paddingVertical: 2,
-    borderRadius: 4,
-    marginLeft: 6,
+    paddingHorizontal: 5,
+    paddingVertical: 1,
+    borderRadius: 3,
+    marginLeft: 4,
   },
   phoneChipText: {
     color: '#10B981',
-    fontSize: 11,
+    fontSize: 10,
     fontWeight: '600',
   },
   vehicleDetailsRow: {
     flexDirection: 'row',
     alignItems: 'center',
-    gap: 5,
+    gap: 4,
   },
   vehicleModelText: {
-    fontSize: 11.5,
+    fontSize: 11,
   },
   card: {
     marginHorizontal: 20,
@@ -2513,14 +2637,14 @@ const styles = StyleSheet.create({
     flexDirection: 'row',
     flexWrap: 'wrap',
     justifyContent: 'space-between',
-    rowGap: 12,
+    rowGap: 8,
   },
   slotCard2x2: {
     width: '48.5%',
-    borderRadius: 14,
-    borderWidth: 1.5,
-    padding: 10,
-    minHeight: 144,
+    borderRadius: 10,
+    borderWidth: 1.2,
+    padding: 7,
+    minHeight: 96,
     justifyContent: 'space-between',
   },
   gridCardTop: {
@@ -2531,90 +2655,95 @@ const styles = StyleSheet.create({
   timeTag: {
     flexDirection: 'row',
     alignItems: 'center',
-    gap: 4,
+    gap: 3,
   },
   gridTimeText: {
-    fontSize: 15,
+    fontSize: 13.5,
     fontWeight: '800',
     letterSpacing: -0.2,
   },
+  gridMinTag: {
+    fontSize: 9.5,
+    fontWeight: '600',
+    marginLeft: 2,
+  },
   gridStatusPill: {
-    paddingHorizontal: 6,
-    paddingVertical: 2,
-    borderRadius: 5,
+    paddingHorizontal: 5,
+    paddingVertical: 1.5,
+    borderRadius: 4,
   },
   gridStatusPillText: {
-    fontSize: 10,
+    fontSize: 9.5,
     fontWeight: '700',
   },
   gridDurationText: {
-    fontSize: 11,
-    marginTop: 2,
+    fontSize: 9.5,
+    marginTop: 1,
     fontWeight: '500',
   },
   gridCardMiddle: {
-    marginVertical: 6,
+    marginVertical: 3,
   },
   capacityRow: {
-    marginBottom: 4,
+    marginBottom: 2,
   },
   capacityText: {
-    fontSize: 11.5,
+    fontSize: 10.5,
     fontWeight: '600',
   },
   gridBookingsList: {
-    gap: 4,
-    marginTop: 2,
+    gap: 2,
+    marginTop: 1,
   },
   gridBookingRow: {
     flexDirection: 'row',
     alignItems: 'center',
-    gap: 5,
+    gap: 3,
   },
   gridRegBadge: {
     backgroundColor: '#FACC15',
-    paddingHorizontal: 5,
+    paddingHorizontal: 4,
     paddingVertical: 1,
-    borderRadius: 3,
+    borderRadius: 2.5,
   },
   gridRegText: {
     color: '#000000',
-    fontSize: 10,
+    fontSize: 9,
     fontWeight: '800',
-    letterSpacing: 0.3,
+    letterSpacing: 0.2,
   },
   gridCustName: {
-    fontSize: 11,
+    fontSize: 9.5,
     fontWeight: '600',
     flex: 1,
   },
   freeBayIndicator: {
     flexDirection: 'row',
     alignItems: 'center',
-    gap: 4,
-    marginTop: 2,
+    gap: 3,
+    marginTop: 1,
   },
   freeBayText: {
-    fontSize: 10.5,
+    fontSize: 9.5,
     fontWeight: '500',
   },
   gridCardBottom: {
-    marginTop: 4,
+    marginTop: 3,
     borderTopWidth: 1,
-    borderTopColor: '#E5E7EB20',
-    paddingTop: 6,
+    borderTopColor: '#E5E7EB15',
+    paddingTop: 3,
   },
   gridActionBtn: {
     flexDirection: 'row',
     alignItems: 'center',
     justifyContent: 'center',
-    gap: 4,
-    paddingVertical: 4,
-    borderRadius: 6,
+    gap: 3,
+    paddingVertical: 2.5,
+    borderRadius: 5,
     borderWidth: 1,
   },
   gridActionBtnText: {
-    fontSize: 11,
+    fontSize: 10,
     fontWeight: '700',
   },
   modalOverlay: {
