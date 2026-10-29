@@ -30,7 +30,7 @@ const REJECTION_PRESETS = [
 
 export default function GarageVerificationReviewScreen({ route, navigation }: any) {
   const { theme } = useAppTheme();
-  const { token, updateGarageStatus, updateGarageDocumentStatus, refreshData } = useAppValues();
+  const { token, updateGarageStatus, updateGarageDocumentStatus, refreshData, authFetch } = useAppValues();
 
   const initialGarageId = route.params?.garageId || route.params?.garage?.id || route.params?.garage?._id;
   const initialGarage = route.params?.garage;
@@ -62,8 +62,8 @@ export default function GarageVerificationReviewScreen({ route, navigation }: an
   const fetchGarageDetails = async () => {
     if (!initialGarageId) return;
     try {
-      const res = await fetch(`${BASE_URL}/garages/${initialGarageId}`, {
-        headers: { Authorization: `Bearer ${token}` }
+      const res = await authFetch(`${BASE_URL}/garages/${initialGarageId}`, {
+        headers: {}
       });
       const data = await res.json();
       if (res.ok) {

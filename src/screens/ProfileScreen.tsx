@@ -31,6 +31,7 @@ export default function ProfileScreen({ navigation }: any) {
     createStaffAccount,
     setToken,
     setUser,
+    logout,
     customers = [],
     vehicles = [],
     alerts = [],
@@ -62,14 +63,14 @@ export default function ProfileScreen({ navigation }: any) {
         {
           text: 'Sign Out',
           style: 'destructive',
-          onPress: () => {
+          onPress: async () => {
             setLoggingOut(true);
-            setTimeout(() => {
+            try {
+              // Revokes the refresh token on the server, clears the stored session and returns to Login
+              await logout();
+            } finally {
               setLoggingOut(false);
-              setToken(null);
-              setUser(null);
-              navigation.replace('Login');
-            }, 1200);
+            }
           },
         },
       ]
@@ -371,6 +372,7 @@ export default function ProfileScreen({ navigation }: any) {
             onPress={() => navigation.navigate('AdminServices')}
             theme={theme}
           />
+          {/* MOT Reminders Hub hidden from the mobile admin app for now
           <MenuRow
             icon="bell-ring"
             iconColor="#D97706"
@@ -379,6 +381,7 @@ export default function ProfileScreen({ navigation }: any) {
             onPress={() => navigation.navigate('AdminReminders')}
             theme={theme}
           />
+          */}
           <MenuRow
             icon="clipboard-text-clock"
             iconColor="#7C3AED"

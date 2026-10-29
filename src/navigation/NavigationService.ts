@@ -13,6 +13,11 @@ export function resetToLogin() {
   }
 }
 
+/** True when the Login screen is already showing (e.g. right after launch) */
+export function isOnLoginScreen() {
+  return navigationRef.isReady() && navigationRef.getCurrentRoute()?.name === 'Login';
+}
+
 export function navigate(name: string, params?: any) {
   if (navigationRef.isReady()) {
     (navigationRef as any).navigate(name, params);

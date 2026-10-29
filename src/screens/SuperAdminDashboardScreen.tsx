@@ -18,15 +18,15 @@ const { width } = Dimensions.get('window');
 
 export default function SuperAdminDashboardScreen({ navigation }: any) {
   const { theme } = useAppTheme();
-  const { user, garages, customers, vehicles, audits, refreshData, updateGarageStatus, token } = useAppValues();
+  const { user, garages, customers, vehicles, audits, refreshData, updateGarageStatus, token, authFetch } = useAppValues();
   const [isRefreshing, setIsRefreshing] = useState(false);
   const [stats, setStats] = useState<any>(null);
   const [loadingAction, setLoadingAction] = useState<string | null>(null);
 
   const fetchPlatformStats = async () => {
     try {
-      const response = await fetch(`${BASE_URL}/dashboard/stats`, {
-        headers: { Authorization: `Bearer ${token}` }
+      const response = await authFetch(`${BASE_URL}/dashboard/stats`, {
+        headers: {}
       });
       if (response.ok) {
         const data = await response.json();

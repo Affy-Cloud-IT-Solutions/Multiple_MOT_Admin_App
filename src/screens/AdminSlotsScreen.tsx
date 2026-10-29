@@ -149,14 +149,16 @@ function formatDisplayDate(dateStr: string): string {
   return dateStr;
 }
 
-export default function AdminSlotsScreen({ navigation }: any) {
+export default function AdminSlotsScreen({ navigation, route }: any) {
   const { theme } = useAppTheme();
-  const { user, token, refreshData, garages, fetchGarageServices, alerts } = useAppValues();
+  const { user, token, refreshData, garages, fetchGarageServices, alerts, authFetch } = useAppValues();
 
   const garageId = user?.garageId || (garages.length > 0 ? garages[0]._id || garages[0].id : '');
 
   // Selected service (defaults to All Services)
   const [selectedService, setSelectedService] = useState<GarageServiceItem>(ALL_SERVICES_ITEM);
+  // Vehicle just booked by staff (AdminBookMot) - its booking card is highlighted
+  const [highlightReg, setHighlightReg] = useState<string>('');
 
   // Dropdown & Calendar modals visibility
   const [serviceDropdownVisible, setServiceDropdownVisible] = useState(false);
@@ -283,11 +285,10 @@ export default function AdminSlotsScreen({ navigation }: any) {
       return;
     }
     try {
-      const res = await fetch(
+      const res = await authFetch(
         `${BASE_URL}/garages/${garageId}/slots?date=${selectedDate}`,
         {
           headers: {
-            Authorization: `Bearer ${token}`,
           },
         }
       );
@@ -326,6 +327,19 @@ export default function AdminSlotsScreen({ navigation }: any) {
         .catch(() => {});
     }
   }, [garageId, fetchGarageServices]);
+
+  // Opened right after a staff booking: jump to the booked date and show all services so the booking is visible
+  useEffect(() => {
+    const isoDate = route?.params?.date;
+    if (!isoDate || !/^\d{4}-\d{2}-\d{2}$/.test(isoDate)) return;
+    const [y, m, d] = isoDate.split('-').map(Number);
+    setSelectedDate(`${String(d).padStart(2, '0')}-${String(m).padStart(2, '0')}-${y}`);
+    setCurrentViewDate(new Date(y, m - 1, 1));
+    setSelectedService(ALL_SERVICES_ITEM);
+    setHighlightReg((route?.params?.highlightReg || '').replace(/\s+/g, '').toUpperCase());
+    // Consume the params so returning to the tab later doesn't jump back to this date
+    navigation.setParams({ date: undefined, highlightReg: undefined });
+  }, [route?.params?.date, route?.params?.highlightReg, navigation]);
 
   // Auto-refresh whenever screen gains focus so any new customer booking shows up instantly
   useFocusEffect(
@@ -417,11 +431,10 @@ export default function AdminSlotsScreen({ navigation }: any) {
     const actionText = isDateBlockedForService ? 'unblocked' : 'blocked';
 
     try {
-      const res = await fetch(`${BASE_URL}/garages/${garageId}/${endpoint}`, {
+      const res = await authFetch(`${BASE_URL}/garages/${garageId}/${endpoint}`, {
         method: 'POST',
         headers: {
           'Content-Type': 'application/json',
-          Authorization: `Bearer ${token}`,
         },
         body: JSON.stringify({
           date: selectedDate,
@@ -526,11 +539,10 @@ export default function AdminSlotsScreen({ navigation }: any) {
 
     setSubmittingStation(true);
     try {
-      const res = await fetch(`${BASE_URL}/garages/${garageId}/stations`, {
+      const res = await authFetch(`${BASE_URL}/garages/${garageId}/stations`, {
         method: 'POST',
         headers: {
           'Content-Type': 'application/json',
-          Authorization: `Bearer ${token}`,
         },
         body: JSON.stringify({
           name: newStationName.trim(),
@@ -565,11 +577,10 @@ export default function AdminSlotsScreen({ navigation }: any) {
     setProcessingSlot(slot.time);
 
     try {
-      const res = await fetch(`${BASE_URL}/garages/${garageId}/${action === 'block' ? 'block-slot' : 'unblock-slot'}`, {
+      const res = await authFetch(`${BASE_URL}/garages/${garageId}/${action === 'block' ? 'block-slot' : 'unblock-slot'}`, {
         method: 'POST',
         headers: {
           'Content-Type': 'application/json',
-          Authorization: `Bearer ${token}`,
         },
         body: JSON.stringify({
           date: selectedDate,
@@ -906,11 +917,16 @@ export default function AdminSlotsScreen({ navigation }: any) {
           ) : (
             displayedBookings.map((b, idx) => {
               const isDateOnlyBooking = b.isDateOnly === true || b.hasMot === false || b.slotTime === 'Full Day Drop-off';
+              const isJustBooked = !!highlightReg && (b.registrationNumber || '').replace(/\s+/g, '').toUpperCase() === highlightReg;
 
               return (
                 <View
                   key={b.id || idx}
-                  style={[styles.bookingItemCard, { backgroundColor: theme.colors.background, borderColor: theme.colors.border }]}
+                  style={[
+                    styles.bookingItemCard,
+                    { backgroundColor: theme.colors.background, borderColor: theme.colors.border },
+                    isJustBooked && { borderColor: theme.colors.secondary, borderWidth: 2 },
+                  ]}
                 >
                   <View style={styles.bookingItemHeader}>
                     {/* Slot Time Tag or Date Drop-off Tag */}

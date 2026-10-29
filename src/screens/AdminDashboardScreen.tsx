@@ -83,9 +83,12 @@ export default function AdminDashboardScreen({ navigation }: any) {
   // After initial registration, ONLY "Initial registration details" is done.
   // Location, Services, and Docs are only completed once explicitly set by the garage owner.
   const hasRegistered = true;
-  const hasLocation = Boolean(currentGarage?.locationConfigured || localSetup.location);
-  const hasServices = Boolean(currentGarage?.servicesConfigured || localSetup.services);
-  const hasDocs = Boolean(currentGarage?.documentsConfigured || localSetup.docs);
+  // Prefer the backend's completion result - it is what decides whether customers can see this garage
+  const serverSteps = currentGarage?.profileCompletion?.steps;
+  const hasLocation = serverSteps ? Boolean(serverSteps.location) : Boolean(currentGarage?.locationConfigured || localSetup.location);
+  const hasServices = serverSteps ? Boolean(serverSteps.services) : Boolean(currentGarage?.servicesConfigured || localSetup.services);
+  const hasDocs = serverSteps ? Boolean(serverSteps.documents) : Boolean(currentGarage?.documentsConfigured || localSetup.docs);
+  const isHiddenFromCustomers = currentGarage?.isVisibleToCustomers === false;
 
   const checklistTasks = [
     {
@@ -254,6 +257,13 @@ export default function AdminDashboardScreen({ navigation }: any) {
           <Text style={[styles.gettingStartedSubtitle, { color: theme.colors.placeholder }]}>
             Finish setup to go live & receive customer bookings
           </Text>
+          {isHiddenFromCustomers && (
+            <Text style={[styles.gettingStartedSubtitle, { color: '#EA580C', fontFamily: fonts.semiBold }]}>
+              {currentGarage?.status === 'Approved'
+                ? 'Your garage is hidden from customers until every step below is complete.'
+                : 'Your garage is hidden from customers until it is approved and every step below is complete.'}
+            </Text>
+          )}
 
           {/* Progress Bar */}
           <View style={[styles.progressBarTrack, { backgroundColor: theme.colors.border + '50' }]}>

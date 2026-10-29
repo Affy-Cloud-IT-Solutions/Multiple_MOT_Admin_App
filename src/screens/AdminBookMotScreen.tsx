@@ -100,7 +100,7 @@ const getServiceCatStyle = (category?: string, name?: string) => {
 
 export default function AdminBookMotScreen({ route, navigation }: any) {
   const { theme } = useAppTheme();
-  const { addAlert, addAudit, rescheduleBooking, refreshData, user, vehicles = [], alerts = [], garages = [], fetchGarageServices } = useAppValues();
+  const { addAlert, addAudit, refreshData, user, token, vehicles = [], alerts = [], garages = [], fetchGarageServices, authFetch } = useAppValues();
 
   // Selected customer and vehicle passed from AdminCustomersScreen
   const customer = route?.params?.customer || {
@@ -110,12 +110,7 @@ export default function AdminBookMotScreen({ route, navigation }: any) {
     email: 'N/A',
   };
 
-  const initialVehicle = route?.params?.vehicle || {
-    registrationNumber: 'AB18 CDE',
-    make: 'FORD',
-    model: 'FOCUS TDCI',
-    customerId: 'c1',
-  };
+  const initialVehicle = route?.params?.vehicle || null;
 
   // Find all customer vehicles to allow switching & showing booking status
   const customerVehicles = React.useMemo(() => {
@@ -133,9 +128,21 @@ export default function AdminBookMotScreen({ route, navigation }: any) {
     initialVehicle || (customerVehicles.length > 0 ? customerVehicles[0] : null)
   );
 
-  // Check if selected vehicle already has an active upcoming MOT booking
+  const isForThisGarage = React.useCallback((a: any) => {
+    if (!user?.garageId || !a?.garageId) return true;
+    const gid = typeof a.garageId === 'object' ? (a.garageId._id || a.garageId.id) : a.garageId;
+    return String(gid) === String(user.garageId);
+  }, [user?.garageId]);
+
+  // The selected vehicle's upcoming active booking at this garage. Confirming updates (reschedules) this
+  // booking instead of creating a second one - the same rule the backend applies.
   const existingBooking = React.useMemo(() => {
     if (route?.params?.booking) return route.params.booking;
+    const bookingId = route?.params?.bookingId;
+    if (bookingId) {
+      const byId = alerts.find(a => (a.id || (a as any)._id) === bookingId);
+      if (byId && byId.registrationNumber?.toUpperCase() === selectedVehicle?.registrationNumber?.toUpperCase()) return byId;
+    }
     if (!selectedVehicle?.registrationNumber) return null;
     const today = new Date();
     today.setHours(0, 0, 0, 0);
@@ -144,19 +151,38 @@ export default function AdminBookMotScreen({ route, navigation }: any) {
       if (a.type !== 'BOOKED') return false;
       if (a.registrationNumber?.toUpperCase() !== selectedVehicle.registrationNumber.toUpperCase()) return false;
       if (a.status !== 'Approved' && a.status !== 'Pending') return false;
-      
-      // Only treat as an existing booking if the booking date is today or in the future
+      if (!isForThisGarage(a)) return false;
+
+      // Past-dated bookings are history; a new booking is created instead
       if (a.date) {
         const bDate = new Date(a.date);
         if (!isNaN(bDate.getTime()) && bDate < today) {
-          return false; // Past booking has completed, ready for fresh booking cycle
+          return false;
         }
       }
       return true;
     });
-  }, [alerts, selectedVehicle, route?.params?.booking]);
+  }, [alerts, selectedVehicle, route?.params?.booking, route?.params?.bookingId, isForThisGarage]);
 
-  const [selectedDate, setSelectedDate] = useState('');
+  // Services to preselect: everything on the booking being rescheduled (or the requested service names)
+  const preferredServiceNames = React.useMemo(() => {
+    const fromBooking = Array.isArray(existingBooking?.services)
+      ? existingBooking.services.map((s: any) => (typeof s === 'string' ? s : s?.name)).filter(Boolean)
+      : [];
+    const raw = fromBooking.length > 0 ? fromBooking : String(route?.params?.serviceName || '').split(/\s*(?:,|\+)\s*/);
+    return raw.map((n: string) => n.trim().toLowerCase()).filter(Boolean);
+  }, [existingBooking, route?.params?.serviceName]);
+
+  const [selectedDate, setSelectedDate] = useState(() => {
+    const raw = route?.params?.bookedDate;
+    if (!raw) return '';
+    const d = new Date(raw);
+    if (isNaN(d.getTime())) return '';
+    const today = new Date();
+    today.setHours(0, 0, 0, 0);
+    if (d < today) return '';
+    return `${d.getFullYear()}-${String(d.getMonth() + 1).padStart(2, '0')}-${String(d.getDate()).padStart(2, '0')}`;
+  });
   const [selectedTime, setSelectedTime] = useState('');
   const [selectedSlot, setSelectedSlot] = useState<any>(null);
   const [garageSlots, setGarageSlots] = useState<any[]>([]);
@@ -205,6 +231,12 @@ export default function AdminBookMotScreen({ route, navigation }: any) {
 
   const garageId = user?.garageId;
 
+  const pickInitialServices = React.useCallback((activeOnly: GarageServiceItem[]) => {
+    const matches = activeOnly.filter(s => preferredServiceNames.includes((s.name || '').trim().toLowerCase()));
+    if (matches.length > 0) return matches;
+    return activeOnly.length > 0 ? [activeOnly[0]] : [];
+  }, [preferredServiceNames]);
+
   // Load services for this garage
   React.useEffect(() => {
     let isMounted = true;
@@ -216,10 +248,7 @@ export default function AdminBookMotScreen({ route, navigation }: any) {
         const activeOnly = currentGarage.services.filter((s: any) => s.isActive !== false);
         if (activeOnly.length > 0 && isMounted) {
           setGarageServices(activeOnly);
-          const initialMatch = route?.params?.serviceName
-            ? activeOnly.find((s: any) => s.name?.toLowerCase() === route.params.serviceName.toLowerCase()) || activeOnly[0]
-            : activeOnly[0];
-          setSelectedServices(initialMatch ? [initialMatch] : (activeOnly.length > 0 ? [activeOnly[0]] : []));
+          setSelectedServices(pickInitialServices(activeOnly));
           return;
         }
       }
@@ -233,10 +262,7 @@ export default function AdminBookMotScreen({ route, navigation }: any) {
           if (isMounted) {
             if (activeOnly.length > 0) {
               setGarageServices(activeOnly);
-              const initialMatch = route?.params?.serviceName
-                ? activeOnly.find((s: any) => s.name?.toLowerCase() === route.params.serviceName.toLowerCase()) || activeOnly[0]
-                : activeOnly[0];
-              setSelectedServices(initialMatch ? [initialMatch] : [activeOnly[0]]);
+              setSelectedServices(pickInitialServices(activeOnly));
             } else {
               setGarageServices([]);
               setSelectedServices([]);
@@ -258,7 +284,7 @@ export default function AdminBookMotScreen({ route, navigation }: any) {
 
     loadServices();
     return () => { isMounted = false; };
-  }, [user?.garageId, garages, fetchGarageServices, route?.params?.serviceName]);
+  }, [user?.garageId, garages, fetchGarageServices, pickInitialServices]);
 
   // Date and Time options for slot selection
   const [currentViewDate, setCurrentViewDate] = useState(new Date());
@@ -328,10 +354,26 @@ export default function AdminBookMotScreen({ route, navigation }: any) {
 
     setLoadingSlots(true);
     try {
-      const res = await fetch(`${BASE_URL}/garages/${garageId}/slots?date=${selectedDate}`);
+      const res = await authFetch(`${BASE_URL}/garages/${garageId}/slots?date=${selectedDate}`, {
+        headers: {},
+      });
       if (res.ok) {
         const data = await res.json();
-        setGarageSlots(data.slots || []);
+        const ownBookingId = existingBooking ? String(existingBooking.id || existingBooking._id || '') : '';
+        const slots = (data.slots || []).map((slot: any) => {
+          // Rescheduling: the booking being moved still occupies its current slot in the API response,
+          // which would show its own slot as Full. Give that place back so the same slot can be kept.
+          const ownsPlace = ownBookingId && Array.isArray(slot.bookings) && slot.bookings.some((b: any) => String(b.id) === ownBookingId);
+          if (!ownsPlace) return slot;
+          const availableCount = Math.min(slot.totalCapacity ?? Infinity, (slot.availableCount || 0) + 1);
+          return {
+            ...slot,
+            availableCount,
+            bookedCount: Math.max(0, (slot.bookedCount || 0) - 1),
+            status: slot.isBlocked ? slot.status : (availableCount > 0 ? 'Available' : slot.status),
+          };
+        });
+        setGarageSlots(slots);
       } else {
         setGarageSlots([]);
       }
@@ -341,7 +383,7 @@ export default function AdminBookMotScreen({ route, navigation }: any) {
     } finally {
       setLoadingSlots(false);
     }
-  }, [garageId, selectedDate]);
+  }, [garageId, selectedDate, token, existingBooking]);
 
   React.useEffect(() => {
     fetchGarageSlots();
@@ -400,8 +442,10 @@ export default function AdminBookMotScreen({ route, navigation }: any) {
   React.useEffect(() => {
     if (freeSlots.length > 0) {
       if (!selectedSlot || !freeSlots.some((s: any) => s.time === selectedSlot.time)) {
-        setSelectedSlot(freeSlots[0]);
-        setSelectedTime(freeSlots[0].time);
+        const preferredTime = String(route?.params?.slotTime || existingBooking?.slotTime || '').split(' - ')[0].trim();
+        const preferred = freeSlots.find((s: any) => s.time === preferredTime) || freeSlots[0];
+        setSelectedSlot(preferred);
+        setSelectedTime(preferred.time);
       }
     } else {
       setSelectedSlot(null);
@@ -444,14 +488,11 @@ export default function AdminBookMotScreen({ route, navigation }: any) {
 
       const targetCustId = customer.id || customer._id || selectedVehicle.customerId;
 
-      if (existingBooking) {
-        await rescheduleBooking(
-          existingBooking.id || existingBooking._id,
-          selectedDate,
-          hasMot ? finalSlotTime : ''
-        );
-      } else {
-        // Add BOOKED alert notification directly with Approved status
+      {
+        // Direct staff booking (instantly Approved). Sent with all selected services, date and slot; the backend
+        // checks bay capacity, assigns a bay and - if this vehicle already has an upcoming booking here -
+        // updates that booking instead of creating a duplicate. (The reschedule endpoint only takes a
+        // date/slot and would drop the selected services.)
         await addAlert({
           type: 'BOOKED',
           customerName: `${customer.firstName} ${customer.lastName}`,
@@ -499,8 +540,8 @@ export default function AdminBookMotScreen({ route, navigation }: any) {
         text2: successMessage,
       });
 
-      // Navigate directly to BookedMots screen
-      navigation.navigate('BookedMots');
+      // Show the booking on the Slots page for the booked date
+      navigation.navigate('Main', { screen: 'Slots', params: { date: selectedDate, highlightReg: selectedVehicle.registrationNumber } });
     } catch (err: any) {
       setLoading(false);
       Alert.alert('Error', err.message || 'Failed to confirm booking slot.');
@@ -601,7 +642,23 @@ export default function AdminBookMotScreen({ route, navigation }: any) {
             </View>
           )}
 
+          {!selectedVehicle && (
+            <TouchableOpacity
+              activeOpacity={0.8}
+              onPress={() => navigation.navigate('CustomerDetail', { customerId: customer.id || customer._id, customer })}
+              style={[styles.existingBookingBanner, { backgroundColor: theme.colors.warning + '14', borderColor: theme.colors.warning + '40' }]}
+            >
+              <Text style={{ fontSize: 13, fontFamily: fonts.bold, color: theme.colors.text }}>
+                No vehicle selected
+              </Text>
+              <Text style={{ fontSize: 12, fontFamily: fonts.regular, color: theme.colors.placeholder, marginTop: 2 }}>
+                {customer.firstName} has no active vehicle to book. Tap to open the customer and add a vehicle.
+              </Text>
+            </TouchableOpacity>
+          )}
+
           {/* Vehicle Main Section */}
+          {selectedVehicle && (
           <View style={styles.vehicleMainSection}>
             {/* Realistic UK Plate */}
             <View style={styles.ukPlateContainer}>
@@ -637,6 +694,7 @@ export default function AdminBookMotScreen({ route, navigation }: any) {
               </View>
             </View>
           </View>
+          )}
 
           {/* Already Booked MOT Alert Banner */}
           {existingBooking && (
@@ -1012,13 +1070,28 @@ export default function AdminBookMotScreen({ route, navigation }: any) {
               </TouchableOpacity>
             </View>
 
-            {/* Slots List */}
-            <View style={styles.slotsListContainer}>
-              {displayedSlots.map((slot: any, idx: number) => {
+            {/* Slots Grid - time and status only (bay counts are not shown) */}
+            <View style={styles.slotGrid}>
+              {displayedSlots.map((slot: any) => {
                 const isPassed = isTimeSlotPassed(slot.time);
                 const isAvailable = !slot.isBlocked && slot.status !== 'Full' && slot.availableCount > 0 && !isPassed;
                 const isSelected = selectedTime === slot.time;
-                const slotNum = slot.slotNumber || (idx + 1);
+                const statusLabel = isSelected
+                  ? 'Selected'
+                  : isPassed
+                    ? 'Past'
+                    : slot.isBlocked
+                      ? 'Blocked'
+                      : isAvailable
+                        ? 'Available'
+                        : 'Booked';
+                const statusColor = isSelected
+                  ? '#FFFFFF'
+                  : isAvailable
+                    ? '#10B981'
+                    : slot.isBlocked || (!isPassed && !isAvailable)
+                      ? theme.colors.error
+                      : theme.colors.placeholder;
 
                 return (
                   <TouchableOpacity
@@ -1029,87 +1102,31 @@ export default function AdminBookMotScreen({ route, navigation }: any) {
                       setSelectedTime(slot.time);
                     }}
                     style={[
-                      styles.detailedSlotCard,
+                      styles.slotBox,
                       {
-                        backgroundColor: isSelected 
-                          ? theme.colors.secondary + '18' 
-                          : isAvailable 
-                            ? theme.colors.card 
+                        backgroundColor: isSelected
+                          ? theme.colors.secondary
+                          : isAvailable
+                            ? theme.colors.card
                             : theme.colors.background,
-                        borderColor: isSelected 
-                          ? theme.colors.secondary 
-                          : isAvailable 
-                            ? theme.colors.border 
-                            : theme.colors.border + '60',
-                        borderWidth: isSelected ? 2 : 1,
-                        opacity: isAvailable ? 1 : 0.75,
+                        borderColor: isSelected
+                          ? theme.colors.secondary
+                          : isAvailable
+                            ? '#10B98160'
+                            : theme.colors.border,
+                        opacity: isAvailable || isSelected ? 1 : 0.6,
                       }
                     ]}
                   >
-                    <View style={{ flexDirection: 'row', alignItems: 'center', justifyContent: 'space-between' }}>
-                      <View style={{ flexDirection: 'row', alignItems: 'center' }}>
-                        <View style={[styles.slotIndexBadge, { backgroundColor: isSelected ? theme.colors.secondary : theme.colors.border + '40' }]}>
-                          <Text style={{ fontSize: 11, fontFamily: fonts.extraBold, color: isSelected ? '#FFFFFF' : theme.colors.text }}>
-                            #{slotNum}
-                          </Text>
-                        </View>
-                        <Text style={[styles.slotTimeTitle, { color: theme.colors.text, marginLeft: 8 }]}>
-                          {slot.time} - {slot.endTime || '45m'}
-                        </Text>
-                      </View>
-
-                      {/* Status Tag */}
-                      {isSelected ? (
-                        <View style={[styles.slotStatusTag, { backgroundColor: theme.colors.secondary }]}>
-                          <MaterialCommunityIcons name="check" size={12} color="#FFFFFF" style={{ marginRight: 3 }} />
-                          <Text style={[styles.slotStatusTagText, { color: '#FFFFFF' }]}>Selected</Text>
-                        </View>
-                      ) : isPassed ? (
-                        <View style={[styles.slotStatusTag, { backgroundColor: theme.colors.border }]}>
-                          <MaterialCommunityIcons name="clock-alert-outline" size={11} color={theme.colors.placeholder} style={{ marginRight: 3 }} />
-                          <Text style={[styles.slotStatusTagText, { color: theme.colors.placeholder }]}>Past Time</Text>
-                        </View>
-                      ) : slot.isBlocked ? (
-                        <View style={[styles.slotStatusTag, { backgroundColor: theme.colors.border }]}>
-                          <MaterialCommunityIcons name="cancel" size={11} color={theme.colors.error} style={{ marginRight: 3 }} />
-                          <Text style={[styles.slotStatusTagText, { color: theme.colors.error }]}>Blocked</Text>
-                        </View>
-                      ) : isAvailable ? (
-                        <View style={[styles.slotStatusTag, { backgroundColor: '#10B98118', borderColor: '#10B98140', borderWidth: 0.5 }]}>
-                          <MaterialCommunityIcons name="check-circle" size={11} color="#10B981" style={{ marginRight: 3 }} />
-                          <Text style={[styles.slotStatusTagText, { color: '#10B981' }]}>
-                            {slot.availableCount} {slot.availableCount === 1 ? 'Bay' : 'Bays'} Available
-                          </Text>
-                        </View>
-                      ) : (
-                        <View style={[styles.slotStatusTag, { backgroundColor: theme.colors.error + '18', borderColor: theme.colors.error + '40', borderWidth: 0.5 }]}>
-                          <MaterialCommunityIcons name="close-circle" size={11} color={theme.colors.error} style={{ marginRight: 3 }} />
-                          <Text style={[styles.slotStatusTagText, { color: theme.colors.error }]}>Fully Booked</Text>
-                        </View>
-                      )}
-                    </View>
-
-                    {/* Booked vehicle / customer details if occupied */}
-                    {slot.bookings && slot.bookings.length > 0 && (
-                      <View style={[styles.slotOccupiedBox, { backgroundColor: theme.colors.background, borderColor: theme.colors.border }]}>
-                        <Text style={{ fontSize: 10, fontFamily: fonts.bold, color: theme.colors.placeholder, textTransform: 'uppercase', marginBottom: 2 }}>
-                          Occupied Bays ({slot.bookings.length}/{slot.totalCapacity || slot.bookings.length}):
-                        </Text>
-                        {slot.bookings.map((b: any, bIdx: number) => (
-                          <View key={b.id || bIdx} style={{ flexDirection: 'row', alignItems: 'center', marginTop: 2 }}>
-                            <MaterialCommunityIcons name="car-side" size={12} color={theme.colors.secondary} style={{ marginRight: 4 }} />
-                            <Text style={{ fontSize: 11, fontFamily: fonts.semiBold, color: theme.colors.text }}>
-                              {b.registrationNumber || 'Vehicle'} • {b.customerName || 'Customer'}
-                            </Text>
-                            {b.stationName ? (
-                              <Text style={{ fontSize: 10, fontFamily: fonts.regular, color: theme.colors.placeholder, marginLeft: 4 }}>
-                                ({b.stationName})
-                              </Text>
-                            ) : null}
-                          </View>
-                        ))}
-                      </View>
-                    )}
+                    <Text style={[styles.slotBoxTime, { color: isSelected ? '#FFFFFF' : theme.colors.text }]}>
+                      {slot.time}
+                    </Text>
+                    <Text style={[styles.slotBoxEnd, { color: isSelected ? '#FFFFFFCC' : theme.colors.placeholder }]}>
+                      to {slot.endTime || '45m'}
+                    </Text>
+                    <Text style={[styles.slotBoxStatus, { color: statusColor }]}>
+                      {statusLabel}
+                    </Text>
                   </TouchableOpacity>
                 );
               })}
@@ -1616,6 +1633,36 @@ const styles = StyleSheet.create({
   slotsListContainer: {
     gap: 10,
     marginBottom: 14,
+  },
+  slotGrid: {
+    flexDirection: 'row',
+    flexWrap: 'wrap',
+    justifyContent: 'space-between',
+    rowGap: 10,
+    marginBottom: 14,
+  },
+  slotBox: {
+    width: '31.5%',
+    paddingVertical: 10,
+    paddingHorizontal: 6,
+    borderRadius: 10,
+    borderWidth: 1.5,
+    alignItems: 'center',
+  },
+  slotBoxTime: {
+    fontSize: 15,
+    fontFamily: fonts.extraBold,
+  },
+  slotBoxEnd: {
+    fontSize: 10,
+    fontFamily: fonts.medium,
+    marginTop: 1,
+  },
+  slotBoxStatus: {
+    fontSize: 10,
+    fontFamily: fonts.bold,
+    marginTop: 4,
+    textTransform: 'uppercase',
   },
   detailedSlotCard: {
     padding: 12,

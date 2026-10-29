@@ -34,7 +34,7 @@ if (Platform.OS === 'android' && UIManager.setLayoutAnimationEnabledExperimental
 
 export default function AdminCustomersScreen({ navigation }: any) {
   const { theme } = useAppTheme();
-  const { customers, vehicles, garages, alerts = [], user, addCustomer, addVehicle, updateVehicleStatus, lookupVehicle, token } = useAppValues();
+  const { customers, vehicles, garages, alerts = [], user, addCustomer, addVehicle, lookupVehicle, token, authFetch } = useAppValues();
 
   const [searchQuery, setSearchQuery] = useState('');
   const [selectedGarageFilter, setSelectedGarageFilter] = useState<string>('ALL');
@@ -52,9 +52,8 @@ export default function AdminCustomersScreen({ navigation }: any) {
   React.useEffect(() => {
     if (user?.role === 'admin' && selectedGarageFilter !== 'ALL') {
       setLoadingGarageCusts(true);
-      fetch(`${BASE_URL}/customers?garageId=${selectedGarageFilter}`, {
+      authFetch(`${BASE_URL}/customers?garageId=${selectedGarageFilter}`, {
         headers: {
-          'Authorization': `Bearer ${token}`
         }
       })
         .then((res) => res.json())
@@ -96,10 +95,9 @@ export default function AdminCustomersScreen({ navigation }: any) {
 
   const fetchMakesList = async (search: string, pageNum: number) => {
     try {
-      const response = await fetch(`${BASE_URL}/vehicles/makes?page=${pageNum}&limit=20&search=${encodeURIComponent(search)}`, {
+      const response = await authFetch(`${BASE_URL}/vehicles/makes?page=${pageNum}&limit=20&search=${encodeURIComponent(search)}`, {
         headers: {
           'Content-Type': 'application/json',
-          Authorization: `Bearer ${token}`
         }
       });
       const data = await response.json();
@@ -116,10 +114,9 @@ export default function AdminCustomersScreen({ navigation }: any) {
   const fetchModelsListForMake = (makeVal: string) => async (search: string, pageNum: number) => {
     if (!makeVal) return { items: [], hasMore: false };
     try {
-      const response = await fetch(`${BASE_URL}/vehicles/models?make=${encodeURIComponent(makeVal)}&page=${pageNum}&limit=20&search=${encodeURIComponent(search)}`, {
+      const response = await authFetch(`${BASE_URL}/vehicles/models?make=${encodeURIComponent(makeVal)}&page=${pageNum}&limit=20&search=${encodeURIComponent(search)}`, {
         headers: {
           'Content-Type': 'application/json',
-          Authorization: `Bearer ${token}`
         }
       });
       const data = await response.json();
@@ -303,7 +300,7 @@ export default function AdminCustomersScreen({ navigation }: any) {
     }
   };
 
-  const handleCreateVehicle = (customerId: string) => {
+  const handleCreateVehicle = async (customerId: string) => {
     if (!regNo.trim() || !make.trim() || !model.trim() || !year.trim() || !expiry.trim()) {
       Alert.alert('Error', 'Please fill in all vehicle details');
       return;
@@ -330,16 +327,22 @@ export default function AdminCustomersScreen({ navigation }: any) {
       }
     }
 
-    addVehicle({
-      customerId,
-      registrationNumber: regNo.trim().toUpperCase(),
-      make: make.trim().toUpperCase(),
-      model: model.trim().toUpperCase(),
-      year: year.trim(),
-      motExpiryDate: expiry.trim(),
-      lastServiceDate: serviceDate.trim() || undefined,
-      status: 'Active',
-    });
+    // Await the save so a rejected vehicle (e.g. duplicate plate) isn't reported as added
+    try {
+      await addVehicle({
+        customerId,
+        registrationNumber: regNo.trim().toUpperCase(),
+        make: make.trim().toUpperCase(),
+        model: model.trim().toUpperCase(),
+        year: year.trim(),
+        motExpiryDate: expiry.trim(),
+        lastServiceDate: serviceDate.trim() || undefined,
+        status: 'Active',
+      });
+    } catch (error: any) {
+      Alert.alert('Error', error?.message || 'Failed to add vehicle.');
+      return;
+    }
 
     setRegNo('');
     setMake('');
@@ -351,18 +354,6 @@ export default function AdminCustomersScreen({ navigation }: any) {
     Alert.alert('Success', 'Vehicle added successfully!');
   };
 
-  const handleChangeVehicleStatus = (vehicleId: string, currentStatus: string) => {
-    Alert.alert(
-      'Update Vehicle Status',
-      'Select new status:',
-      [
-        { text: 'Active', onPress: () => updateVehicleStatus(vehicleId, 'Active') },
-        { text: 'Sold', onPress: () => updateVehicleStatus(vehicleId, 'Sold') },
-        { text: 'Scrapped', onPress: () => updateVehicleStatus(vehicleId, 'Scrapped') },
-        { text: 'Cancel', style: 'cancel' },
-      ]
-    );
-  };
 
   const sourceCustomers = (user?.role === 'admin' && selectedGarageFilter !== 'ALL')
     ? garageCustomers
@@ -538,6 +529,14 @@ export default function AdminCustomersScreen({ navigation }: any) {
                       <Text style={[styles.customerNameText, { color: theme.colors.text }]} numberOfLines={1}>
                         {c.firstName} {c.lastName}
                       </Text>
+                      {c.email ? (
+                        <View style={[styles.customerInfoItem, { marginTop: 2 }]}>
+                          <MaterialCommunityIcons name="email-outline" size={11} color={theme.colors.placeholder} />
+                          <Text style={[styles.customerInfoText, { flexShrink: 1 }]} numberOfLines={1}>
+                            {c.email}
+                          </Text>
+                        </View>
+                      ) : null}
                       <View style={styles.customerInfoCol}>
                         {c.mobile ? (
                           <View style={styles.customerInfoItem}>
@@ -898,8 +897,8 @@ export default function AdminCustomersScreen({ navigation }: any) {
                                 </View>
                               </View>
 
-                              <TouchableOpacity
-                                onPress={() => handleChangeVehicleStatus(v.id, v.status)}
+                              {/* Status is display-only here (no tap / status popup) */}
+                              <View
                                 style={[
                                   styles.statusPill,
                                   {
@@ -934,7 +933,7 @@ export default function AdminCustomersScreen({ navigation }: any) {
                                 >
                                   {v.status}
                                 </Text>
-                              </TouchableOpacity>
+                              </View>
                             </View>
 
                             {v.status === 'Rejected' && v.rejectionReason && (

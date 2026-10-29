@@ -11,6 +11,7 @@ import {
   Text,
   ActivityIndicator,
   Modal,
+  Image,
 } from 'react-native';
 import MaterialCommunityIcons from 'react-native-vector-icons/MaterialCommunityIcons';
 import { pick, types, isErrorWithCode, errorCodes } from '@react-native-documents/picker';
@@ -20,7 +21,6 @@ import { validateEmail, validatePassword } from '../utils/validationUtils';
 import AsyncStorage from '@react-native-async-storage/async-storage';
 import { fonts } from '../theme/theme';
 import {
-  AdminHeroLogo,
   EmailIcon,
   LockIcon,
   EyeIcon,
@@ -29,7 +29,7 @@ import {
 
 export default function LoginScreen({ navigation }: any) {
   const { theme } = useAppTheme();
-  const { setToken, setTokens, setUser } = useAppValues();
+  const { setToken, setTokens, setUser, refreshSession } = useAppValues();
   const [email, setEmail] = useState('');
   const [password, setPassword] = useState('');
   const [showPassword, setShowPassword] = useState(false);
@@ -60,45 +60,34 @@ export default function LoginScreen({ navigation }: any) {
         if (storedRefreshToken && storedUserJson) {
           const storedUser = JSON.parse(storedUserJson);
           console.log('[LOGIN] Verifying persisted session with refresh token...');
-          try {
-            const refRes = await fetch(`${BASE_URL}/auth/refresh-token`, {
-              method: 'POST',
-              headers: { 'Content-Type': 'application/json' },
-              body: JSON.stringify({ refreshToken: storedRefreshToken })
-            });
+          const isStaffRole = (role?: string) => role === 'admin' || role === 'staff' || role === 'garage_admin';
 
-            if (refRes.ok) {
-              const refData = await refRes.json();
-              const newAccessToken = refData.accessToken || refData.token;
-              const newRefreshToken = refData.refreshToken || storedRefreshToken;
-              const activeUser = refData.user || storedUser;
+          // Make the shared session aware of the stored tokens, then refresh through the app's single,
+          // de-duplicated refresh (so it can't race another refresh with the same token)
+          setTokens(storedToken, storedRefreshToken);
+          const outcome = await refreshSession();
 
-              console.log('[LOGIN] Session verified and refreshed successfully.');
-              setTokens(newAccessToken, newRefreshToken);
-              setUser(activeUser);
-
-              if (activeUser.role === 'admin' || activeUser.role === 'staff' || activeUser.role === 'garage_admin') {
-                navigation.replace('Main');
-                return;
-              } else {
-                setTokens(null, null);
-                setUser(null);
-              }
-            } else {
-              console.warn('[LOGIN] Stored refresh token is expired or invalid. Staying on Login.');
-              setTokens(null, null);
-              setUser(null);
+          if (outcome.status === 'ok') {
+            const activeUser = outcome.user || storedUser;
+            setUser(activeUser);
+            if (isStaffRole(activeUser.role)) {
+              navigation.replace('Main');
+              return;
             }
-          } catch (netErr) {
-            console.warn('[LOGIN] Network error during session refresh check:', netErr);
-            if (storedToken) {
-              setTokens(storedToken, storedRefreshToken);
-              setUser(storedUser);
-              if (storedUser.role === 'admin' || storedUser.role === 'staff' || storedUser.role === 'garage_admin') {
-                navigation.replace('Main');
-                return;
-              }
+            setTokens(null, null);
+            setUser(null);
+          } else if (outcome.status === 'transient') {
+            // Offline / server issue: the session is still valid - keep it instead of forcing a new login
+            console.warn('[LOGIN] Could not verify session right now, keeping stored session:', outcome.reason);
+            setUser(storedUser);
+            if (isStaffRole(storedUser.role)) {
+              navigation.replace('Main');
+              return;
             }
+          } else {
+            console.warn('[LOGIN] Stored refresh token is expired or invalid. Staying on Login.');
+            setTokens(null, null);
+            setUser(null);
           }
         }
       } catch (err) {
@@ -296,14 +285,16 @@ export default function LoginScreen({ navigation }: any) {
       <ScrollView contentContainerStyle={styles.scrollContent} keyboardShouldPersistTaps="handled">
         {/* Logo and Brand */}
         <View style={styles.headerContainer}>
-          <AdminHeroLogo
-            size={92}
-            primary={theme.colors.primary}
-            secondary={theme.colors.secondary || '#1677FF'}
-            dark={theme.dark}
-          />
+          <View style={styles.brandLogoCard}>
+            <Image
+              source={require('../images/ondoorcarservice_Logo.png')}
+              style={styles.brandLogoImage}
+              resizeMode="contain"
+              accessibilityLabel="Ondoorcarservice"
+            />
+          </View>
           <Text style={[styles.title, { color: theme.colors.text }]}>
-            MOT Admin Hub
+            Ondoorcarservice Hub
           </Text>
           <Text style={[styles.subtitle, { color: theme.colors.placeholder }]}>
             Garage Testing Station & Reminder Terminal
@@ -518,6 +509,18 @@ export default function LoginScreen({ navigation }: any) {
   );
 }
 const styles = StyleSheet.create({
+  brandLogoCard: {
+    backgroundColor: '#FFFFFF',
+    borderRadius: 18,
+    paddingHorizontal: 16,
+    paddingVertical: 10,
+    alignItems: 'center',
+    justifyContent: 'center',
+  },
+  brandLogoImage: {
+    width: 200,
+    height: 89, // logo is 750 x 333
+  },
   container: {
     flex: 1,
   },

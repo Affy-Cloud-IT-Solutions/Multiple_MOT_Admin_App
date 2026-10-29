@@ -123,8 +123,12 @@ export default function AdminAlertsScreen() {
     }
   };
 
-  const handleAcknowledge = (alertId: string) => {
-    acknowledgeAlert(alertId);
+  const handleAcknowledge = async (alertId: string) => {
+    try {
+      await acknowledgeAlert(alertId);
+    } catch (error: any) {
+      Alert.alert('Error', error?.message || 'Could not acknowledge this notification.');
+    }
   };
 
   return (

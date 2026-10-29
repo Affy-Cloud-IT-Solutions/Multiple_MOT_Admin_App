@@ -1,7 +1,8 @@
 import React, { createContext, useContext, useState, useEffect, useCallback, useRef, ReactNode } from 'react';
-import { Alert, Platform } from 'react-native';
+import { Alert, AppState, Platform } from 'react-native';
 import AsyncStorage from '@react-native-async-storage/async-storage';
-import { resetToLogin } from '../navigation/NavigationService';
+import { resetToLogin, isOnLoginScreen } from '../navigation/NavigationService';
+import { isTokenExpired, msUntilAccessTokenRefresh, requestTokenRefresh, RefreshOutcome } from '../utils/authSession';
 
 export interface Customer {
   id: string;
@@ -98,6 +99,10 @@ export interface Garage {
   locationConfigured?: boolean;
   servicesConfigured?: boolean;
   documentsConfigured?: boolean;
+  /** Computed by the backend: which setup steps are done (location, services, documents) */
+  profileCompletion?: { complete: boolean; steps: { location: boolean; services: boolean; documents: boolean }; missing: string[] };
+  /** Approved AND profile complete - only then do customers see this garage */
+  isVisibleToCustomers?: boolean;
   verificationStatus?: 'Pending' | 'Verified' | 'Rejected' | 'Expired';
   rejectionReason?: string;
   verificationDocuments?: { id?: string; _id?: string; name: string; fileUrl: string; documentType?: string; status?: 'Pending' | 'Verified' | 'Rejected'; rejectionReason?: string; verifiedAt?: string; uploadDate?: string }[];
@@ -147,6 +152,8 @@ interface DataContextType {
   setRefreshToken: (token: string | null) => void;
   setTokens: (accessToken: string | null, refreshToken: string | null) => void;
   refreshAccessToken: () => Promise<string | null>;
+  /** Refreshes the session; only an 'invalid' outcome means the user must log in again */
+  refreshSession: () => Promise<RefreshOutcome>;
   authFetch: (url: string, options?: RequestInit) => Promise<Response>;
   logout: () => Promise<void>;
   user: UserProfile | null;
@@ -185,8 +192,8 @@ interface DataContextType {
 const DataContext = createContext<DataContextType | undefined>(undefined);
 
 // Local development backend (port 5000 reverse-tunneled to connected Android device via adb reverse)
-// export const BASE_URL = 'http://localhost:5000/api';
-export const BASE_URL = 'https://api.ondoorcarservice.com/api';
+export const BASE_URL = 'http://localhost:5000/api';
+// export const BASE_URL = 'https://api.ondoorcarservice.com/api';
 
 const decodeToken = (tokenStr: string | null) => {
   if (!tokenStr) return null;
@@ -241,8 +248,13 @@ export const DataProvider = ({ children }: { children: ReactNode }) => {
   const [token, setTokenState] = useState<string | null>(null);
   const [refreshToken, setRefreshTokenState] = useState<string | null>(null);
   const [user, setUserState] = useState<UserProfile | null>(null);
+  // Always hold the latest tokens. Callbacks read these instead of state captured in their closure, so a
+  // stale callback can never send a refresh token that has already been rotated (which the server revokes).
+  const tokenRef = useRef<string | null>(null);
+  const refreshTokenRef = useRef<string | null>(null);
 
   const setRefreshToken = useCallback((newRefreshToken: string | null) => {
+    refreshTokenRef.current = newRefreshToken;
     setRefreshTokenState(newRefreshToken);
     if (newRefreshToken) {
       AsyncStorage.setItem('user_refresh_token', newRefreshToken).catch(err => console.error(err));
@@ -252,6 +264,8 @@ export const DataProvider = ({ children }: { children: ReactNode }) => {
   }, []);
 
   const setToken = useCallback((newToken: string | null) => {
+    tokenRef.current = newToken;
+    if (!newToken) refreshTokenRef.current = null;
     setTokenState(newToken);
     if (newToken) {
       AsyncStorage.setItem('user_token', newToken).catch(err => console.error(err));
@@ -271,6 +285,8 @@ export const DataProvider = ({ children }: { children: ReactNode }) => {
   }, []);
 
   const setTokens = useCallback((newToken: string | null, newRefreshToken: string | null) => {
+    tokenRef.current = newToken;
+    refreshTokenRef.current = newRefreshToken;
     setTokenState(newToken);
     setRefreshTokenState(newRefreshToken);
     if (newToken) {
@@ -305,62 +321,59 @@ export const DataProvider = ({ children }: { children: ReactNode }) => {
   }, []);
 
   // Mutex/singleton to prevent multiple concurrent refresh calls
-  const refreshPromiseRef = useRef<Promise<string | null> | null>(null);
+  const refreshPromiseRef = useRef<Promise<RefreshOutcome> | null>(null);
+  const sessionExpiredAlertShownRef = useRef(false);
 
   const handleSessionExpired = useCallback(() => {
-    console.warn('[AUTH] Session expired. Clearing session and navigating to login.');
+    if (!tokenRef.current && !refreshTokenRef.current) return;
+    // Several requests can fail at once - clear the session and show the alert only once
+    if (sessionExpiredAlertShownRef.current) return;
+    sessionExpiredAlertShownRef.current = true;
+    console.warn('[AUTH] Refresh token expired or revoked. Clearing session and navigating to login.');
     setTokens(null, null);
     setUser(null);
+    // Already on Login (e.g. at launch): just clear the session, no popup
+    if (isOnLoginScreen()) {
+      sessionExpiredAlertShownRef.current = false;
+      return;
+    }
     resetToLogin();
     Alert.alert(
       'Session Expired',
-      'Your session has expired. Please log in again to continue.'
+      'Your session has expired. Please log in again to continue.',
+      [{ text: 'OK', onPress: () => { sessionExpiredAlertShownRef.current = false; } }]
     );
   }, [setTokens, setUser]);
 
-  const refreshAccessToken = useCallback(async (): Promise<string | null> => {
+  /**
+   * Exchanges the refresh token for a new access token (and rotated refresh token).
+   * Only one refresh runs at a time; concurrent callers share its result. Tokens are stored on success.
+   * The session is NOT cleared here - only an 'invalid' outcome should log the user out.
+   */
+  const refreshSession = useCallback(async (): Promise<RefreshOutcome> => {
     if (refreshPromiseRef.current) {
       return refreshPromiseRef.current;
     }
 
-    const refreshTask = (async (): Promise<string | null> => {
+    const refreshTask = (async (): Promise<RefreshOutcome> => {
       try {
-        let currentRefreshToken = refreshToken;
-        if (!currentRefreshToken) {
-          currentRefreshToken = await AsyncStorage.getItem('user_refresh_token');
-        }
-
-        if (!currentRefreshToken) {
-          console.warn('[AUTH] No refresh token found. Cannot refresh session.');
-          return null;
-        }
-
+        const currentRefreshToken = refreshTokenRef.current || await AsyncStorage.getItem('user_refresh_token');
         console.log('[AUTH] Calling refresh token endpoint...');
-        const res = await fetch(`${BASE_URL}/auth/refresh-token`, {
-          method: 'POST',
-          headers: { 'Content-Type': 'application/json' },
-          body: JSON.stringify({ refreshToken: currentRefreshToken })
-        });
+        const outcome = await requestTokenRefresh(BASE_URL, currentRefreshToken);
 
-        const data = await res.json();
-        if (res.ok && (data.accessToken || data.token)) {
-          const newAccessToken = data.accessToken || data.token;
-          const newRefreshToken = data.refreshToken || currentRefreshToken;
-
+        if (outcome.status === 'ok') {
           console.log('[AUTH] Access token refreshed successfully.');
-          setTokens(newAccessToken, newRefreshToken);
-          if (data.user) {
-            setUserState(prev => ({ ...prev, ...data.user }));
-            AsyncStorage.setItem('user_profile', JSON.stringify(data.user)).catch(e => console.error(e));
+          setTokens(outcome.accessToken, outcome.refreshToken);
+          if (outcome.user) {
+            setUserState(prev => ({ ...prev, ...outcome.user }));
+            AsyncStorage.setItem('user_profile', JSON.stringify(outcome.user)).catch(e => console.error(e));
           }
-          return newAccessToken;
+        } else if (outcome.status === 'invalid') {
+          console.warn('[AUTH] Refresh token rejected by server:', outcome.reason);
         } else {
-          console.warn('[AUTH] Refresh token rejected by server:', data.error);
-          return null;
+          console.warn('[AUTH] Could not refresh token right now (keeping session):', outcome.reason);
         }
-      } catch (err) {
-        console.error('[AUTH] Exception while refreshing token:', err);
-        return null;
+        return outcome;
       } finally {
         refreshPromiseRef.current = null;
       }
@@ -368,7 +381,12 @@ export const DataProvider = ({ children }: { children: ReactNode }) => {
 
     refreshPromiseRef.current = refreshTask;
     return refreshTask;
-  }, [refreshToken, setTokens]);
+  }, [setTokens]);
+
+  const refreshAccessToken = useCallback(async (): Promise<string | null> => {
+    const outcome = await refreshSession();
+    return outcome.status === 'ok' ? outcome.accessToken : null;
+  }, [refreshSession]);
 
   const authFetch = useCallback(async (url: string, options: RequestInit = {}): Promise<Response> => {
     const rawHeaders: Record<string, string> = {};
@@ -382,9 +400,17 @@ export const DataProvider = ({ children }: { children: ReactNode }) => {
       }
     }
 
-    let activeToken = token;
-    if (!activeToken) {
-      activeToken = await AsyncStorage.getItem('user_token');
+    let activeToken = tokenRef.current || await AsyncStorage.getItem('user_token');
+    const hasRefreshToken = !!(refreshTokenRef.current || await AsyncStorage.getItem('user_refresh_token'));
+
+    // Refresh up front when the access token is (about to be) expired, instead of waiting for a 401
+    if (hasRefreshToken && (!activeToken || isTokenExpired(activeToken))) {
+      const outcome = await refreshSession();
+      if (outcome.status === 'ok') {
+        activeToken = outcome.accessToken;
+      } else if (outcome.status === 'invalid') {
+        handleSessionExpired();
+      }
     }
 
     if (activeToken && !rawHeaders['Authorization']) {
@@ -393,24 +419,60 @@ export const DataProvider = ({ children }: { children: ReactNode }) => {
 
     let response = await fetch(url, { ...options, headers: rawHeaders });
 
-    if (response.status === 401) {
+    if (response.status === 401 && hasRefreshToken) {
       console.log(`[AUTH] 401 Unauthorized for ${url}. Attempting access token refresh...`);
-      const newAccessToken = await refreshAccessToken();
-      if (newAccessToken) {
-        rawHeaders['Authorization'] = `Bearer ${newAccessToken}`;
+      const outcome = await refreshSession();
+      if (outcome.status === 'ok') {
+        rawHeaders['Authorization'] = `Bearer ${outcome.accessToken}`;
         response = await fetch(url, { ...options, headers: rawHeaders });
-      } else {
-        console.warn(`[AUTH] Failed to refresh token for ${url}. Triggering session expiration.`);
+      } else if (outcome.status === 'invalid') {
+        // Only the refresh token being rejected ends the session - not an expired access token
         handleSessionExpired();
       }
+      // 'transient': keep the session and return the 401; the next request retries the refresh
     }
 
     return response;
-  }, [token, refreshAccessToken, handleSessionExpired]);
+  }, [refreshSession, handleSessionExpired]);
+
+  // Proactively refresh shortly before the access token expires, so screens that read `token`
+  // directly always have a valid one. Transient failures are retried; a rejected refresh token ends the session.
+  useEffect(() => {
+    if (!token) return;
+    let retryTimer: ReturnType<typeof setTimeout> | null = null;
+    const delay = msUntilAccessTokenRefresh(token);
+    if (delay === null) return;
+
+    const runRefresh = async () => {
+      const outcome = await refreshSession();
+      if (outcome.status === 'invalid') {
+        handleSessionExpired();
+      } else if (outcome.status === 'transient') {
+        retryTimer = setTimeout(runRefresh, 30 * 1000);
+      }
+    };
+    const timer = setTimeout(runRefresh, delay);
+    return () => {
+      clearTimeout(timer);
+      if (retryTimer) clearTimeout(retryTimer);
+    };
+  }, [token, refreshSession, handleSessionExpired]);
+
+  // Timers don't run while the app is in the background, so check again as soon as it comes back
+  useEffect(() => {
+    const subscription = AppState.addEventListener('change', async nextState => {
+      if (nextState !== 'active' || !refreshTokenRef.current) return;
+      if (!tokenRef.current || isTokenExpired(tokenRef.current)) {
+        const outcome = await refreshSession();
+        if (outcome.status === 'invalid') handleSessionExpired();
+      }
+    });
+    return () => subscription.remove();
+  }, [refreshSession, handleSessionExpired]);
 
   const logout = useCallback(async () => {
     try {
-      const activeRefreshToken = refreshToken || await AsyncStorage.getItem('user_refresh_token');
+      const activeRefreshToken = refreshTokenRef.current || await AsyncStorage.getItem('user_refresh_token');
       if (activeRefreshToken) {
         await fetch(`${BASE_URL}/auth/logout`, {
           method: 'POST',
@@ -545,9 +607,11 @@ export const DataProvider = ({ children }: { children: ReactNode }) => {
         const storedUserJson = await AsyncStorage.getItem('user_profile');
 
         if (storedToken && !token) {
+          tokenRef.current = storedToken;
           setTokenState(storedToken);
         }
         if (storedRefreshToken && !refreshToken) {
+          refreshTokenRef.current = storedRefreshToken;
           setRefreshTokenState(storedRefreshToken);
         }
         if (storedUserJson && !user) {
@@ -569,11 +633,10 @@ export const DataProvider = ({ children }: { children: ReactNode }) => {
 
   const addCustomer = async (customerData: Omit<Customer, 'id' | 'createdDate'>): Promise<string> => {
     try {
-      const response = await fetch(`${BASE_URL}/customers`, {
+      const response = await authFetch(`${BASE_URL}/customers`, {
         method: 'POST',
         headers: { 
           'Content-Type': 'application/json',
-          'Authorization': `Bearer ${token}`
         },
         body: JSON.stringify(customerData)
       });
@@ -591,11 +654,10 @@ export const DataProvider = ({ children }: { children: ReactNode }) => {
 
   const addVehicle = async (vehicleData: Omit<Vehicle, 'id'>): Promise<void> => {
     try {
-      const response = await fetch(`${BASE_URL}/vehicles`, {
+      const response = await authFetch(`${BASE_URL}/vehicles`, {
         method: 'POST',
         headers: { 
           'Content-Type': 'application/json',
-          'Authorization': `Bearer ${token}`
         },
         body: JSON.stringify(vehicleData)
       });
@@ -612,11 +674,10 @@ export const DataProvider = ({ children }: { children: ReactNode }) => {
 
   const updateVehicleStatus = async (vehicleId: string, status: 'Active' | 'Sold' | 'Scrapped' | 'Pending'): Promise<void> => {
     try {
-      const response = await fetch(`${BASE_URL}/vehicles/${vehicleId}`, {
+      const response = await authFetch(`${BASE_URL}/vehicles/${vehicleId}`, {
         method: 'PUT',
         headers: { 
           'Content-Type': 'application/json',
-          'Authorization': `Bearer ${token}`
         },
         body: JSON.stringify({ status })
       });
@@ -633,11 +694,10 @@ export const DataProvider = ({ children }: { children: ReactNode }) => {
 
   const addAlert = async (alertData: Omit<AlertNotification, 'id' | 'status' | 'date'> & { status?: 'Pending' | 'Approved' | 'Acknowledged' | 'Rejected', date?: string }): Promise<void> => {
     try {
-      const response = await fetch(`${BASE_URL}/alerts`, {
+      const response = await authFetch(`${BASE_URL}/alerts`, {
         method: 'POST',
         headers: { 
           'Content-Type': 'application/json',
-          'Authorization': `Bearer ${token}`
         },
         body: JSON.stringify(alertData)
       });
@@ -654,11 +714,10 @@ export const DataProvider = ({ children }: { children: ReactNode }) => {
 
   const approveAlert = async (alertId: string): Promise<void> => {
     try {
-      const response = await fetch(`${BASE_URL}/alerts/${alertId}/approve`, {
+      const response = await authFetch(`${BASE_URL}/alerts/${alertId}/approve`, {
         method: 'PUT',
         headers: { 
           'Content-Type': 'application/json',
-          'Authorization': `Bearer ${token}`
         }
       });
       if (!response.ok) {
@@ -674,11 +733,10 @@ export const DataProvider = ({ children }: { children: ReactNode }) => {
 
   const acknowledgeAlert = async (alertId: string): Promise<void> => {
     try {
-      const response = await fetch(`${BASE_URL}/alerts/${alertId}/acknowledge`, {
+      const response = await authFetch(`${BASE_URL}/alerts/${alertId}/acknowledge`, {
         method: 'PUT',
         headers: { 
           'Content-Type': 'application/json',
-          'Authorization': `Bearer ${token}`
         }
       });
       if (!response.ok) {
@@ -694,11 +752,10 @@ export const DataProvider = ({ children }: { children: ReactNode }) => {
 
   const addAudit = async (activity: string, details: string): Promise<void> => {
     try {
-      const response = await fetch(`${BASE_URL}/audit`, {
+      const response = await authFetch(`${BASE_URL}/audit`, {
         method: 'POST',
         headers: { 
           'Content-Type': 'application/json',
-          'Authorization': `Bearer ${token}`
         },
         body: JSON.stringify({ activity, details })
       });
@@ -708,18 +765,17 @@ export const DataProvider = ({ children }: { children: ReactNode }) => {
       }
       await refreshData();
     } catch (error) {
-      console.error('[DATA CONTEXT] addAudit error:', error);
-      throw error;
+      // Audit logging is best-effort: never turn an action that already succeeded into an error for the user
+      console.warn('[DATA CONTEXT] addAudit failed (action itself was not affected):', error);
     }
   };
 
   const createStaffAccount = async (name: string, email: string, password: string): Promise<void> => {
     try {
-      const response = await fetch(`${BASE_URL}/auth/create-staff`, {
+      const response = await authFetch(`${BASE_URL}/auth/create-staff`, {
         method: 'POST',
         headers: { 
           'Content-Type': 'application/json',
-          'Authorization': `Bearer ${token}`
         },
         body: JSON.stringify({ name, email, password })
       });
@@ -743,10 +799,9 @@ export const DataProvider = ({ children }: { children: ReactNode }) => {
     }
 
     try {
-      const response = await fetch(`${BASE_URL}/auth/staff`, {
+      const response = await authFetch(`${BASE_URL}/auth/staff`, {
         method: 'GET',
         headers: { 
-          'Authorization': `Bearer ${token}`
         }
       });
       const data = await response.json();
@@ -762,10 +817,9 @@ export const DataProvider = ({ children }: { children: ReactNode }) => {
 
   const deleteStaffAccount = async (staffId: string): Promise<void> => {
     try {
-      const response = await fetch(`${BASE_URL}/auth/staff/${staffId}`, {
+      const response = await authFetch(`${BASE_URL}/auth/staff/${staffId}`, {
         method: 'DELETE',
         headers: { 
-          'Authorization': `Bearer ${token}`
         }
       });
       const data = await response.json();
@@ -780,11 +834,10 @@ export const DataProvider = ({ children }: { children: ReactNode }) => {
 
   const rescheduleBooking = async (alertId: string, date: string, slot?: string): Promise<void> => {
     try {
-      const response = await fetch(`${BASE_URL}/alerts/${alertId}/reschedule`, {
+      const response = await authFetch(`${BASE_URL}/alerts/${alertId}/reschedule`, {
         method: 'PUT',
         headers: { 
           'Content-Type': 'application/json',
-          'Authorization': `Bearer ${token}`
         },
         body: JSON.stringify({ date, slot })
       });
@@ -801,11 +854,10 @@ export const DataProvider = ({ children }: { children: ReactNode }) => {
 
   const cancelBooking = async (alertId: string, reason?: string): Promise<void> => {
     try {
-      const response = await fetch(`${BASE_URL}/alerts/${alertId}/cancel`, {
+      const response = await authFetch(`${BASE_URL}/alerts/${alertId}/cancel`, {
         method: 'PUT',
         headers: { 
           'Content-Type': 'application/json',
-          'Authorization': `Bearer ${token}`
         },
         body: JSON.stringify({ reason: reason || '' })
       });
@@ -822,11 +874,10 @@ export const DataProvider = ({ children }: { children: ReactNode }) => {
 
   const rejectAlert = async (alertId: string, reason: string): Promise<void> => {
     try {
-      const response = await fetch(`${BASE_URL}/alerts/${alertId}/reject`, {
+      const response = await authFetch(`${BASE_URL}/alerts/${alertId}/reject`, {
         method: 'PUT',
         headers: { 
           'Content-Type': 'application/json',
-          'Authorization': `Bearer ${token}`
         },
         body: JSON.stringify({ reason })
       });
@@ -844,14 +895,12 @@ export const DataProvider = ({ children }: { children: ReactNode }) => {
   const lookupVehicle = async (vrn: string): Promise<any> => {
     let timeoutId: any = null;
     try {
+      // authFetch adds the (refreshed) access token
       const headers: Record<string, string> = {};
-      if (token) {
-        headers['Authorization'] = `Bearer ${token}`;
-      }
       const controller = new AbortController();
       timeoutId = setTimeout(() => controller.abort(), 12000);
 
-      const response = await fetch(`${BASE_URL}/vehicles/dvla/${encodeURIComponent(vrn)}`, {
+      const response = await authFetch(`${BASE_URL}/vehicles/dvla/${encodeURIComponent(vrn)}`, {
         method: 'GET',
         headers,
         signal: controller.signal
@@ -945,9 +994,8 @@ export const DataProvider = ({ children }: { children: ReactNode }) => {
 
   const fetchGarages = async (): Promise<Garage[]> => {
     try {
-      const response = await fetch(`${BASE_URL}/garages`, {
+      const response = await authFetch(`${BASE_URL}/garages`, {
         headers: {
-          'Authorization': `Bearer ${token}`
         }
       });
       const data = await response.json();
@@ -964,11 +1012,10 @@ export const DataProvider = ({ children }: { children: ReactNode }) => {
 
   const updateGarageStatus = async (garageId: string, status: string, verificationStatus?: string, rejectionReason?: string): Promise<void> => {
     try {
-      const response = await fetch(`${BASE_URL}/garages/${garageId}/status`, {
+      const response = await authFetch(`${BASE_URL}/garages/${garageId}/status`, {
         method: 'PUT',
         headers: {
           'Content-Type': 'application/json',
-          'Authorization': `Bearer ${token}`
         },
         body: JSON.stringify({ status, verificationStatus, rejectionReason })
       });
@@ -985,11 +1032,10 @@ export const DataProvider = ({ children }: { children: ReactNode }) => {
 
   const updateGarageDocumentStatus = async (garageId: string, docId: string, status: 'Verified' | 'Rejected' | 'Pending', rejectionReason?: string): Promise<any> => {
     try {
-      const response = await fetch(`${BASE_URL}/garages/${garageId}/documents/${docId}/status`, {
+      const response = await authFetch(`${BASE_URL}/garages/${garageId}/documents/${docId}/status`, {
         method: 'PUT',
         headers: {
           'Content-Type': 'application/json',
-          'Authorization': `Bearer ${token}`
         },
         body: JSON.stringify({ status, rejectionReason })
       });
@@ -1007,11 +1053,10 @@ export const DataProvider = ({ children }: { children: ReactNode }) => {
 
   const updateGarageProfile = async (garageId: string, updates: Partial<Garage>): Promise<any> => {
     try {
-      const response = await fetch(`${BASE_URL}/garages/${garageId}`, {
+      const response = await authFetch(`${BASE_URL}/garages/${garageId}`, {
         method: 'PUT',
         headers: {
           'Content-Type': 'application/json',
-          'Authorization': `Bearer ${token}`
         },
         body: JSON.stringify(updates)
       });
@@ -1031,9 +1076,7 @@ export const DataProvider = ({ children }: { children: ReactNode }) => {
     const garageId = user?.garageId || (decodeToken(token)?.garageId);
     if (!garageId) return null;
     try {
-      const res = await fetch(`${BASE_URL}/garages/${garageId}`, {
-        headers: token ? { 'Authorization': `Bearer ${token}` } : {}
-      });
+      const res = await authFetch(`${BASE_URL}/garages/${garageId}`);
       if (res.ok) {
         const data = await res.json();
         setCurrentGarage(data);
@@ -1047,11 +1090,10 @@ export const DataProvider = ({ children }: { children: ReactNode }) => {
 
   const uploadGarageDocument = async (garageId: string, documentName: string, fileUrl: string, documentType?: string) => {
     try {
-      const response = await fetch(`${BASE_URL}/garages/${garageId}/upload-documents`, {
+      const response = await authFetch(`${BASE_URL}/garages/${garageId}/upload-documents`, {
         method: 'POST',
         headers: {
           'Content-Type': 'application/json',
-          'Authorization': `Bearer ${token}`
         },
         body: JSON.stringify({ documentName, fileUrl, documentType })
       });
@@ -1071,11 +1113,10 @@ export const DataProvider = ({ children }: { children: ReactNode }) => {
     try {
       const garageId = user?.garageId || (decodeToken(token)?.garageId);
       if (!garageId) throw new Error('No garage associated with this account');
-      const response = await fetch(`${BASE_URL}/garages/${garageId}/submit-for-review`, {
+      const response = await authFetch(`${BASE_URL}/garages/${garageId}/submit-for-review`, {
         method: 'POST',
         headers: {
           'Content-Type': 'application/json',
-          'Authorization': `Bearer ${token}`
         }
       });
       const data = await response.json();
@@ -1131,11 +1172,10 @@ export const DataProvider = ({ children }: { children: ReactNode }) => {
 
   const addGarageService = async (garageId: string, serviceData: any): Promise<any> => {
     try {
-      const response = await fetch(`${BASE_URL}/garages/${garageId}/services`, {
+      const response = await authFetch(`${BASE_URL}/garages/${garageId}/services`, {
         method: 'POST',
         headers: {
           'Content-Type': 'application/json',
-          'Authorization': `Bearer ${token}`
         },
         body: JSON.stringify(serviceData)
       });
@@ -1153,11 +1193,10 @@ export const DataProvider = ({ children }: { children: ReactNode }) => {
 
   const updateGarageService = async (garageId: string, serviceId: string, updates: any): Promise<any> => {
     try {
-      const response = await fetch(`${BASE_URL}/garages/${garageId}/services/${serviceId}`, {
+      const response = await authFetch(`${BASE_URL}/garages/${garageId}/services/${serviceId}`, {
         method: 'PUT',
         headers: {
           'Content-Type': 'application/json',
-          'Authorization': `Bearer ${token}`
         },
         body: JSON.stringify(updates)
       });
@@ -1175,10 +1214,9 @@ export const DataProvider = ({ children }: { children: ReactNode }) => {
 
   const deleteGarageService = async (garageId: string, serviceId: string): Promise<any> => {
     try {
-      const response = await fetch(`${BASE_URL}/garages/${garageId}/services/${serviceId}`, {
+      const response = await authFetch(`${BASE_URL}/garages/${garageId}/services/${serviceId}`, {
         method: 'DELETE',
         headers: {
-          'Authorization': `Bearer ${token}`
         }
       });
       const data = await response.json();
@@ -1195,11 +1233,10 @@ export const DataProvider = ({ children }: { children: ReactNode }) => {
 
   const seedGarageDefaultServices = async (garageId: string): Promise<any> => {
     try {
-      const response = await fetch(`${BASE_URL}/garages/${garageId}/services/seed-defaults`, {
+      const response = await authFetch(`${BASE_URL}/garages/${garageId}/services/seed-defaults`, {
         method: 'POST',
         headers: {
           'Content-Type': 'application/json',
-          'Authorization': `Bearer ${token}`
         }
       });
       const data = await response.json();
@@ -1285,6 +1322,7 @@ export const DataProvider = ({ children }: { children: ReactNode }) => {
         setRefreshToken,
         setTokens,
         refreshAccessToken,
+        refreshSession,
         authFetch,
         logout,
         user,

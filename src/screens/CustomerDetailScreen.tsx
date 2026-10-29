@@ -28,7 +28,7 @@ if (Platform.OS === 'android' && UIManager.setLayoutAnimationEnabledExperimental
 
 export default function CustomerDetailScreen({ route, navigation }: any) {
   const { theme } = useAppTheme();
-  const { customers, vehicles, alerts, audits, rescheduleBooking, refreshData, token } = useAppValues();
+  const { customers, vehicles, alerts, audits, rescheduleBooking, refreshData, token, authFetch } = useAppValues();
 
   const customerId = route.params?.customerId || route.params?.customer?.id || route.params?.customer?._id;
   const passedCustomer = route.params?.customer || null;
@@ -49,8 +49,8 @@ export default function CustomerDetailScreen({ route, navigation }: any) {
     let isMounted = true;
     if (!passedCustomer && !localCustomer && customerId) {
       setLoadingCustomer(true);
-      fetch(`${BASE_URL}/customers/${customerId}`, {
-        headers: token ? { 'Authorization': `Bearer ${token}` } : {}
+      authFetch(`${BASE_URL}/customers/${customerId}`, {
+        headers: {}
       })
         .then(res => res.json())
         .then(data => {

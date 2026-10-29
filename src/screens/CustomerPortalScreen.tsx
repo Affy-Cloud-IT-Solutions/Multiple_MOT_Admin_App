@@ -27,7 +27,7 @@ if (Platform.OS === 'android' && UIManager.setLayoutAnimationEnabledExperimental
 
 export default function CustomerPortalScreen({ route, navigation }: any) {
   const { isDarkMode, theme, toggleTheme } = useAppTheme();
-  const { customers, vehicles, alerts, addAlert, addVehicle, addAudit, updateVehicleStatus, refreshData, setToken, setUser, token } = useAppValues();
+  const { customers, vehicles, alerts, addAlert, addVehicle, addAudit, updateVehicleStatus, refreshData, setToken, setUser, token, authFetch } = useAppValues();
 
   // Find active customer
   const customerId = route?.params?.customerId || 'c1';
@@ -68,10 +68,9 @@ export default function CustomerPortalScreen({ route, navigation }: any) {
 
   const fetchMakesList = async (search: string, pageNum: number) => {
     try {
-      const response = await fetch(`${BASE_URL}/vehicles/makes?page=${pageNum}&limit=20&search=${encodeURIComponent(search)}`, {
+      const response = await authFetch(`${BASE_URL}/vehicles/makes?page=${pageNum}&limit=20&search=${encodeURIComponent(search)}`, {
         headers: {
           'Content-Type': 'application/json',
-          Authorization: `Bearer ${token}`
         }
       });
       const data = await response.json();
@@ -88,10 +87,9 @@ export default function CustomerPortalScreen({ route, navigation }: any) {
   const fetchModelsListForMake = (makeVal: string) => async (search: string, pageNum: number) => {
     if (!makeVal) return { items: [], hasMore: false };
     try {
-      const response = await fetch(`${BASE_URL}/vehicles/models?make=${encodeURIComponent(makeVal)}&page=${pageNum}&limit=20&search=${encodeURIComponent(search)}`, {
+      const response = await authFetch(`${BASE_URL}/vehicles/models?make=${encodeURIComponent(makeVal)}&page=${pageNum}&limit=20&search=${encodeURIComponent(search)}`, {
         headers: {
           'Content-Type': 'application/json',
-          Authorization: `Bearer ${token}`
         }
       });
       const data = await response.json();
@@ -157,16 +155,12 @@ export default function CustomerPortalScreen({ route, navigation }: any) {
         {
           text: 'Mark Sold',
           style: 'destructive',
-          onPress: () => {
+          onPress: async () => {
             setLoadingAction(actionId);
-            setTimeout(() => {
-              setLoadingAction(null);
-
-              // Update vehicle status in shared DB
-              updateVehicleStatus(vehicleId, 'Sold');
-
-              // Add notification to Admin alerts
-              addAlert({
+            try {
+              // Update vehicle status in shared DB, then notify admins - only report success once both are saved
+              await updateVehicleStatus(vehicleId, 'Sold');
+              await addAlert({
                 type: 'SOLD',
                 customerName: `${customer.firstName} ${customer.lastName}`,
                 customerId: customer.id,
@@ -178,7 +172,11 @@ export default function CustomerPortalScreen({ route, navigation }: any) {
                 'Status Updated',
                 'Vehicle ownership updated. Automated reminders for this vehicle have been permanently deactivated.'
               );
-            }, 1200);
+            } catch (error: any) {
+              Alert.alert('Error', error?.message || 'Could not update the vehicle status. Please try again.');
+            } finally {
+              setLoadingAction(null);
+            }
           },
         },
       ]

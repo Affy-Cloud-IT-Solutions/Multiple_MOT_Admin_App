@@ -19,7 +19,7 @@ import { fonts } from '../theme/theme';
 
 export default function SuperAdminGaragesScreen({ navigation }: any) {
   const { theme } = useAppTheme();
-  const { garages, refreshData, updateGarageStatus, updateGarageDocumentStatus, updateGarageProfile, token } = useAppValues();
+  const { garages, refreshData, updateGarageStatus, updateGarageDocumentStatus, updateGarageProfile, token, authFetch } = useAppValues();
 
   const [searchQuery, setSearchQuery] = useState('');
   const [selectedFilter, setSelectedFilter] = useState<'ALL' | 'Approved' | 'Pending' | 'Suspended'>('ALL');
@@ -56,8 +56,8 @@ export default function SuperAdminGaragesScreen({ navigation }: any) {
   const fetchFullGarageDetails = async (garageId: string) => {
     setLoadingDetails(true);
     try {
-      const response = await fetch(`${BASE_URL}/garages/${garageId}`, {
-        headers: { Authorization: `Bearer ${token}` }
+      const response = await authFetch(`${BASE_URL}/garages/${garageId}`, {
+        headers: {}
       });
       if (response.ok) {
         const data = await response.json();
@@ -203,11 +203,10 @@ export default function SuperAdminGaragesScreen({ navigation }: any) {
   const handleStationStatusChange = async (garageId: string, stationId: string, status: 'Approved' | 'Rejected') => {
     setApprovingStationId(stationId);
     try {
-      const res = await fetch(`${BASE_URL}/garages/${garageId}/stations/${stationId}/status`, {
+      const res = await authFetch(`${BASE_URL}/garages/${garageId}/stations/${stationId}/status`, {
         method: 'PUT',
         headers: {
           'Content-Type': 'application/json',
-          Authorization: `Bearer ${token}`
         },
         body: JSON.stringify({ status })
       });
