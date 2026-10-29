@@ -15,6 +15,7 @@ import {
 import MaterialCommunityIcons from 'react-native-vector-icons/MaterialCommunityIcons';
 import { useAppTheme } from '../context/ThemeContext';
 import { useAppValues, Garage, BASE_URL } from '../context/DataContext';
+import { fonts } from '../theme/theme';
 
 export default function SuperAdminGaragesScreen({ navigation }: any) {
   const { theme } = useAppTheme();
@@ -516,7 +517,7 @@ export default function SuperAdminGaragesScreen({ navigation }: any) {
                         </Text>
                       </View>
                       <View style={{ backgroundColor: selectedGarage.verificationStatus === 'Verified' ? '#10B98120' : '#F59E0B20', paddingHorizontal: 8, paddingVertical: 2, borderRadius: 6 }}>
-                        <Text style={{ fontSize: 11, fontWeight: '700', color: selectedGarage.verificationStatus === 'Verified' ? '#10B981' : '#F59E0B' }}>
+                        <Text style={{ fontFamily: fonts.bold, fontSize: 11, color: selectedGarage.verificationStatus === 'Verified' ? '#10B981' : '#F59E0B' }}>
                           {selectedGarage.verificationStatus || 'Pending Review'}
                         </Text>
                       </View>
@@ -524,19 +525,19 @@ export default function SuperAdminGaragesScreen({ navigation }: any) {
 
                     <View style={{ flexDirection: 'row', flexWrap: 'wrap', gap: 8, marginBottom: 10 }}>
                       <View style={{ flex: 1, minWidth: 120, backgroundColor: theme.colors.card, padding: 8, borderRadius: 6, borderWidth: 1, borderColor: theme.colors.border }}>
-                        <Text style={{ fontSize: 10, color: theme.colors.placeholder }}>DVLA VTS Site #</Text>
-                        <Text style={{ fontSize: 13, fontWeight: '700', color: theme.colors.text }}>{selectedGarage.vtsNumber || 'VTS-Pending'}</Text>
+                        <Text style={{ fontFamily: fonts.regular, fontSize: 10, color: theme.colors.placeholder }}>DVLA VTS Site #</Text>
+                        <Text style={{ fontFamily: fonts.bold, fontSize: 13, color: theme.colors.text }}>{selectedGarage.vtsNumber || 'VTS-Pending'}</Text>
                       </View>
                       <View style={{ flex: 1, minWidth: 120, backgroundColor: theme.colors.card, padding: 8, borderRadius: 6, borderWidth: 1, borderColor: theme.colors.border }}>
-                        <Text style={{ fontSize: 10, color: theme.colors.placeholder }}>MOT AE #</Text>
-                        <Text style={{ fontSize: 13, fontWeight: '700', color: theme.colors.text }}>{selectedGarage.motAuthorisedExaminerNumber || 'AE-Pending'}</Text>
+                        <Text style={{ fontFamily: fonts.regular, fontSize: 10, color: theme.colors.placeholder }}>MOT AE #</Text>
+                        <Text style={{ fontFamily: fonts.bold, fontSize: 13, color: theme.colors.text }}>{selectedGarage.motAuthorisedExaminerNumber || 'AE-Pending'}</Text>
                       </View>
                     </View>
 
                     {selectedGarage.businessRegistrationNumber ? (
                       <View style={{ backgroundColor: theme.colors.card, padding: 8, borderRadius: 6, borderWidth: 1, borderColor: theme.colors.border, marginBottom: 10 }}>
-                        <Text style={{ fontSize: 10, color: theme.colors.placeholder }}>Companies House / Business Reg #</Text>
-                        <Text style={{ fontSize: 13, fontWeight: '700', color: theme.colors.text }}>{selectedGarage.businessRegistrationNumber}</Text>
+                        <Text style={{ fontFamily: fonts.regular, fontSize: 10, color: theme.colors.placeholder }}>Companies House / Business Reg #</Text>
+                        <Text style={{ fontFamily: fonts.bold, fontSize: 13, color: theme.colors.text }}>{selectedGarage.businessRegistrationNumber}</Text>
                       </View>
                     ) : null}
 
@@ -545,9 +546,9 @@ export default function SuperAdminGaragesScreen({ navigation }: any) {
                       <View style={{ backgroundColor: '#EF444415', borderWidth: 1, borderColor: '#EF444440', borderRadius: 8, padding: 10, marginBottom: 10 }}>
                         <View style={{ flexDirection: 'row', alignItems: 'center', marginBottom: 4 }}>
                           <MaterialCommunityIcons name="alert-circle" size={16} color="#EF4444" style={{ marginRight: 6 }} />
-                          <Text style={{ fontSize: 12, fontWeight: '700', color: '#EF4444' }}>Application Rejected</Text>
+                          <Text style={{ fontFamily: fonts.bold, fontSize: 12, color: '#EF4444' }}>Application Rejected</Text>
                         </View>
-                        <Text style={{ fontSize: 11, color: theme.colors.text }}>
+                        <Text style={{ fontFamily: fonts.regular, fontSize: 11, color: theme.colors.text }}>
                           Reason: {selectedGarage.rejectionReason || 'Documentation or verification criteria not verified.'}
                         </Text>
                       </View>
@@ -555,14 +556,14 @@ export default function SuperAdminGaragesScreen({ navigation }: any) {
 
                     {/* Verification Documents List */}
                     <View style={{ flexDirection: 'row', justifyContent: 'space-between', alignItems: 'center', marginBottom: 6 }}>
-                      <Text style={{ fontSize: 12, fontWeight: '700', color: theme.colors.text }}>
+                      <Text style={{ fontFamily: fonts.bold, fontSize: 12, color: theme.colors.text }}>
                         Submitted Certificates ({selectedGarage.verificationDocuments?.length || 0})
                       </Text>
-                      <Text style={{ fontSize: 10, color: theme.colors.placeholder }}>Tap to inspect & verify</Text>
+                      <Text style={{ fontFamily: fonts.regular, fontSize: 10, color: theme.colors.placeholder }}>Tap to inspect & verify</Text>
                     </View>
 
                     {(!selectedGarage.verificationDocuments || selectedGarage.verificationDocuments.length === 0) ? (
-                      <Text style={{ fontSize: 11, color: theme.colors.placeholder, marginVertical: 4 }}>No legal certificates attached.</Text>
+                      <Text style={{ fontFamily: fonts.regular, fontSize: 11, color: theme.colors.placeholder, marginVertical: 4 }}>No legal certificates attached.</Text>
                     ) : (
                       selectedGarage.verificationDocuments.map((doc: any, dIdx: number) => {
                         const docStatus = doc.status || 'Pending';
@@ -591,8 +592,8 @@ export default function SuperAdminGaragesScreen({ navigation }: any) {
                               style={{ marginRight: 10 }} 
                             />
                             <View style={{ flex: 1 }}>
-                              <Text style={{ fontSize: 13, fontWeight: '700', color: theme.colors.text }}>{doc.name}</Text>
-                              <Text style={{ fontSize: 10.5, color: theme.colors.placeholder, marginTop: 2 }}>
+                              <Text style={{ fontFamily: fonts.bold, fontSize: 13, color: theme.colors.text }}>{doc.name}</Text>
+                              <Text style={{ fontFamily: fonts.regular, fontSize: 10.5, color: theme.colors.placeholder, marginTop: 2 }}>
                                 Uploaded: {doc.uploadDate ? new Date(doc.uploadDate).toLocaleDateString() : 'Recent'}
                               </Text>
                             </View>
@@ -605,8 +606,8 @@ export default function SuperAdminGaragesScreen({ navigation }: any) {
                               marginRight: 6
                             }}>
                               <Text style={{
+                                fontFamily: fonts.bold,
                                 fontSize: 10.5,
-                                fontWeight: '700',
                                 color: isDocVerified ? '#10B981' : isDocRejected ? '#EF4444' : '#F59E0B'
                               }}>
                                 {docStatus}
@@ -747,14 +748,14 @@ export default function SuperAdminGaragesScreen({ navigation }: any) {
                     <View style={{ flexDirection: 'row', justifyContent: 'space-between', alignItems: 'center', marginBottom: 10 }}>
                       <Text style={[styles.infoSectionTitle, { color: theme.colors.text }]}>MOT Testing Stations</Text>
                       <View style={{ backgroundColor: theme.colors.primary + '20', paddingHorizontal: 8, paddingVertical: 2, borderRadius: 6 }}>
-                        <Text style={{ fontSize: 11, fontWeight: '700', color: theme.colors.primary }}>
+                        <Text style={{ fontFamily: fonts.bold, fontSize: 11, color: theme.colors.primary }}>
                           {(garageDetails?.stations || []).filter((s: any) => s.status === 'Approved').length} Approved
                         </Text>
                       </View>
                     </View>
 
                     {(!garageDetails?.stations || garageDetails.stations.length === 0) ? (
-                      <Text style={{ fontSize: 12, color: theme.colors.placeholder }}>No stations configured yet.</Text>
+                      <Text style={{ fontFamily: fonts.regular, fontSize: 12, color: theme.colors.placeholder }}>No stations configured yet.</Text>
                     ) : (
                       garageDetails.stations.map((st: any) => {
                         const isPending = st.status === 'Pending';
@@ -775,8 +776,8 @@ export default function SuperAdminGaragesScreen({ navigation }: any) {
                           >
                             <View style={{ flexDirection: 'row', justifyContent: 'space-between', alignItems: 'center' }}>
                               <View style={{ flex: 1 }}>
-                                <Text style={{ fontSize: 13, fontWeight: '700', color: theme.colors.text }}>{st.name}</Text>
-                                <Text style={{ fontSize: 11, color: theme.colors.placeholder, marginTop: 2 }}>
+                                <Text style={{ fontFamily: fonts.bold, fontSize: 13, color: theme.colors.text }}>{st.name}</Text>
+                                <Text style={{ fontFamily: fonts.regular, fontSize: 11, color: theme.colors.placeholder, marginTop: 2 }}>
                                   {st.type || 'Class 4 MOT Bay'} • {st.slotDuration || 40} mins/slot
                                 </Text>
                               </View>
@@ -790,8 +791,8 @@ export default function SuperAdminGaragesScreen({ navigation }: any) {
                               >
                                 <Text
                                   style={{
+                                    fontFamily: fonts.bold,
                                     fontSize: 10.5,
-                                    fontWeight: '700',
                                     color: isApproved ? '#10B981' : isPending ? '#F59E0B' : '#EF4444',
                                   }}
                                 >
@@ -820,7 +821,7 @@ export default function SuperAdminGaragesScreen({ navigation }: any) {
                                     )
                                   }
                                 >
-                                  <Text style={{ fontSize: 11.5, fontWeight: '700', color: '#EF4444' }}>Reject</Text>
+                                  <Text style={{ fontFamily: fonts.bold, fontSize: 11.5, color: '#EF4444' }}>Reject</Text>
                                 </TouchableOpacity>
                                 <TouchableOpacity
                                   style={{
@@ -841,7 +842,7 @@ export default function SuperAdminGaragesScreen({ navigation }: any) {
                                   {isProcessing ? (
                                     <ActivityIndicator size="small" color="#FFFFFF" />
                                   ) : (
-                                    <Text style={{ fontSize: 11.5, fontWeight: '700', color: '#FFFFFF' }}>
+                                    <Text style={{ fontFamily: fonts.bold, fontSize: 11.5, color: '#FFFFFF' }}>
                                       Approve Station
                                     </Text>
                                   )}
@@ -914,7 +915,7 @@ export default function SuperAdminGaragesScreen({ navigation }: any) {
 
             {selectedDoc && (
               <View style={{ marginTop: 12 }}>
-                <Text style={{ fontSize: 16, fontWeight: '800', color: theme.colors.text }}>{selectedDoc.name}</Text>
+                <Text style={{ fontFamily: fonts.extraBold, fontSize: 16, color: theme.colors.text }}>{selectedDoc.name}</Text>
                 
                 <View style={{ flexDirection: 'row', gap: 8, marginVertical: 8 }}>
                   <View style={{ 
@@ -924,8 +925,8 @@ export default function SuperAdminGaragesScreen({ navigation }: any) {
                     borderRadius: 6 
                   }}>
                     <Text style={{ 
+                      fontFamily: fonts.bold,
                       fontSize: 11, 
-                      fontWeight: '700', 
                       color: selectedDoc.status === 'Verified' ? '#10B981' : selectedDoc.status === 'Rejected' ? '#EF4444' : '#F59E0B' 
                     }}>
                       Status: {selectedDoc.status || 'Pending'}
@@ -934,8 +935,8 @@ export default function SuperAdminGaragesScreen({ navigation }: any) {
                 </View>
 
                 <View style={{ backgroundColor: theme.colors.background, padding: 10, borderRadius: 8, marginVertical: 8 }}>
-                  <Text style={{ fontSize: 11, color: theme.colors.placeholder }}>Certificate File Link / URL:</Text>
-                  <Text style={{ fontSize: 12, color: theme.colors.text, marginTop: 2 }} numberOfLines={2}>
+                  <Text style={{ fontFamily: fonts.regular, fontSize: 11, color: theme.colors.placeholder }}>Certificate File Link / URL:</Text>
+                  <Text style={{ fontFamily: fonts.medium, fontSize: 12, color: theme.colors.text, marginTop: 2 }} numberOfLines={2}>
                     {selectedDoc.fileUrl}
                   </Text>
                 </View>
@@ -953,7 +954,7 @@ export default function SuperAdminGaragesScreen({ navigation }: any) {
                   }}
                 >
                   <MaterialCommunityIcons name="open-in-new" size={18} color="#FFFFFF" style={{ marginRight: 6 }} />
-                  <Text style={{ color: '#FFFFFF', fontWeight: '700', fontSize: 13 }}>Open & View Document File</Text>
+                  <Text style={{ fontFamily: fonts.bold, color: '#FFFFFF', fontSize: 13 }}>Open & View Document File</Text>
                 </TouchableOpacity>
 
                 {selectedGarage?.status === 'Pending' && (
@@ -978,7 +979,7 @@ export default function SuperAdminGaragesScreen({ navigation }: any) {
                       ) : (
                         <>
                           <MaterialCommunityIcons name="close-circle-outline" size={18} color="#EF4444" style={{ marginRight: 4 }} />
-                          <Text style={{ color: '#EF4444', fontWeight: '700', fontSize: 12.5 }}>Reject Doc</Text>
+                          <Text style={{ fontFamily: fonts.bold, color: '#EF4444', fontSize: 12.5 }}>Reject Doc</Text>
                         </>
                       )}
                     </TouchableOpacity>
@@ -1001,7 +1002,7 @@ export default function SuperAdminGaragesScreen({ navigation }: any) {
                       ) : (
                         <>
                           <MaterialCommunityIcons name="check-circle-outline" size={18} color="#FFFFFF" style={{ marginRight: 4 }} />
-                          <Text style={{ color: '#FFFFFF', fontWeight: '700', fontSize: 12.5 }}>Verify Doc</Text>
+                          <Text style={{ fontFamily: fonts.bold, color: '#FFFFFF', fontSize: 12.5 }}>Verify Doc</Text>
                         </>
                       )}
                     </TouchableOpacity>
@@ -1032,11 +1033,11 @@ export default function SuperAdminGaragesScreen({ navigation }: any) {
               </TouchableOpacity>
             </View>
 
-            <Text style={{ fontSize: 12, color: theme.colors.placeholder, marginVertical: 8 }}>
+            <Text style={{ fontFamily: fonts.regular, fontSize: 12, color: theme.colors.placeholder, marginVertical: 8 }}>
               Select or specify the regulatory reason for rejection. This reason will be shown to the garage admin upon login.
             </Text>
 
-            <Text style={{ fontSize: 11, fontWeight: '700', color: theme.colors.text, marginBottom: 6 }}>
+            <Text style={{ fontFamily: fonts.bold, fontSize: 11, color: theme.colors.text, marginBottom: 6 }}>
               Quick Common Reasons:
             </Text>
 
@@ -1067,7 +1068,7 @@ export default function SuperAdminGaragesScreen({ navigation }: any) {
                       color={isSelected ? theme.colors.primary : theme.colors.placeholder} 
                       style={{ marginRight: 6 }} 
                     />
-                    <Text style={{ fontSize: 11.5, color: isSelected ? theme.colors.primary : theme.colors.text, flex: 1 }}>
+                    <Text style={{ fontFamily: fonts.medium, fontSize: 11.5, color: isSelected ? theme.colors.primary : theme.colors.text, flex: 1 }}>
                       {preset}
                     </Text>
                   </TouchableOpacity>
@@ -1075,7 +1076,7 @@ export default function SuperAdminGaragesScreen({ navigation }: any) {
               })}
             </ScrollView>
 
-            <Text style={{ fontSize: 11, fontWeight: '700', color: theme.colors.text, marginTop: 8, marginBottom: 4 }}>
+            <Text style={{ fontFamily: fonts.bold, fontSize: 11, color: theme.colors.text, marginTop: 8, marginBottom: 4 }}>
               Custom Rejection Note / Guidance:
             </Text>
             <TextInput
@@ -1086,6 +1087,7 @@ export default function SuperAdminGaragesScreen({ navigation }: any) {
               multiline
               numberOfLines={3}
               style={{
+                fontFamily: fonts.regular,
                 backgroundColor: theme.colors.background,
                 borderColor: theme.colors.border,
                 borderWidth: 1,
@@ -1110,7 +1112,7 @@ export default function SuperAdminGaragesScreen({ navigation }: any) {
                   alignItems: 'center'
                 }}
               >
-                <Text style={{ fontSize: 13, color: theme.colors.placeholder, fontWeight: '700' }}>Cancel</Text>
+                <Text style={{ fontFamily: fonts.bold, fontSize: 13, color: theme.colors.placeholder }}>Cancel</Text>
               </TouchableOpacity>
 
               <TouchableOpacity
@@ -1131,7 +1133,7 @@ export default function SuperAdminGaragesScreen({ navigation }: any) {
                 ) : (
                   <>
                     <MaterialCommunityIcons name="close-octagon-outline" size={18} color="#FFFFFF" style={{ marginRight: 6 }} />
-                    <Text style={{ fontSize: 13, color: '#FFFFFF', fontWeight: '800' }}>Confirm Rejection</Text>
+                    <Text style={{ fontFamily: fonts.extraBold, fontSize: 13, color: '#FFFFFF' }}>Confirm Rejection</Text>
                   </>
                 )}
               </TouchableOpacity>
@@ -1153,13 +1155,13 @@ const styles = StyleSheet.create({
     paddingBottom: 10,
   },
   title: {
+    fontFamily: fonts.extraBold,
     fontSize: 24,
-    fontWeight: '800',
     letterSpacing: -0.5,
   },
   subtitle: {
+    fontFamily: fonts.regular,
     fontSize: 13,
-    fontWeight: '400',
     marginTop: 2,
   },
   searchSection: {
@@ -1176,6 +1178,7 @@ const styles = StyleSheet.create({
     height: 44,
   },
   searchInput: {
+    fontFamily: fonts.regular,
     flex: 1,
     fontSize: 14,
     marginLeft: 8,
@@ -1194,8 +1197,8 @@ const styles = StyleSheet.create({
     borderWidth: 1,
   },
   filterChipText: {
+    fontFamily: fonts.bold,
     fontSize: 12,
-    fontWeight: '700',
   },
   listContent: {
     paddingHorizontal: 16,
@@ -1210,10 +1213,11 @@ const styles = StyleSheet.create({
     gap: 8,
   },
   emptyStateTitle: {
+    fontFamily: fonts.bold,
     fontSize: 16,
-    fontWeight: '700',
   },
   emptyStateSubtitle: {
+    fontFamily: fonts.regular,
     fontSize: 13,
     textAlign: 'center',
   },
@@ -1236,8 +1240,8 @@ const styles = StyleSheet.create({
     justifyContent: 'center',
   },
   garageName: {
+    fontFamily: fonts.bold,
     fontSize: 15.5,
-    fontWeight: '700',
     flex: 1,
     marginRight: 8,
   },
@@ -1247,8 +1251,8 @@ const styles = StyleSheet.create({
     borderRadius: 6,
   },
   statusBadgeText: {
+    fontFamily: fonts.bold,
     fontSize: 11,
-    fontWeight: '700',
   },
   locationRow: {
     flexDirection: 'row',
@@ -1256,6 +1260,7 @@ const styles = StyleSheet.create({
     marginTop: 3,
   },
   locationText: {
+    fontFamily: fonts.regular,
     fontSize: 12,
     flex: 1,
     lineHeight: 16,
@@ -1272,6 +1277,7 @@ const styles = StyleSheet.create({
     gap: 4,
   },
   contactText: {
+    fontFamily: fonts.regular,
     fontSize: 11.5,
   },
   cardFooter: {
@@ -1287,8 +1293,8 @@ const styles = StyleSheet.create({
     gap: 4,
   },
   metricChipText: {
+    fontFamily: fonts.semiBold,
     fontSize: 11.5,
-    fontWeight: '600',
   },
   modalOverlay: {
     flex: 1,
@@ -1309,10 +1315,11 @@ const styles = StyleSheet.create({
     borderBottomWidth: 1,
   },
   modalTitle: {
+    fontFamily: fonts.extraBold,
     fontSize: 18,
-    fontWeight: '800',
   },
   modalSubtitle: {
+    fontFamily: fonts.regular,
     fontSize: 12,
     marginTop: 2,
   },
@@ -1331,10 +1338,11 @@ const styles = StyleSheet.create({
     marginBottom: 14,
   },
   statusBannerTitle: {
+    fontFamily: fonts.extraBold,
     fontSize: 13,
-    fontWeight: '800',
   },
   statusBannerSubtitle: {
+    fontFamily: fonts.regular,
     fontSize: 11.5,
     marginTop: 2,
   },
@@ -1345,8 +1353,8 @@ const styles = StyleSheet.create({
     marginBottom: 12,
   },
   infoSectionTitle: {
+    fontFamily: fonts.bold,
     fontSize: 13,
-    fontWeight: '700',
     marginBottom: 8,
     textTransform: 'uppercase',
     letterSpacing: 0.3,
@@ -1361,6 +1369,7 @@ const styles = StyleSheet.create({
     marginTop: 1,
   },
   infoText: {
+    fontFamily: fonts.regular,
     fontSize: 13,
     flex: 1,
   },
@@ -1370,15 +1379,16 @@ const styles = StyleSheet.create({
     paddingVertical: 6,
   },
   staffNameText: {
+    fontFamily: fonts.semiBold,
     fontSize: 13,
-    fontWeight: '600',
   },
   staffEmailText: {
+    fontFamily: fonts.regular,
     fontSize: 11.5,
   },
   actionsHeading: {
+    fontFamily: fonts.bold,
     fontSize: 13,
-    fontWeight: '700',
     marginTop: 8,
     marginBottom: 10,
     textTransform: 'uppercase',
@@ -1397,9 +1407,9 @@ const styles = StyleSheet.create({
     gap: 8,
   },
   modalActionBtnText: {
+    fontFamily: fonts.bold,
     color: '#FFFFFF',
     fontSize: 14,
-    fontWeight: '700',
   },
   garageAvatarImg: {
     width: '100%',
@@ -1440,9 +1450,9 @@ const styles = StyleSheet.create({
     borderRadius: 10,
   },
   modalCarouselTagText: {
+    fontFamily: fonts.bold,
     color: '#FFFFFF',
     fontSize: 11,
-    fontWeight: 'bold',
   },
   saveGalleryBtn: {
     paddingHorizontal: 12,
@@ -1450,9 +1460,9 @@ const styles = StyleSheet.create({
     borderRadius: 6,
   },
   saveGalleryBtnText: {
+    fontFamily: fonts.bold,
     color: '#FFFFFF',
     fontSize: 12,
-    fontWeight: 'bold',
   },
   adminGalleryThumbBox: {
     width: 90,
@@ -1490,13 +1500,13 @@ const styles = StyleSheet.create({
     borderRadius: 3,
   },
   adminGalleryIndexText: {
+    fontFamily: fonts.bold,
     color: '#FFFFFF',
     fontSize: 8,
-    fontWeight: 'bold',
   },
   presetSectionLabel: {
+    fontFamily: fonts.semiBold,
     fontSize: 11,
-    fontWeight: '600',
     marginTop: 10,
     marginBottom: 6,
   },
@@ -1513,8 +1523,8 @@ const styles = StyleSheet.create({
     borderWidth: 1,
   },
   presetChipText: {
+    fontFamily: fonts.semiBold,
     fontSize: 10,
-    fontWeight: '600',
   },
   addImageInputRow: {
     flexDirection: 'row',
@@ -1522,6 +1532,7 @@ const styles = StyleSheet.create({
     alignItems: 'center',
   },
   imageUrlInput: {
+    fontFamily: fonts.regular,
     flex: 1,
     height: 38,
     borderWidth: 1,
@@ -1538,9 +1549,9 @@ const styles = StyleSheet.create({
     gap: 4,
   },
   addImageBtnText: {
+    fontFamily: fonts.bold,
     color: '#FFFFFF',
     fontSize: 12,
-    fontWeight: 'bold',
   },
   docModalContent: {
     margin: 20,

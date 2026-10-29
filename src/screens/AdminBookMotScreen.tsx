@@ -13,6 +13,7 @@ import {
 import MaterialCommunityIcons from 'react-native-vector-icons/MaterialCommunityIcons';
 import Toast from 'react-native-toast-message';
 import { useAppTheme } from '../context/ThemeContext';
+import { fonts } from '../theme/theme';
 import { useAppValues, BASE_URL } from '../context/DataContext';
 import { SafeAreaView } from 'react-native-safe-area-context';
 
@@ -533,7 +534,7 @@ export default function AdminBookMotScreen({ route, navigation }: any) {
           {/* Customer Vehicles Selector Strip (If Multiple Vehicles) */}
           {customerVehicles.length > 1 && (
             <View style={{ marginBottom: 14 }}>
-              <Text style={{ fontSize: 11, fontWeight: '700', color: theme.colors.placeholder, textTransform: 'uppercase', marginBottom: 8, letterSpacing: 0.5 }}>
+              <Text style={{ fontSize: 11, fontFamily: fonts.bold, color: theme.colors.placeholder, textTransform: 'uppercase', marginBottom: 8, letterSpacing: 0.5 }}>
                 Select Vehicle to Book ({customerVehicles.length} Registered):
               </Text>
               <ScrollView horizontal showsHorizontalScrollIndicator={false} contentContainerStyle={{ gap: 8, paddingBottom: 2 }}>
@@ -561,7 +562,7 @@ export default function AdminBookMotScreen({ route, navigation }: any) {
                       ]}
                     >
                       <View style={{ flexDirection: 'row', alignItems: 'center', justifyContent: 'space-between' }}>
-                        <Text style={{ fontSize: 12, fontWeight: '800', color: theme.colors.text }}>
+                        <Text style={{ fontSize: 12, fontFamily: fonts.extraBold, color: theme.colors.text }}>
                           {v.registrationNumber}
                         </Text>
                         {isSel && (
@@ -574,21 +575,21 @@ export default function AdminBookMotScreen({ route, navigation }: any) {
                       {isBk ? (
                         <View style={{ backgroundColor: theme.colors.secondary + '20', paddingHorizontal: 5, paddingVertical: 1.5, borderRadius: 3, marginTop: 4, flexDirection: 'row', alignItems: 'center' }}>
                           <MaterialCommunityIcons name="calendar-check" size={10} color={theme.colors.secondary} style={{ marginRight: 3 }} />
-                          <Text style={{ fontSize: 9, fontWeight: 'bold', color: theme.colors.secondary }}>
+                          <Text style={{ fontSize: 9, fontFamily: fonts.bold, color: theme.colors.secondary }}>
                             Booked: {formatBookingDate(vBooking.date)}
                           </Text>
                         </View>
                       ) : isPend ? (
                         <View style={{ backgroundColor: theme.colors.warning + '20', paddingHorizontal: 5, paddingVertical: 1.5, borderRadius: 3, marginTop: 4, flexDirection: 'row', alignItems: 'center' }}>
                           <MaterialCommunityIcons name="clock-outline" size={10} color={theme.colors.warning} style={{ marginRight: 3 }} />
-                          <Text style={{ fontSize: 9, fontWeight: 'bold', color: theme.colors.warning }}>
+                          <Text style={{ fontSize: 9, fontFamily: fonts.bold, color: theme.colors.warning }}>
                             Pending Approval
                           </Text>
                         </View>
                       ) : (
                         <View style={{ backgroundColor: '#10B98120', paddingHorizontal: 5, paddingVertical: 1.5, borderRadius: 3, marginTop: 4, flexDirection: 'row', alignItems: 'center' }}>
                           <MaterialCommunityIcons name="check-circle-outline" size={10} color="#10B981" style={{ marginRight: 3 }} />
-                          <Text style={{ fontSize: 9, fontWeight: 'bold', color: '#10B981' }}>
+                          <Text style={{ fontSize: 9, fontFamily: fonts.bold, color: '#10B981' }}>
                             Available
                           </Text>
                         </View>
@@ -629,7 +630,7 @@ export default function AdminBookMotScreen({ route, navigation }: any) {
                 ) : null}
                 <View style={[styles.specChip, { backgroundColor: '#10B98115', borderColor: '#10B98140' }]}>
                   <View style={[styles.statusDot, { backgroundColor: '#10B981' }]} />
-                  <Text style={[styles.specChipText, { color: '#10B981', fontWeight: '700' }]}>
+                  <Text style={[styles.specChipText, { color: '#10B981', fontFamily: fonts.bold }]}>
                     {selectedVehicle?.status || 'Active'}
                   </Text>
                 </View>
@@ -642,19 +643,19 @@ export default function AdminBookMotScreen({ route, navigation }: any) {
             <View style={[styles.existingBookingBanner, { backgroundColor: theme.colors.secondary + '14', borderColor: theme.colors.secondary + '40' }]}>
               <View style={{ flexDirection: 'row', alignItems: 'center' }}>
                 <MaterialCommunityIcons name="calendar-clock" size={18} color={theme.colors.secondary} style={{ marginRight: 8 }} />
-                <Text style={{ fontSize: 13, fontWeight: 'bold', color: theme.colors.text, flex: 1 }}>
+                <Text style={{ fontSize: 13, fontFamily: fonts.bold, color: theme.colors.text, flex: 1 }}>
                   Vehicle Already Has A Booked MOT Slot
                 </Text>
                 <View style={[styles.bookingStatusTag, { backgroundColor: existingBooking.status === 'Approved' ? theme.colors.secondary : theme.colors.warning }]}>
-                  <Text style={{ fontSize: 10, fontWeight: 'bold', color: '#FFFFFF' }}>
+                  <Text style={{ fontSize: 10, fontFamily: fonts.bold, color: '#FFFFFF' }}>
                     {existingBooking.status === 'Approved' ? 'Confirmed' : 'Pending'}
                   </Text>
                 </View>
               </View>
               <Text style={{ fontSize: 12, color: theme.colors.text, marginTop: 4 }}>
-                Existing Appointment: <Text style={{ fontWeight: 'bold' }}>{formatBookingDate(existingBooking.date)}</Text> at <Text style={{ fontWeight: 'bold' }}>{existingBooking.slotTime || 'Slot'}</Text>
+                Existing Appointment: <Text style={{ fontFamily: fonts.bold }}>{formatBookingDate(existingBooking.date)}</Text> at <Text style={{ fontFamily: fonts.bold }}>{existingBooking.slotTime || 'Slot'}</Text>
               </Text>
-              <Text style={{ fontSize: 11, color: theme.colors.secondary, marginTop: 4, fontWeight: '600' }}>
+              <Text style={{ fontSize: 11, color: theme.colors.secondary, marginTop: 4, fontFamily: fonts.semiBold }}>
                 ℹ️ Proceeding with a new slot below will reschedule / update this vehicle's appointment.
               </Text>
             </View>
@@ -738,7 +739,7 @@ export default function AdminBookMotScreen({ route, navigation }: any) {
           </View>
           {selectedServices.length > 0 && (
             <View style={{ backgroundColor: theme.colors.primary + '18', paddingHorizontal: 8, paddingVertical: 3, borderRadius: 6 }}>
-              <Text style={{ fontSize: 11, fontWeight: '700', color: theme.colors.primary }}>
+              <Text style={{ fontSize: 11, fontFamily: fonts.bold, color: theme.colors.primary }}>
                 Total £{totalServicePrice.toFixed(2)} • ~{totalServiceDuration}m
               </Text>
             </View>
@@ -748,12 +749,12 @@ export default function AdminBookMotScreen({ route, navigation }: any) {
         {loadingServices ? (
           <View style={[styles.emptyNoticeCard, { backgroundColor: theme.colors.card, borderColor: theme.colors.border, marginBottom: 14 }]}>
             <ActivityIndicator size="small" color={theme.colors.secondary} style={{ marginRight: 8 }} />
-            <Text style={{ color: theme.colors.placeholder, fontSize: 13 }}>Loading available services...</Text>
+            <Text style={{ color: theme.colors.placeholder, fontSize: 13, fontFamily: fonts.regular }}>Loading available services...</Text>
           </View>
         ) : garageServices.length === 0 ? (
           <View style={[styles.emptyNoticeCard, { backgroundColor: theme.colors.card, borderColor: theme.colors.border, marginBottom: 14 }]}>
             <MaterialCommunityIcons name="alert-circle-outline" size={18} color={theme.colors.placeholder} style={{ marginRight: 8 }} />
-            <Text style={{ color: theme.colors.placeholder, fontSize: 13 }}>No services configured for this garage yet.</Text>
+            <Text style={{ color: theme.colors.placeholder, fontSize: 13, fontFamily: fonts.regular }}>No services configured for this garage yet.</Text>
           </View>
         ) : (
           <ScrollView
@@ -791,17 +792,17 @@ export default function AdminBookMotScreen({ route, navigation }: any) {
                       <Text
                         style={[
                           styles.serviceChipTitle,
-                          { color: theme.colors.text, fontWeight: isSel ? '800' : '600' }
+                          { color: theme.colors.text, fontFamily: isSel ? fonts.extraBold : fonts.semiBold }
                         ]}
                         numberOfLines={1}
                       >
                         {srv.name}
                       </Text>
                       <View style={{ flexDirection: 'row', alignItems: 'center', marginTop: 2 }}>
-                        <Text style={{ fontSize: 11, fontWeight: '700', color: theme.colors.primary }}>
+                        <Text style={{ fontSize: 11, fontFamily: fonts.bold, color: theme.colors.primary }}>
                           £{srv.price}
                         </Text>
-                        <Text style={{ fontSize: 10, color: theme.colors.placeholder, marginLeft: 6 }}>
+                        <Text style={{ fontSize: 10, fontFamily: fonts.regular, color: theme.colors.placeholder, marginLeft: 6 }}>
                           • {srv.duration || 45} mins
                         </Text>
                       </View>
@@ -877,7 +878,7 @@ export default function AdminBookMotScreen({ route, navigation }: any) {
                     style={[
                       styles.dayCellText,
                       { color: theme.colors.text },
-                      isSelected && { color: '#FFFFFF', fontWeight: 'bold' },
+                      isSelected && { color: '#FFFFFF', fontFamily: fonts.bold },
                       !selectable && { color: theme.colors.placeholder + '40' }
                     ]}
                   >
@@ -909,25 +910,25 @@ export default function AdminBookMotScreen({ route, navigation }: any) {
           <View style={[styles.emptyNoticeCard, { backgroundColor: '#10B98110', borderColor: '#10B98130', flexDirection: 'column', alignItems: 'flex-start', padding: 14, marginBottom: 16 }]}>
             <View style={{ flexDirection: 'row', alignItems: 'center', marginBottom: 6 }}>
               <MaterialCommunityIcons name="calendar-check" size={20} color="#10B981" style={{ marginRight: 8 }} />
-              <Text style={{ fontSize: 14, fontWeight: '700', color: '#10B981' }}>
+              <Text style={{ fontSize: 14, fontFamily: fonts.bold, color: '#10B981' }}>
                 Full-Day Workshop Drop-off (08:00 – 18:00)
               </Text>
             </View>
-            <Text style={{ fontSize: 12.5, color: theme.colors.text, lineHeight: 18 }}>
+            <Text style={{ fontSize: 12.5, fontFamily: fonts.regular, color: theme.colors.text, lineHeight: 18 }}>
               No 45-minute bay slot is needed for {selectedServiceNames}. Customer will bring the vehicle to the garage on {selectedDate ? formatBookingDate(selectedDate) : 'the selected date'} (drop-off 08:00 – 10:30).
             </Text>
           </View>
         ) : !selectedDate ? (
           <View style={[styles.emptyNoticeCard, { backgroundColor: theme.colors.card, borderColor: theme.colors.border }]}>
             <MaterialCommunityIcons name="calendar-clock" size={22} color={theme.colors.placeholder} />
-            <Text style={{ marginLeft: 8, color: theme.colors.placeholder, fontSize: 13 }}>
+            <Text style={{ marginLeft: 8, color: theme.colors.placeholder, fontSize: 13, fontFamily: fonts.regular }}>
               Please select an appointment date above to view garage slots.
             </Text>
           </View>
         ) : loadingSlots ? (
           <View style={[styles.emptyNoticeCard, { backgroundColor: theme.colors.card, borderColor: theme.colors.border }]}>
             <ActivityIndicator size="small" color={theme.colors.secondary} style={{ marginRight: 8 }} />
-            <Text style={{ color: theme.colors.placeholder, fontSize: 13 }}>
+            <Text style={{ color: theme.colors.placeholder, fontSize: 13, fontFamily: fonts.regular }}>
               Checking garage slot schedule...
             </Text>
           </View>
@@ -935,10 +936,10 @@ export default function AdminBookMotScreen({ route, navigation }: any) {
           <View style={[styles.emptyNoticeCard, { backgroundColor: theme.colors.card, borderColor: theme.colors.border }]}>
             <MaterialCommunityIcons name="calendar-remove" size={24} color={theme.colors.error} />
             <View style={{ marginLeft: 10, flex: 1 }}>
-              <Text style={{ color: theme.colors.text, fontSize: 13.5, fontWeight: '700' }}>
+              <Text style={{ color: theme.colors.text, fontSize: 13.5, fontFamily: fonts.bold }}>
                 No Slots Configured
               </Text>
-              <Text style={{ color: theme.colors.placeholder, fontSize: 12, marginTop: 2 }}>
+              <Text style={{ color: theme.colors.placeholder, fontSize: 12, fontFamily: fonts.regular, marginTop: 2 }}>
                 No MOT slots were found for this garage on this date.
               </Text>
             </View>
@@ -1048,7 +1049,7 @@ export default function AdminBookMotScreen({ route, navigation }: any) {
                     <View style={{ flexDirection: 'row', alignItems: 'center', justifyContent: 'space-between' }}>
                       <View style={{ flexDirection: 'row', alignItems: 'center' }}>
                         <View style={[styles.slotIndexBadge, { backgroundColor: isSelected ? theme.colors.secondary : theme.colors.border + '40' }]}>
-                          <Text style={{ fontSize: 11, fontWeight: '800', color: isSelected ? '#FFFFFF' : theme.colors.text }}>
+                          <Text style={{ fontSize: 11, fontFamily: fonts.extraBold, color: isSelected ? '#FFFFFF' : theme.colors.text }}>
                             #{slotNum}
                           </Text>
                         </View>
@@ -1091,17 +1092,17 @@ export default function AdminBookMotScreen({ route, navigation }: any) {
                     {/* Booked vehicle / customer details if occupied */}
                     {slot.bookings && slot.bookings.length > 0 && (
                       <View style={[styles.slotOccupiedBox, { backgroundColor: theme.colors.background, borderColor: theme.colors.border }]}>
-                        <Text style={{ fontSize: 10, fontWeight: '700', color: theme.colors.placeholder, textTransform: 'uppercase', marginBottom: 2 }}>
+                        <Text style={{ fontSize: 10, fontFamily: fonts.bold, color: theme.colors.placeholder, textTransform: 'uppercase', marginBottom: 2 }}>
                           Occupied Bays ({slot.bookings.length}/{slot.totalCapacity || slot.bookings.length}):
                         </Text>
                         {slot.bookings.map((b: any, bIdx: number) => (
                           <View key={b.id || bIdx} style={{ flexDirection: 'row', alignItems: 'center', marginTop: 2 }}>
                             <MaterialCommunityIcons name="car-side" size={12} color={theme.colors.secondary} style={{ marginRight: 4 }} />
-                            <Text style={{ fontSize: 11, fontWeight: '600', color: theme.colors.text }}>
+                            <Text style={{ fontSize: 11, fontFamily: fonts.semiBold, color: theme.colors.text }}>
                               {b.registrationNumber || 'Vehicle'} • {b.customerName || 'Customer'}
                             </Text>
                             {b.stationName ? (
-                              <Text style={{ fontSize: 10, color: theme.colors.placeholder, marginLeft: 4 }}>
+                              <Text style={{ fontSize: 10, fontFamily: fonts.regular, color: theme.colors.placeholder, marginLeft: 4 }}>
                                 ({b.stationName})
                               </Text>
                             ) : null}
@@ -1163,7 +1164,7 @@ export default function AdminBookMotScreen({ route, navigation }: any) {
 
             <View style={styles.summaryRow}>
               <Text style={[styles.summaryLabel, { color: theme.colors.placeholder }]}>Selected Services:</Text>
-              <Text style={[styles.summaryValue, { color: theme.colors.primary, fontWeight: 'bold' }]}>
+              <Text style={[styles.summaryValue, { color: theme.colors.primary, fontFamily: fonts.bold }]}>
                 {selectedServiceNames} • £{totalServicePrice.toFixed(2)} (~{totalServiceDuration}m)
               </Text>
             </View>
@@ -1171,14 +1172,14 @@ export default function AdminBookMotScreen({ route, navigation }: any) {
             {isDateOnly ? (
               <View style={styles.summaryRow}>
                 <Text style={[styles.summaryLabel, { color: theme.colors.placeholder }]}>Intake Schedule:</Text>
-                <Text style={[styles.summaryValue, { color: '#10B981', fontWeight: 'bold' }]}>
+                <Text style={[styles.summaryValue, { color: '#10B981', fontFamily: fonts.bold }]}>
                   Full-Day Drop-off (08:00 – 18:00)
                 </Text>
               </View>
             ) : (
               <View style={styles.summaryRow}>
                 <Text style={[styles.summaryLabel, { color: theme.colors.placeholder }]}>Selected Slot:</Text>
-                <Text style={[styles.summaryValue, { color: theme.colors.secondary, fontWeight: 'bold' }]}>
+                <Text style={[styles.summaryValue, { color: theme.colors.secondary, fontFamily: fonts.bold }]}>
                   Slot #{selectedSlot?.slotNumber || getSlotNumber({ slotTime: selectedTime })} ({selectedSlot?.time || selectedTime} - {selectedSlot?.endTime || '45m'})
                 </Text>
               </View>
@@ -1186,7 +1187,7 @@ export default function AdminBookMotScreen({ route, navigation }: any) {
 
             <View style={styles.summaryRow}>
               <Text style={[styles.summaryLabel, { color: theme.colors.placeholder }]}>Action Type:</Text>
-              <Text style={[styles.summaryValue, { color: existingBooking ? theme.colors.warning : '#10B981', fontWeight: 'bold' }]}>
+              <Text style={[styles.summaryValue, { color: existingBooking ? theme.colors.warning : '#10B981', fontFamily: fonts.bold }]}>
                 {existingBooking ? 'Reschedule Active Booking' : 'Direct Booking & Instant Approval'}
               </Text>
             </View>
@@ -1238,7 +1239,7 @@ const styles = StyleSheet.create({
   },
   navTitle: {
     fontSize: 16,
-    fontWeight: 'bold',
+    fontFamily: fonts.bold,
   },
   scrollContent: {
     padding: 16,
@@ -1271,7 +1272,7 @@ const styles = StyleSheet.create({
   },
   staffDirectBadgeText: {
     fontSize: 11,
-    fontWeight: '700',
+    fontFamily: fonts.bold,
     color: '#10B981',
   },
   vehicleMainSection: {
@@ -1305,7 +1306,7 @@ const styles = StyleSheet.create({
   },
   ukPlateGbText: {
     color: '#FFFFFF',
-    fontWeight: '900',
+    fontFamily: fonts.extraBold,
     fontSize: 8,
     letterSpacing: 0.5,
   },
@@ -1317,7 +1318,7 @@ const styles = StyleSheet.create({
   },
   ukPlateNumberText: {
     color: '#000000',
-    fontWeight: '900',
+    fontFamily: fonts.extraBold,
     fontSize: 15,
     letterSpacing: 1.5,
   },
@@ -1326,7 +1327,7 @@ const styles = StyleSheet.create({
   },
   vehicleTitleText: {
     fontSize: 16,
-    fontWeight: '800',
+    fontFamily: fonts.extraBold,
     letterSpacing: -0.3,
     marginBottom: 4,
   },
@@ -1347,7 +1348,7 @@ const styles = StyleSheet.create({
   },
   specChipText: {
     fontSize: 11,
-    fontWeight: '600',
+    fontFamily: fonts.semiBold,
   },
   statusDot: {
     width: 6,
@@ -1372,12 +1373,12 @@ const styles = StyleSheet.create({
   },
   dateColLabel: {
     fontSize: 11,
-    fontWeight: '600',
+    fontFamily: fonts.semiBold,
     textTransform: 'uppercase',
   },
   dateColValue: {
     fontSize: 13,
-    fontWeight: '700',
+    fontFamily: fonts.bold,
   },
   customerStrip: {
     flexDirection: 'row',
@@ -1395,7 +1396,7 @@ const styles = StyleSheet.create({
   },
   customerAvatarText: {
     fontSize: 13,
-    fontWeight: '800',
+    fontFamily: fonts.extraBold,
   },
   custNameRow: {
     flexDirection: 'row',
@@ -1404,7 +1405,7 @@ const styles = StyleSheet.create({
   },
   customerNameText: {
     fontSize: 13.5,
-    fontWeight: '700',
+    fontFamily: fonts.bold,
   },
   contactPrefBadge: {
     paddingHorizontal: 6,
@@ -1413,7 +1414,7 @@ const styles = StyleSheet.create({
   },
   contactPrefText: {
     fontSize: 10,
-    fontWeight: '700',
+    fontFamily: fonts.bold,
   },
   custContactMeta: {
     flexDirection: 'row',
@@ -1427,10 +1428,11 @@ const styles = StyleSheet.create({
   },
   contactItemText: {
     fontSize: 11.5,
+    fontFamily: fonts.regular,
   },
   sectionHeading: {
     fontSize: 13,
-    fontWeight: 'bold',
+    fontFamily: fonts.bold,
     textTransform: 'uppercase',
     letterSpacing: 0.5,
     marginBottom: 12,
@@ -1457,7 +1459,7 @@ const styles = StyleSheet.create({
   },
   calendarTitle: {
     fontSize: 15,
-    fontWeight: 'bold',
+    fontFamily: fonts.bold,
   },
   weekdayRow: {
     flexDirection: 'row',
@@ -1471,7 +1473,7 @@ const styles = StyleSheet.create({
     width: '14.2%',
     textAlign: 'center',
     fontSize: 11,
-    fontWeight: '600',
+    fontFamily: fonts.semiBold,
   },
   daysGrid: {
     flexDirection: 'row',
@@ -1486,6 +1488,7 @@ const styles = StyleSheet.create({
   },
   dayCellText: {
     fontSize: 13,
+    fontFamily: fonts.regular,
   },
   timePickerContainer: {
     flexDirection: 'row',
@@ -1510,10 +1513,11 @@ const styles = StyleSheet.create({
   },
   timeLabel: {
     fontSize: 12,
-    fontWeight: 'bold',
+    fontFamily: fonts.bold,
   },
   timeText: {
     fontSize: 11,
+    fontFamily: fonts.regular,
     marginTop: 1,
   },
   notesInput: {
@@ -1521,6 +1525,7 @@ const styles = StyleSheet.create({
     borderRadius: 10,
     padding: 12,
     fontSize: 13,
+    fontFamily: fonts.regular,
     height: 80,
     textAlignVertical: 'top',
     marginBottom: 28,
@@ -1544,7 +1549,7 @@ const styles = StyleSheet.create({
     alignItems: 'center',
   },
   submitBtnText: {
-    fontWeight: 'bold',
+    fontFamily: fonts.bold,
     fontSize: 14,
   },
   vehicleSelectorChip: {
@@ -1579,11 +1584,11 @@ const styles = StyleSheet.create({
   },
   statValue: {
     fontSize: 16,
-    fontWeight: '800',
+    fontFamily: fonts.extraBold,
   },
   statLabel: {
     fontSize: 11,
-    fontWeight: '600',
+    fontFamily: fonts.semiBold,
     marginTop: 2,
   },
   statDivider: {
@@ -1606,7 +1611,7 @@ const styles = StyleSheet.create({
   },
   slotFilterText: {
     fontSize: 11,
-    fontWeight: '700',
+    fontFamily: fonts.bold,
   },
   slotsListContainer: {
     gap: 10,
@@ -1623,7 +1628,7 @@ const styles = StyleSheet.create({
   },
   slotTimeTitle: {
     fontSize: 13.5,
-    fontWeight: '700',
+    fontFamily: fonts.bold,
   },
   slotStatusTag: {
     flexDirection: 'row',
@@ -1634,7 +1639,7 @@ const styles = StyleSheet.create({
   },
   slotStatusTagText: {
     fontSize: 11,
-    fontWeight: '700',
+    fontFamily: fonts.bold,
   },
   slotOccupiedBox: {
     marginTop: 8,
@@ -1650,7 +1655,7 @@ const styles = StyleSheet.create({
   },
   summaryTitle: {
     fontSize: 13,
-    fontWeight: '800',
+    fontFamily: fonts.extraBold,
     textTransform: 'uppercase',
     letterSpacing: 0.5,
   },
@@ -1662,10 +1667,11 @@ const styles = StyleSheet.create({
   },
   summaryLabel: {
     fontSize: 12,
+    fontFamily: fonts.regular,
   },
   summaryValue: {
     fontSize: 12,
-    fontWeight: '600',
+    fontFamily: fonts.semiBold,
     maxWidth: '65%',
     textAlign: 'right',
   },
@@ -1684,5 +1690,6 @@ const styles = StyleSheet.create({
   },
   serviceChipTitle: {
     fontSize: 13,
+    fontFamily: fonts.semiBold,
   },
 });

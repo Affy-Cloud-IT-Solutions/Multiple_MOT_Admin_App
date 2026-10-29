@@ -3,6 +3,7 @@ import { View, StyleSheet, ScrollView, Text, TextInput, TouchableOpacity, Alert,
 import MaterialCommunityIcons from 'react-native-vector-icons/MaterialCommunityIcons';
 import { useAppTheme } from '../context/ThemeContext';
 import { useAppValues, BASE_URL } from '../context/DataContext';
+import { fonts } from '../theme/theme';
 
 export default function AdminRemindersScreen() {
   const { theme } = useAppTheme();
@@ -512,7 +513,7 @@ const styles = StyleSheet.create({
   },
   tabText: {
     fontSize: 13,
-    fontWeight: 'bold',
+    fontFamily: fonts.bold,
   },
   scrollContent: {
     padding: 16,
@@ -521,11 +522,12 @@ const styles = StyleSheet.create({
   tabContent: {},
   sectionTitle: {
     fontSize: 18,
-    fontWeight: 'bold',
+    fontFamily: fonts.bold,
     marginBottom: 4,
   },
   sectionDesc: {
     fontSize: 13,
+    fontFamily: fonts.regular,
     marginBottom: 20,
     lineHeight: 18,
   },
@@ -537,6 +539,7 @@ const styles = StyleSheet.create({
   emptyText: {
     fontSize: 14,
     fontStyle: 'italic',
+    fontFamily: fonts.regular,
     textAlign: 'center',
   },
   logCard: {
@@ -564,14 +567,16 @@ const styles = StyleSheet.create({
     marginRight: 8,
   },
   logActivity: {
-    fontWeight: 'bold',
+    fontFamily: fonts.bold,
     fontSize: 13.5,
   },
   logDate: {
     fontSize: 10.5,
+    fontFamily: fonts.medium,
   },
   logDetails: {
     fontSize: 12.5,
+    fontFamily: fonts.regular,
     lineHeight: 17,
   },
   reportCard: {
@@ -607,7 +612,7 @@ const styles = StyleSheet.create({
   },
   reportTitle: {
     fontSize: 14.5,
-    fontWeight: 'bold',
+    fontFamily: fonts.bold,
   },
   metricBadge: {
     borderRadius: 6,
@@ -616,7 +621,7 @@ const styles = StyleSheet.create({
   },
   metricText: {
     fontSize: 10.5,
-    fontWeight: 'bold',
+    fontFamily: fonts.bold,
   },
   exportDivider: {
     height: 1,
@@ -625,7 +630,7 @@ const styles = StyleSheet.create({
   },
   exportLabel: {
     fontSize: 10,
-    fontWeight: '700',
+    fontFamily: fonts.bold,
     letterSpacing: 0.8,
     marginBottom: 10,
   },
@@ -648,7 +653,7 @@ const styles = StyleSheet.create({
   },
   exportBtnText: {
     fontSize: 12,
-    fontWeight: '700',
+    fontFamily: fonts.bold,
   },
   pdfBtn: {
     backgroundColor: '#FEF2F2',
@@ -683,11 +688,12 @@ const styles = StyleSheet.create({
   },
   dvsaBannerTitle: {
     fontSize: 12.5,
-    fontWeight: '700',
+    fontFamily: fonts.bold,
     marginBottom: 2,
   },
   dvsaBannerText: {
     fontSize: 11,
+    fontFamily: fonts.regular,
     lineHeight: 16,
   },
   templateHeader: {
@@ -698,7 +704,7 @@ const styles = StyleSheet.create({
     alignItems: 'center',
   },
   templateDaysText: {
-    fontWeight: 'bold',
+    fontFamily: fonts.bold,
     fontSize: 13.5,
   },
   templateInput: {
@@ -707,6 +713,7 @@ const styles = StyleSheet.create({
     paddingHorizontal: 12,
     paddingVertical: 10,
     fontSize: 13,
+    fontFamily: fonts.regular,
     textAlignVertical: 'top',
     height: 80,
     marginBottom: 12,
@@ -716,7 +723,7 @@ const styles = StyleSheet.create({
   },
   placeholderLabel: {
     fontSize: 11,
-    fontWeight: '600',
+    fontFamily: fonts.semiBold,
     marginBottom: 6,
   },
   placeholderScroll: {
@@ -729,7 +736,7 @@ const styles = StyleSheet.create({
   },
   placeholderPillText: {
     fontSize: 10.5,
-    fontWeight: '600',
+    fontFamily: fonts.semiBold,
   },
   saveBtn: {
     height: 40,
@@ -744,7 +751,7 @@ const styles = StyleSheet.create({
   },
   saveBtnText: {
     color: '#FFFFFF',
-    fontWeight: 'bold',
+    fontFamily: fonts.bold,
     fontSize: 13,
   },
 });

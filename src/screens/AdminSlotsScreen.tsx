@@ -16,6 +16,7 @@ import MaterialCommunityIcons from 'react-native-vector-icons/MaterialCommunityI
 import { useFocusEffect } from '@react-navigation/native';
 import { useAppTheme } from '../context/ThemeContext';
 import { useAppValues, BASE_URL } from '../context/DataContext';
+import { fonts } from '../theme/theme';
 
 interface Station {
   id?: string;
@@ -847,7 +848,7 @@ export default function AdminSlotsScreen({ navigation }: any) {
                       <View style={[styles.metricDotIndicator, { backgroundColor: '#0284C7' }]} />
                     </View>
                     <Text style={[styles.metricValueModern, { color: '#0284C7' }]}>
-                      {totalBookedToday} <Text style={{ fontSize: 10.5, fontWeight: '500', color: theme.colors.placeholder }}>/ {totalCapacityToday}</Text>
+                      {totalBookedToday} <Text style={{ fontSize: 10.5, fontFamily: fonts.medium, color: theme.colors.placeholder }}>/ {totalCapacityToday}</Text>
                     </Text>
                     <Text style={[styles.metricLabelModern, { color: theme.colors.placeholder }]}>
                       Slots Booked
@@ -959,7 +960,7 @@ export default function AdminSlotsScreen({ navigation }: any) {
                       <Text style={{
                         color: b.status === 'Completed' ? '#10B981' : b.status === 'Approved' ? '#0284C7' : '#F59E0B',
                         fontSize: 9.5,
-                        fontWeight: '700'
+                        fontFamily: fonts.bold
                       }}>
                         {b.status || 'Pending'}
                       </Text>
@@ -978,7 +979,7 @@ export default function AdminSlotsScreen({ navigation }: any) {
                         styles.customerNameText,
                         {
                           color: b.status === 'Completed' ? '#10B981' : b.status === 'Approved' ? theme.colors.text : '#F59E0B',
-                          fontWeight: '600',
+                          fontFamily: fonts.semiBold,
                         },
                       ]}
                     >
@@ -1010,7 +1011,7 @@ export default function AdminSlotsScreen({ navigation }: any) {
                         const name = typeof s === 'string' ? s : s?.name || '';
                         return (
                           <View key={sIdx} style={{ backgroundColor: theme.colors.primary + '15', paddingHorizontal: 5, paddingVertical: 1, borderRadius: 3 }}>
-                            <Text style={{ fontSize: 9, color: theme.colors.primary, fontWeight: '600' }}>{name}</Text>
+                            <Text style={{ fontSize: 9, color: theme.colors.primary, fontFamily: fonts.semiBold }}>{name}</Text>
                           </View>
                         );
                       })}
@@ -1295,7 +1296,7 @@ export default function AdminSlotsScreen({ navigation }: any) {
             <View style={styles.serviceMetaRow}>
               <View style={[styles.serviceMetaChip, { backgroundColor: theme.colors.primary + '12' }]}>
                 <MaterialCommunityIcons name="currency-gbp" size={13} color={theme.colors.primary} />
-                <Text style={[styles.serviceMetaChipText, { color: theme.colors.primary, fontWeight: '700' }]}>
+                <Text style={[styles.serviceMetaChipText, { color: theme.colors.primary, fontFamily: fonts.bold }]}>
                   £{(selectedService.price ?? 45).toFixed(2)}
                 </Text>
               </View>
@@ -1533,7 +1534,7 @@ export default function AdminSlotsScreen({ navigation }: any) {
                     styles.customerNameText,
                     {
                       color: b.status === 'Approved' ? theme.colors.text : '#F59E0B',
-                      fontWeight: '600',
+                      fontFamily: fonts.semiBold,
                     },
                   ]}
                 >
@@ -1565,7 +1566,7 @@ export default function AdminSlotsScreen({ navigation }: any) {
                     const name = typeof s === 'string' ? s : s?.name || '';
                     return (
                       <View key={sIdx} style={{ backgroundColor: theme.colors.primary + '15', paddingHorizontal: 6, paddingVertical: 2, borderRadius: 4 }}>
-                        <Text style={{ fontSize: 10, color: theme.colors.primary, fontWeight: '600' }}>{name}</Text>
+                        <Text style={{ fontSize: 10, color: theme.colors.primary, fontFamily: fonts.semiBold }}>{name}</Text>
                       </View>
                     );
                   })}
@@ -1587,13 +1588,13 @@ export default function AdminSlotsScreen({ navigation }: any) {
         <View style={styles.guideBulletRow}>
           <MaterialCommunityIcons name="clock-in" size={15} color={theme.colors.primary} />
           <Text style={[styles.guideCardText, { color: theme.colors.text }]}>
-            Recommended Drop-Off Window: <Text style={{ fontWeight: '700' }}>08:00 AM – 10:30 AM</Text>
+            Recommended Drop-Off Window: <Text style={{ fontFamily: fonts.bold }}>08:00 AM – 10:30 AM</Text>
           </Text>
         </View>
         <View style={styles.guideBulletRow}>
           <MaterialCommunityIcons name="clock-out" size={15} color="#10B981" />
           <Text style={[styles.guideCardText, { color: theme.colors.text }]}>
-            Target Collection Window: <Text style={{ fontWeight: '700' }}>04:00 PM – 05:30 PM</Text>
+            Target Collection Window: <Text style={{ fontFamily: fonts.bold }}>04:00 PM – 05:30 PM</Text>
           </Text>
         </View>
         <View style={styles.guideBulletRow}>
@@ -1663,7 +1664,7 @@ export default function AdminSlotsScreen({ navigation }: any) {
                       <MaterialCommunityIcons name={catDetails.icon} size={18} color={catDetails.text} />
                     </View>
                     <View style={{ flex: 1 }}>
-                      <Text style={[styles.dropdownItemName, { color: isSelected ? theme.colors.primary : theme.colors.text, fontWeight: isSelected ? '700' : '600' }]}>
+                      <Text style={[styles.dropdownItemName, { color: isSelected ? theme.colors.primary : theme.colors.text, fontFamily: isSelected ? fonts.bold : fonts.semiBold }]}>
                         {svc.name}
                       </Text>
                       <Text style={[styles.dropdownItemTag, { color: theme.colors.placeholder }]}>
@@ -1725,7 +1726,7 @@ export default function AdminSlotsScreen({ navigation }: any) {
               <View style={[styles.activeDateTag, { backgroundColor: theme.colors.background, borderColor: theme.colors.border }]}>
                 <MaterialCommunityIcons name="calendar-check" size={14} color="#10B981" />
                 <Text style={[styles.activeDateTagText, { color: theme.colors.text }]}>
-                  Selected: <Text style={{ fontWeight: '800', color: theme.colors.primary }}>{selectedDate}</Text>
+                  Selected: <Text style={{ fontFamily: fonts.extraBold, color: theme.colors.primary }}>{selectedDate}</Text>
                 </Text>
               </View>
             </View>
@@ -1810,7 +1811,7 @@ export default function AdminSlotsScreen({ navigation }: any) {
                               : isToday
                               ? theme.colors.primary
                               : theme.colors.text,
-                            fontWeight: isSelected || isToday || hasPastBookings ? '800' : '600',
+                            fontFamily: isSelected || isToday || hasPastBookings ? fonts.extraBold : fonts.semiBold,
                           }
                         ]}
                       >
@@ -1932,7 +1933,7 @@ export default function AdminSlotsScreen({ navigation }: any) {
                 style={[styles.modalBtnCancel, { borderColor: theme.colors.border }]}
                 onPress={() => setModalVisible(false)}
               >
-                <Text style={{ color: theme.colors.text, fontWeight: '600' }}>Cancel</Text>
+                <Text style={{ color: theme.colors.text, fontFamily: fonts.semiBold }}>Cancel</Text>
               </TouchableOpacity>
               <TouchableOpacity
                 style={[styles.modalBtnSubmit, { backgroundColor: theme.colors.primary }]}
@@ -1970,13 +1971,13 @@ const styles = StyleSheet.create({
   },
   title: {
     fontSize: 24,
-    fontWeight: '700',
+    fontFamily: fonts.bold,
     letterSpacing: -0.5,
   },
   subtitle: {
     fontSize: 12.5,
     marginTop: 2,
-    fontWeight: '400',
+    fontFamily: fonts.regular,
   },
   bellHeaderBtn: {
     width: 40,
@@ -2006,7 +2007,7 @@ const styles = StyleSheet.create({
   },
   stationCountChipText: {
     fontSize: 12,
-    fontWeight: '700',
+    fontFamily: fonts.bold,
   },
   addStationHeaderBtn: {
     flexDirection: 'row',
@@ -2019,7 +2020,7 @@ const styles = StyleSheet.create({
   addStationHeaderBtnText: {
     color: '#FFFFFF',
     fontSize: 12,
-    fontWeight: '700',
+    fontFamily: fonts.bold,
   },
   topFilterBar: {
     flexDirection: 'row',
@@ -2053,12 +2054,12 @@ const styles = StyleSheet.create({
   },
   dropdownLabel: {
     fontSize: 9.5,
-    fontWeight: '600',
+    fontFamily: fonts.semiBold,
     textTransform: 'uppercase',
   },
   dropdownValue: {
     fontSize: 12.5,
-    fontWeight: '700',
+    fontFamily: fonts.bold,
   },
   datePickerBtn: {
     flex: 1,
@@ -2082,12 +2083,12 @@ const styles = StyleSheet.create({
   },
   dateLabel: {
     fontSize: 9.5,
-    fontWeight: '600',
+    fontFamily: fonts.semiBold,
     textTransform: 'uppercase',
   },
   dateValue: {
     fontSize: 12.5,
-    fontWeight: '700',
+    fontFamily: fonts.bold,
   },
   dropdownModalCard: {
     borderRadius: 18,
@@ -2108,7 +2109,7 @@ const styles = StyleSheet.create({
   },
   dropdownModalTitle: {
     fontSize: 16,
-    fontWeight: '700',
+    fontFamily: fonts.bold,
   },
   serviceDropdownItem: {
     flexDirection: 'row',
@@ -2129,9 +2130,11 @@ const styles = StyleSheet.create({
   },
   dropdownItemName: {
     fontSize: 13.5,
+    fontFamily: fonts.regular,
   },
   dropdownItemTag: {
     fontSize: 11,
+    fontFamily: fonts.regular,
     marginTop: 2,
   },
   calendarModalCard: {
@@ -2152,7 +2155,7 @@ const styles = StyleSheet.create({
   },
   closeCalModalBtnText: {
     fontSize: 13,
-    fontWeight: '600',
+    fontFamily: fonts.semiBold,
   },
   calendarCard: {
     marginHorizontal: 20,
@@ -2180,11 +2183,12 @@ const styles = StyleSheet.create({
   },
   calendarTitle: {
     fontSize: 17,
-    fontWeight: '800',
+    fontFamily: fonts.extraBold,
     letterSpacing: -0.2,
   },
   calSubTitle: {
     fontSize: 11,
+    fontFamily: fonts.regular,
     marginTop: 1,
   },
   calToolbarRow: {
@@ -2206,7 +2210,7 @@ const styles = StyleSheet.create({
   },
   todayQuickBtnText: {
     fontSize: 12,
-    fontWeight: '700',
+    fontFamily: fonts.bold,
   },
   activeDateTag: {
     flexDirection: 'row',
@@ -2219,6 +2223,7 @@ const styles = StyleSheet.create({
   },
   activeDateTagText: {
     fontSize: 12,
+    fontFamily: fonts.regular,
   },
   calGridContainer: {
     marginBottom: 12,
@@ -2235,7 +2240,7 @@ const styles = StyleSheet.create({
     width: '14.28%',
     textAlign: 'center',
     fontSize: 12,
-    fontWeight: '700',
+    fontFamily: fonts.bold,
     textTransform: 'uppercase',
   },
   daysGrid: {
@@ -2258,6 +2263,7 @@ const styles = StyleSheet.create({
   },
   dayText: {
     fontSize: 13,
+    fontFamily: fonts.regular,
   },
   todayDot: {
     width: 4,
@@ -2293,7 +2299,7 @@ const styles = StyleSheet.create({
   },
   legendText: {
     fontSize: 11,
-    fontWeight: '600',
+    fontFamily: fonts.semiBold,
   },
   pastDateBanner: {
     flexDirection: 'row',
@@ -2311,7 +2317,7 @@ const styles = StyleSheet.create({
   pastDateBannerText: {
     color: '#D97706',
     fontSize: 12.5,
-    fontWeight: '600',
+    fontFamily: fonts.semiBold,
     flex: 1,
     lineHeight: 17,
   },
@@ -2335,7 +2341,7 @@ const styles = StyleSheet.create({
   },
   summaryCardTitle: {
     fontSize: 14.5,
-    fontWeight: '700',
+    fontFamily: fonts.bold,
   },
   bookingCountBadge: {
     paddingHorizontal: 7,
@@ -2344,7 +2350,7 @@ const styles = StyleSheet.create({
   },
   bookingCountBadgeText: {
     fontSize: 11,
-    fontWeight: '700',
+    fontFamily: fonts.bold,
   },
   metricGrid: {
     flexDirection: 'row',
@@ -2378,13 +2384,13 @@ const styles = StyleSheet.create({
   },
   metricValueModern: {
     fontSize: 16,
-    fontWeight: '800',
+    fontFamily: fonts.extraBold,
     letterSpacing: -0.2,
     marginBottom: 1,
   },
   metricLabelModern: {
     fontSize: 9,
-    fontWeight: '700',
+    fontFamily: fonts.bold,
     letterSpacing: 0.1,
     textTransform: 'uppercase',
   },
@@ -2397,12 +2403,12 @@ const styles = StyleSheet.create({
   },
   metricBoxValue: {
     fontSize: 15,
-    fontWeight: '700',
+    fontFamily: fonts.bold,
     marginBottom: 1,
   },
   metricBoxLabel: {
     fontSize: 9,
-    fontWeight: '600',
+    fontFamily: fonts.semiBold,
     textTransform: 'uppercase',
   },
   whoseBookingsSection: {
@@ -2412,7 +2418,7 @@ const styles = StyleSheet.create({
   },
   whoseBookingsTitle: {
     fontSize: 12.5,
-    fontWeight: '700',
+    fontFamily: fonts.bold,
     marginBottom: 6,
   },
   emptyBookingBox: {
@@ -2424,6 +2430,7 @@ const styles = StyleSheet.create({
   },
   emptyBookingText: {
     fontSize: 11.5,
+    fontFamily: fonts.regular,
     flex: 1,
     lineHeight: 15,
   },
@@ -2450,7 +2457,7 @@ const styles = StyleSheet.create({
   },
   slotTimeBadgeText: {
     fontSize: 10.5,
-    fontWeight: '700',
+    fontFamily: fonts.bold,
     color: '#6366F1',
   },
   regPlateBadge: {
@@ -2461,7 +2468,7 @@ const styles = StyleSheet.create({
   },
   regPlateText: {
     color: '#000000',
-    fontWeight: '800',
+    fontFamily: fonts.extraBold,
     fontSize: 10.5,
     letterSpacing: 0.4,
   },
@@ -2476,7 +2483,7 @@ const styles = StyleSheet.create({
   },
   bayBadgeText: {
     fontSize: 9.5,
-    fontWeight: '600',
+    fontFamily: fonts.semiBold,
   },
   bookingStatusPill: {
     paddingHorizontal: 5,
@@ -2492,7 +2499,7 @@ const styles = StyleSheet.create({
   },
   customerNameText: {
     fontSize: 12,
-    fontWeight: '600',
+    fontFamily: fonts.semiBold,
   },
   phoneChip: {
     flexDirection: 'row',
@@ -2507,7 +2514,7 @@ const styles = StyleSheet.create({
   phoneChipText: {
     color: '#10B981',
     fontSize: 10,
-    fontWeight: '600',
+    fontFamily: fonts.semiBold,
   },
   vehicleDetailsRow: {
     flexDirection: 'row',
@@ -2516,6 +2523,7 @@ const styles = StyleSheet.create({
   },
   vehicleModelText: {
     fontSize: 11,
+    fontFamily: fonts.regular,
   },
   card: {
     marginHorizontal: 20,
@@ -2537,10 +2545,11 @@ const styles = StyleSheet.create({
   },
   cardTitle: {
     fontSize: 16,
-    fontWeight: '700',
+    fontFamily: fonts.bold,
   },
   cardDescription: {
     fontSize: 12,
+    fontFamily: fonts.regular,
     marginBottom: 12,
     lineHeight: 16,
   },
@@ -2555,7 +2564,7 @@ const styles = StyleSheet.create({
   addStationBtnText: {
     color: '#FFFFFF',
     fontSize: 12,
-    fontWeight: '600',
+    fontFamily: fonts.semiBold,
   },
   stationsList: {
     gap: 8,
@@ -2574,10 +2583,11 @@ const styles = StyleSheet.create({
   },
   stationName: {
     fontSize: 14,
-    fontWeight: '600',
+    fontFamily: fonts.semiBold,
   },
   stationType: {
     fontSize: 11,
+    fontFamily: fonts.regular,
     marginTop: 2,
   },
   statusBadge: {
@@ -2590,7 +2600,7 @@ const styles = StyleSheet.create({
   },
   statusBadgeText: {
     fontSize: 11,
-    fontWeight: '700',
+    fontFamily: fonts.bold,
   },
   summaryBanner: {
     flexDirection: 'row',
@@ -2601,7 +2611,7 @@ const styles = StyleSheet.create({
   },
   summaryBannerText: {
     fontSize: 12,
-    fontWeight: '600',
+    fontFamily: fonts.semiBold,
     flex: 1,
   },
   timelineSection: {
@@ -2617,10 +2627,11 @@ const styles = StyleSheet.create({
   },
   sectionTitle: {
     fontSize: 17,
-    fontWeight: '700',
+    fontFamily: fonts.bold,
   },
   sectionSubtitle: {
     fontSize: 12,
+    fontFamily: fonts.regular,
     marginTop: 3,
   },
   loaderContainer: {
@@ -2631,6 +2642,7 @@ const styles = StyleSheet.create({
   loaderText: {
     marginTop: 10,
     fontSize: 13,
+    fontFamily: fonts.regular,
   },
   // 2x2 Grid Styling
   slotsGrid2x2: {
@@ -2659,12 +2671,12 @@ const styles = StyleSheet.create({
   },
   gridTimeText: {
     fontSize: 13.5,
-    fontWeight: '800',
+    fontFamily: fonts.extraBold,
     letterSpacing: -0.2,
   },
   gridMinTag: {
     fontSize: 9.5,
-    fontWeight: '600',
+    fontFamily: fonts.semiBold,
     marginLeft: 2,
   },
   gridStatusPill: {
@@ -2674,12 +2686,12 @@ const styles = StyleSheet.create({
   },
   gridStatusPillText: {
     fontSize: 9.5,
-    fontWeight: '700',
+    fontFamily: fonts.bold,
   },
   gridDurationText: {
     fontSize: 9.5,
     marginTop: 1,
-    fontWeight: '500',
+    fontFamily: fonts.medium,
   },
   gridCardMiddle: {
     marginVertical: 3,
@@ -2689,7 +2701,7 @@ const styles = StyleSheet.create({
   },
   capacityText: {
     fontSize: 10.5,
-    fontWeight: '600',
+    fontFamily: fonts.semiBold,
   },
   gridBookingsList: {
     gap: 2,
@@ -2709,12 +2721,12 @@ const styles = StyleSheet.create({
   gridRegText: {
     color: '#000000',
     fontSize: 9,
-    fontWeight: '800',
+    fontFamily: fonts.extraBold,
     letterSpacing: 0.2,
   },
   gridCustName: {
     fontSize: 9.5,
-    fontWeight: '600',
+    fontFamily: fonts.semiBold,
     flex: 1,
   },
   freeBayIndicator: {
@@ -2725,7 +2737,7 @@ const styles = StyleSheet.create({
   },
   freeBayText: {
     fontSize: 9.5,
-    fontWeight: '500',
+    fontFamily: fonts.medium,
   },
   gridCardBottom: {
     marginTop: 3,
@@ -2744,7 +2756,7 @@ const styles = StyleSheet.create({
   },
   gridActionBtnText: {
     fontSize: 10,
-    fontWeight: '700',
+    fontFamily: fonts.bold,
   },
   modalOverlay: {
     flex: 1,
@@ -2764,10 +2776,11 @@ const styles = StyleSheet.create({
   },
   modalTitle: {
     fontSize: 18,
-    fontWeight: '700',
+    fontFamily: fonts.bold,
   },
   modalSubtitle: {
     fontSize: 12.5,
+    fontFamily: fonts.regular,
     marginBottom: 16,
     lineHeight: 18,
   },
@@ -2776,7 +2789,7 @@ const styles = StyleSheet.create({
   },
   inputLabel: {
     fontSize: 13,
-    fontWeight: '600',
+    fontFamily: fonts.semiBold,
     marginBottom: 6,
   },
   textInput: {
@@ -2785,6 +2798,7 @@ const styles = StyleSheet.create({
     borderWidth: 1,
     paddingHorizontal: 12,
     fontSize: 14,
+    fontFamily: fonts.regular,
   },
   typeSelectorRow: {
     flexDirection: 'row',
@@ -2799,7 +2813,7 @@ const styles = StyleSheet.create({
   },
   typeOptionText: {
     fontSize: 11.5,
-    fontWeight: '600',
+    fontFamily: fonts.semiBold,
   },
   approvalNotice: {
     flexDirection: 'row',
@@ -2812,7 +2826,7 @@ const styles = StyleSheet.create({
   approvalNoticeText: {
     color: '#D97706',
     fontSize: 12,
-    fontWeight: '500',
+    fontFamily: fonts.medium,
     flex: 1,
   },
   modalActions: {
@@ -2833,7 +2847,7 @@ const styles = StyleSheet.create({
   },
   modalBtnSubmitText: {
     color: '#FFFFFF',
-    fontWeight: '700',
+    fontFamily: fonts.bold,
     fontSize: 13,
   },
   emptySlotsCard: {
@@ -2846,11 +2860,12 @@ const styles = StyleSheet.create({
   },
   emptySlotsTitle: {
     fontSize: 18,
-    fontWeight: '800',
+    fontFamily: fonts.extraBold,
     marginBottom: 6,
   },
   emptySlotsSubtitle: {
     fontSize: 13,
+    fontFamily: fonts.regular,
     textAlign: 'center',
     lineHeight: 18,
     marginBottom: 18,
@@ -2865,7 +2880,7 @@ const styles = StyleSheet.create({
   },
   emptyAddStationBtnText: {
     color: '#FFFFFF',
-    fontWeight: '700',
+    fontFamily: fonts.bold,
     fontSize: 13.5,
   },
 
@@ -2882,7 +2897,7 @@ const styles = StyleSheet.create({
   },
   serviceSelectorTitle: {
     fontSize: 14,
-    fontWeight: '700',
+    fontFamily: fonts.bold,
     letterSpacing: -0.2,
   },
   modeIndicatorBadge: {
@@ -2895,7 +2910,7 @@ const styles = StyleSheet.create({
   },
   modeIndicatorText: {
     fontSize: 11.5,
-    fontWeight: '700',
+    fontFamily: fonts.bold,
   },
   servicePillsScroll: {
     paddingRight: 20,
@@ -2922,11 +2937,11 @@ const styles = StyleSheet.create({
   },
   servicePillName: {
     fontSize: 13,
-    fontWeight: '700',
+    fontFamily: fonts.bold,
   },
   servicePillModeTag: {
     fontSize: 10.5,
-    fontWeight: '500',
+    fontFamily: fonts.medium,
     marginTop: 1,
   },
   activeCheckDot: {
@@ -2974,7 +2989,7 @@ const styles = StyleSheet.create({
   },
   serviceOverviewTitle: {
     fontSize: 18,
-    fontWeight: '800',
+    fontFamily: fonts.extraBold,
     letterSpacing: -0.3,
   },
   serviceCategoryBadge: {
@@ -2984,7 +2999,7 @@ const styles = StyleSheet.create({
   },
   serviceCategoryBadgeText: {
     fontSize: 11,
-    fontWeight: '700',
+    fontFamily: fonts.bold,
     textTransform: 'uppercase',
   },
   serviceMetaRow: {
@@ -3003,6 +3018,7 @@ const styles = StyleSheet.create({
   },
   serviceMetaChipText: {
     fontSize: 12,
+    fontFamily: fonts.regular,
   },
   dateOnlyBannerBox: {
     borderRadius: 12,
@@ -3017,10 +3033,11 @@ const styles = StyleSheet.create({
   },
   dateOnlyBannerTitle: {
     fontSize: 13,
-    fontWeight: '700',
+    fontFamily: fonts.bold,
   },
   dateOnlyBannerBody: {
     fontSize: 12,
+    fontFamily: fonts.regular,
     lineHeight: 17,
   },
 
@@ -3038,11 +3055,12 @@ const styles = StyleSheet.create({
   },
   intakeCardTitle: {
     fontSize: 16,
-    fontWeight: '700',
+    fontFamily: fonts.bold,
     letterSpacing: -0.2,
   },
   intakeCardSubtitle: {
     fontSize: 12,
+    fontFamily: fonts.regular,
     marginTop: 2,
   },
   intakeStatusPill: {
@@ -3055,7 +3073,7 @@ const styles = StyleSheet.create({
   },
   intakeStatusPillText: {
     fontSize: 11.5,
-    fontWeight: '700',
+    fontFamily: fonts.bold,
   },
   capacityProgressContainer: {
     marginTop: 12,
@@ -3073,7 +3091,7 @@ const styles = StyleSheet.create({
   },
   capacityProgressText: {
     fontSize: 11.5,
-    fontWeight: '500',
+    fontFamily: fonts.medium,
   },
   dateBlockActionBtn: {
     flexDirection: 'row',
@@ -3086,7 +3104,7 @@ const styles = StyleSheet.create({
   },
   dateBlockActionBtnText: {
     fontSize: 13,
-    fontWeight: '700',
+    fontFamily: fonts.bold,
   },
 
   // Service Bookings Card Styles
@@ -3104,11 +3122,12 @@ const styles = StyleSheet.create({
   },
   emptyDateOnlyTitle: {
     fontSize: 15,
-    fontWeight: '700',
+    fontFamily: fonts.bold,
     marginBottom: 4,
   },
   emptyDateOnlySubtitle: {
     fontSize: 12,
+    fontFamily: fonts.regular,
     textAlign: 'center',
     lineHeight: 17,
   },
@@ -3119,7 +3138,7 @@ const styles = StyleSheet.create({
   },
   statusPillSmallText: {
     fontSize: 11,
-    fontWeight: '700',
+    fontFamily: fonts.bold,
   },
   priceTagBadge: {
     paddingHorizontal: 8,
@@ -3128,7 +3147,7 @@ const styles = StyleSheet.create({
   },
   priceTagBadgeText: {
     fontSize: 11.5,
-    fontWeight: '800',
+    fontFamily: fonts.extraBold,
   },
 
   // Guide Card Styles
@@ -3145,7 +3164,7 @@ const styles = StyleSheet.create({
   },
   guideCardTitle: {
     fontSize: 15,
-    fontWeight: '700',
+    fontFamily: fonts.bold,
   },
   guideBulletRow: {
     flexDirection: 'row',
@@ -3155,6 +3174,7 @@ const styles = StyleSheet.create({
   },
   guideCardText: {
     fontSize: 12.5,
+    fontFamily: fonts.regular,
     flex: 1,
     lineHeight: 17,
   },
@@ -3171,6 +3191,6 @@ const styles = StyleSheet.create({
   },
   manageServicesBtnText: {
     fontSize: 12.5,
-    fontWeight: '700',
+    fontFamily: fonts.bold,
   },
 });

@@ -213,6 +213,8 @@ export default function CustomAlertModal() {
   );
 }
 
+import { fonts } from '../theme/theme';
+
 const styles = StyleSheet.create({
   overlay: {
     flex: 1,
@@ -245,12 +247,13 @@ const styles = StyleSheet.create({
     marginBottom: 16,
   },
   title: {
+    fontFamily: fonts.bold,
     fontSize: 18,
-    fontWeight: 'bold',
     textAlign: 'center',
     marginBottom: 8,
   },
   message: {
+    fontFamily: fonts.regular,
     fontSize: 13.5,
     textAlign: 'center',
     lineHeight: 18,
@@ -273,7 +276,7 @@ const styles = StyleSheet.create({
     paddingHorizontal: 16,
   },
   buttonText: {
+    fontFamily: fonts.bold,
     fontSize: 14,
-    fontWeight: 'bold',
   },
 });

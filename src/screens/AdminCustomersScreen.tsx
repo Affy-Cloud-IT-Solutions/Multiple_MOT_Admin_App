@@ -17,6 +17,7 @@ import {
 } from 'react-native';
 import MaterialCommunityIcons from 'react-native-vector-icons/MaterialCommunityIcons';
 import { useAppTheme } from '../context/ThemeContext';
+import { fonts } from '../theme/theme';
 import { useAppValues, BASE_URL } from '../context/DataContext';
 import SearchableDropdown from '../components/SearchableDropdown';
 import {
@@ -451,7 +452,7 @@ export default function AdminCustomersScreen({ navigation }: any) {
                   borderColor: selectedGarageFilter === 'ALL' ? theme.colors.secondary : theme.colors.border,
                 }}
               >
-                <Text style={{ fontSize: 11.5, fontWeight: '700', color: selectedGarageFilter === 'ALL' ? '#FFFFFF' : theme.colors.text }}>
+                <Text style={{ fontSize: 11.5, fontFamily: fonts.bold, color: selectedGarageFilter === 'ALL' ? '#FFFFFF' : theme.colors.text }}>
                   All Garages ({customers.length})
                 </Text>
               </TouchableOpacity>
@@ -473,7 +474,7 @@ export default function AdminCustomersScreen({ navigation }: any) {
                       borderColor: isSelected ? theme.colors.secondary : theme.colors.border,
                     }}
                   >
-                    <Text style={{ fontSize: 11.5, fontWeight: '700', color: isSelected ? '#FFFFFF' : theme.colors.text }}>
+                    <Text style={{ fontSize: 11.5, fontFamily: fonts.bold, color: isSelected ? '#FFFFFF' : theme.colors.text }}>
                       {g.name} ({custCount})
                     </Text>
                   </TouchableOpacity>
@@ -580,7 +581,7 @@ export default function AdminCustomersScreen({ navigation }: any) {
                         style={[styles.viewDetailsBtn, { flex: 1, backgroundColor: theme.colors.secondary + '12', borderColor: theme.colors.secondary, marginVertical: 0 }]}
                       >
                         <MaterialCommunityIcons name="account-details-outline" size={18} color={theme.colors.secondary} />
-                        <Text style={{ color: theme.colors.secondary, fontWeight: 'bold', fontSize: 12, marginLeft: 6 }} numberOfLines={1}>
+                        <Text style={{ color: theme.colors.secondary, fontFamily: fonts.bold, fontSize: 12, marginLeft: 6 }} numberOfLines={1}>
                           Details & History
                         </Text>
                       </TouchableOpacity>
@@ -589,7 +590,17 @@ export default function AdminCustomersScreen({ navigation }: any) {
                         onPress={() => {
                           const bookableVehicles = customerVehicles.filter(v => v.status === 'Active');
                           if (bookableVehicles.length === 0) {
-                            Alert.alert('No Approved Vehicles', 'This customer has no active/approved vehicles. Please add or approve a vehicle first.');
+                            Alert.alert(
+                              'No Approved Vehicles',
+                              'This customer has no active/approved vehicles. Please add or approve a vehicle first.',
+                              [
+                                { text: 'Cancel', style: 'cancel' },
+                                {
+                                  text: 'Add',
+                                  onPress: () => navigation.navigate('CustomerDetail', { customerId: c.id }),
+                                },
+                              ]
+                            );
                             return;
                           }
                           
@@ -645,7 +656,7 @@ export default function AdminCustomersScreen({ navigation }: any) {
                         style={[styles.viewDetailsBtn, { flex: 1, backgroundColor: theme.colors.primary + '12', borderColor: theme.colors.primary, marginVertical: 0 }]}
                       >
                         <MaterialCommunityIcons name="calendar-plus" size={18} color={theme.colors.primary} />
-                        <Text style={{ color: theme.colors.primary, fontWeight: 'bold', fontSize: 12, marginLeft: 6 }} numberOfLines={1}>
+                        <Text style={{ color: theme.colors.primary, fontFamily: fonts.bold, fontSize: 12, marginLeft: 6 }} numberOfLines={1}>
                           Book Service
                         </Text>
                       </TouchableOpacity>
@@ -653,7 +664,7 @@ export default function AdminCustomersScreen({ navigation }: any) {
 
                     {isBookingMotForCustId === c.id && (
                       <View style={[styles.vehicleForm, { backgroundColor: theme.colors.background, borderColor: theme.colors.border, marginBottom: 12 }]}>
-                        <Text style={{ fontWeight: 'bold', fontSize: 13, color: theme.colors.text, marginBottom: 10 }}>
+                        <Text style={{ fontFamily: fonts.bold, fontSize: 13, color: theme.colors.text, marginBottom: 10 }}>
                           Select Vehicle to Book Service:
                         </Text>
                         {customerVehicles.filter(v => v.status === 'Active').map(v => {
@@ -699,28 +710,28 @@ export default function AdminCustomersScreen({ navigation }: any) {
                                 <Text style={styles.recentPlateText}>{v.registrationNumber}</Text>
                               </View>
                               <View style={{ flex: 1, marginLeft: 10 }}>
-                                <Text style={{ color: theme.colors.text, fontWeight: '600', fontSize: 12 }}>
+                                <Text style={{ color: theme.colors.text, fontFamily: fonts.semiBold, fontSize: 12 }}>
                                   {v.make} {v.model} {v.year ? `(${v.year})` : ''}
                                 </Text>
                                 <View style={{ flexDirection: 'row', alignItems: 'center', marginTop: 3 }}>
                                   {isBooked ? (
                                     <View style={{ flexDirection: 'row', alignItems: 'center', backgroundColor: theme.colors.secondary + '18', paddingHorizontal: 6, paddingVertical: 2, borderRadius: 4 }}>
                                       <MaterialCommunityIcons name="calendar-check" size={11} color={theme.colors.secondary} style={{ marginRight: 4 }} />
-                                      <Text style={{ fontSize: 10, fontWeight: 'bold', color: theme.colors.secondary }}>
+                                      <Text style={{ fontSize: 10, fontFamily: fonts.bold, color: theme.colors.secondary }}>
                                         Booked: {new Date(existingBooking.date).toLocaleDateString('en-GB', { day: 'numeric', month: 'short' })} ({existingBooking.slotTime || 'Slot'})
                                       </Text>
                                     </View>
                                   ) : isPending ? (
                                     <View style={{ flexDirection: 'row', alignItems: 'center', backgroundColor: theme.colors.warning + '18', paddingHorizontal: 6, paddingVertical: 2, borderRadius: 4 }}>
                                       <MaterialCommunityIcons name="clock-outline" size={11} color={theme.colors.warning} style={{ marginRight: 4 }} />
-                                      <Text style={{ fontSize: 10, fontWeight: 'bold', color: theme.colors.warning }}>
+                                      <Text style={{ fontSize: 10, fontFamily: fonts.bold, color: theme.colors.warning }}>
                                         Booking Pending Approval
                                       </Text>
                                     </View>
                                   ) : (
                                     <View style={{ flexDirection: 'row', alignItems: 'center', backgroundColor: '#10B98118', paddingHorizontal: 6, paddingVertical: 2, borderRadius: 4 }}>
                                       <MaterialCommunityIcons name="check-circle-outline" size={11} color="#10B981" style={{ marginRight: 4 }} />
-                                      <Text style={{ fontSize: 10, fontWeight: 'bold', color: '#10B981' }}>
+                                      <Text style={{ fontSize: 10, fontFamily: fonts.bold, color: '#10B981' }}>
                                         Available to Book
                                       </Text>
                                     </View>
@@ -738,7 +749,7 @@ export default function AdminCustomersScreen({ navigation }: any) {
                           }}
                           style={{ marginTop: 10, alignItems: 'center', paddingVertical: 4 }}
                         >
-                          <Text style={{ color: theme.colors.error, fontWeight: 'bold', fontSize: 13 }}>Cancel</Text>
+                          <Text style={{ color: theme.colors.error, fontFamily: fonts.bold, fontSize: 13 }}>Cancel</Text>
                         </TouchableOpacity>
                       </View>
                     )}
@@ -765,7 +776,7 @@ export default function AdminCustomersScreen({ navigation }: any) {
                         style={[styles.addVehicleBadge, { borderColor: theme.colors.secondary }]}
                       >
                         <MaterialCommunityIcons name="plus-circle" size={16} color={theme.colors.secondary} />
-                        <Text style={{ fontSize: 11, fontWeight: 'bold', color: theme.colors.secondary, marginLeft: 4 }}>
+                        <Text style={{ fontSize: 11, fontFamily: fonts.bold, color: theme.colors.secondary, marginLeft: 4 }}>
                           Add
                         </Text>
                       </TouchableOpacity>
@@ -773,7 +784,7 @@ export default function AdminCustomersScreen({ navigation }: any) {
 
                     {addingVehicleForCustId === c.id && (
                       <View style={[styles.vehicleForm, { backgroundColor: theme.colors.background, borderColor: theme.colors.border }]}>
-                        <Text style={{ fontWeight: 'bold', fontSize: 13, color: theme.colors.text, marginBottom: 10 }}>
+                        <Text style={{ fontFamily: fonts.bold, fontSize: 13, color: theme.colors.text, marginBottom: 10 }}>
                           <MaterialCommunityIcons name="car" size={16} color={theme.colors.secondary} /> Add Vehicle
                         </Text>
                         
@@ -853,7 +864,7 @@ export default function AdminCustomersScreen({ navigation }: any) {
                           onPress={() => handleCreateVehicle(c.id)}
                           style={[styles.vehicleSubmitBtn, { backgroundColor: theme.colors.secondary }]}
                         >
-                          <Text style={{ color: theme.dark ? theme.colors.background : '#FFFFFF', fontWeight: 'bold', fontSize: 13 }}>Save Vehicle</Text>
+                          <Text style={{ color: theme.dark ? theme.colors.background : '#FFFFFF', fontFamily: fonts.bold, fontSize: 13 }}>Save Vehicle</Text>
                         </TouchableOpacity>
                       </View>
                     )}
@@ -910,7 +921,7 @@ export default function AdminCustomersScreen({ navigation }: any) {
                                 <Text
                                   style={{
                                     fontSize: 10,
-                                    fontWeight: 'bold',
+                                    fontFamily: fonts.bold,
                                     marginLeft: 3,
                                     color: isSold
                                       ? theme.colors.placeholder
@@ -928,7 +939,7 @@ export default function AdminCustomersScreen({ navigation }: any) {
 
                             {v.status === 'Rejected' && v.rejectionReason && (
                               <View style={[styles.custRejectionReasonBox, { backgroundColor: theme.colors.error + '10', borderColor: theme.colors.error }]}>
-                                <Text style={{ fontSize: 11, color: theme.colors.error, fontWeight: 'bold' }}>Rejection Reason:</Text>
+                                <Text style={{ fontSize: 11, color: theme.colors.error, fontFamily: fonts.bold }}>Rejection Reason:</Text>
                                 <Text style={{ fontSize: 12, color: theme.colors.text, marginTop: 2 }}>{v.rejectionReason}</Text>
                               </View>
                             )}
@@ -1054,7 +1065,7 @@ export default function AdminCustomersScreen({ navigation }: any) {
               <View style={{ flexDirection: 'row', justifyContent: 'space-between', alignItems: 'center', marginVertical: 10, paddingHorizontal: 4 }}>
                 <View style={{ flexDirection: 'row', alignItems: 'center' }}>
                   <MaterialCommunityIcons name="car" size={20} color={theme.colors.placeholder} style={{ marginRight: 8 }} />
-                  <Text style={{ fontSize: 14, fontWeight: '600', color: theme.colors.text }}>Include Vehicle Details?</Text>
+                  <Text style={{ fontSize: 14, fontFamily: fonts.semiBold, color: theme.colors.text }}>Include Vehicle Details?</Text>
                 </View>
                 <Switch
                   value={addVehicleNow}
@@ -1069,13 +1080,13 @@ export default function AdminCustomersScreen({ navigation }: any) {
 
               {addVehicleNow && (
                 <View style={{ marginTop: 4, padding: 12, borderWidth: 1, borderColor: theme.colors.border, borderRadius: 8, backgroundColor: theme.dark ? '#1C1C1E' : '#F2F2F7', marginBottom: 12 }}>
-                  <Text style={{ fontSize: 13, fontWeight: 'bold', color: theme.colors.text, marginBottom: 10 }}>Vehicle Details</Text>
+                  <Text style={{ fontSize: 13, fontFamily: fonts.bold, color: theme.colors.text, marginBottom: 10 }}>Vehicle Details</Text>
                   
                   {/* Plate input & lookup row */}
                   <View style={{ flexDirection: 'row', alignItems: 'center', marginBottom: 12 }}>
                     <View style={{ flexDirection: 'row', flex: 1, height: 40, backgroundColor: '#FFD300', borderWidth: 1.5, borderColor: '#000000', borderRadius: 6, overflow: 'hidden', alignItems: 'center' }}>
                       <View style={{ width: 28, height: '100%', backgroundColor: '#0A4E9B', justifyContent: 'center', alignItems: 'center' }}>
-                        <Text style={{ color: '#FFFFFF', fontWeight: 'bold', fontSize: 8 }}>UK</Text>
+                        <Text style={{ color: '#FFFFFF', fontFamily: fonts.bold, fontSize: 8 }}>UK</Text>
                       </View>
                       <TextInput
                         value={newCustRegNo}
@@ -1084,7 +1095,7 @@ export default function AdminCustomersScreen({ navigation }: any) {
                         placeholderTextColor="#808080"
                         autoCapitalize="characters"
                         maxLength={8}
-                        style={{ flex: 1, fontSize: 15, fontWeight: 'bold', color: '#000000', textAlign: 'center', height: '100%', padding: 0 }}
+                        style={{ flex: 1, fontSize: 15, fontFamily: fonts.bold, color: '#000000', textAlign: 'center', height: '100%', padding: 0 }}
                       />
                     </View>
                     <TouchableOpacity
@@ -1097,7 +1108,7 @@ export default function AdminCustomersScreen({ navigation }: any) {
                       ) : (
                         <>
                           <MaterialCommunityIcons name="magnify" size={16} color={theme.dark ? theme.colors.background : '#FFFFFF'} style={{ marginRight: 4 }} />
-                          <Text style={{ color: theme.dark ? theme.colors.background : '#FFFFFF', fontWeight: 'bold', fontSize: 12 }}>LOOKUP</Text>
+                          <Text style={{ color: theme.dark ? theme.colors.background : '#FFFFFF', fontFamily: fonts.bold, fontSize: 12 }}>LOOKUP</Text>
                         </>
                       )}
                     </TouchableOpacity>
@@ -1245,7 +1256,7 @@ const styles = StyleSheet.create({
   },
   formTitle: {
     fontSize: 18,
-    fontWeight: 'bold',
+    fontFamily: fonts.bold,
     marginLeft: 8,
   },
   formRow: {
@@ -1258,7 +1269,7 @@ const styles = StyleSheet.create({
   },
   label: {
     fontSize: 13,
-    fontWeight: '600',
+    fontFamily: fonts.semiBold,
     marginBottom: 4,
   },
   formInput: {
@@ -1267,6 +1278,7 @@ const styles = StyleSheet.create({
     borderRadius: 8,
     paddingHorizontal: 10,
     fontSize: 14,
+    fontFamily: fonts.regular,
   },
   subFormInput: {
     height: 36,
@@ -1274,6 +1286,7 @@ const styles = StyleSheet.create({
     borderRadius: 6,
     paddingHorizontal: 8,
     fontSize: 12,
+    fontFamily: fonts.regular,
   },
   iconInput: {
     flexDirection: 'row',
@@ -1288,6 +1301,7 @@ const styles = StyleSheet.create({
     flex: 1,
     height: '100%',
     fontSize: 14,
+    fontFamily: fonts.regular,
     paddingHorizontal: 8,
     padding: 0,
   },
@@ -1300,12 +1314,12 @@ const styles = StyleSheet.create({
   },
   submitButtonText: {
     color: '#FFFFFF',
-    fontWeight: 'bold',
+    fontFamily: fonts.bold,
     fontSize: 14,
   },
   directoryTitle: {
     fontSize: 18,
-    fontWeight: 'bold',
+    fontFamily: fonts.bold,
     marginBottom: 14,
   },
   emptyState: {
@@ -1314,6 +1328,7 @@ const styles = StyleSheet.create({
   },
   emptyText: {
     fontSize: 14,
+    fontFamily: fonts.regular,
     fontStyle: 'italic',
     textAlign: 'center',
     marginTop: 8,
@@ -1346,7 +1361,7 @@ const styles = StyleSheet.create({
     marginRight: 12,
   },
   customerInitial: {
-    fontWeight: '700',
+    fontFamily: fonts.bold,
     fontSize: 13,
   },
   customerInfoCol: {
@@ -1361,17 +1376,18 @@ const styles = StyleSheet.create({
   },
   customerInfoText: {
     fontSize: 12,
+    fontFamily: fonts.regular,
     color: '#6B7280',
     marginLeft: 3,
   },
   customerVehicleCountText: {
     fontSize: 11.5,
-    fontWeight: '600',
+    fontFamily: fonts.semiBold,
     marginLeft: 5,
   },
   customerNameText: {
     fontSize: 15,
-    fontWeight: '600',
+    fontFamily: fonts.semiBold,
     letterSpacing: -0.2,
   },
   customerHeaderRight: {
@@ -1406,7 +1422,7 @@ const styles = StyleSheet.create({
   },
   vehiclesTitleText: {
     fontSize: 14,
-    fontWeight: 'bold',
+    fontFamily: fonts.bold,
     marginLeft: 6,
   },
   addVehicleBadge: {
@@ -1452,13 +1468,13 @@ const styles = StyleSheet.create({
   },
   recentPlateText: {
     color: '#000',
-    fontWeight: 'bold',
+    fontFamily: fonts.bold,
     fontSize: 10,
     letterSpacing: 0.5,
   },
   cancelButtonText: {
     fontSize: 13,
-    fontWeight: 'bold',
+    fontFamily: fonts.bold,
   },
   viewDetailsBtn: {
     flexDirection: 'row',
@@ -1477,7 +1493,7 @@ const styles = StyleSheet.create({
   },
   vehicleMakeText: {
     fontSize: 13,
-    fontWeight: 'bold',
+    fontFamily: fonts.bold,
   },
   statusPill: {
     flexDirection: 'row',
@@ -1539,11 +1555,12 @@ const styles = StyleSheet.create({
   },
   modalTitle: {
     fontSize: 16,
-    fontWeight: '800',
+    fontFamily: fonts.extraBold,
     letterSpacing: -0.2,
   },
   modalSubtitle: {
     fontSize: 11.5,
+    fontFamily: fonts.regular,
     marginTop: 2,
   },
   modalCloseBtn: {

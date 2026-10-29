@@ -18,6 +18,7 @@ import { useAppTheme } from '../context/ThemeContext';
 import { useAppValues, BASE_URL } from '../context/DataContext';
 import { validateEmail, validatePassword } from '../utils/validationUtils';
 import AsyncStorage from '@react-native-async-storage/async-storage';
+import { fonts } from '../theme/theme';
 import {
   AdminHeroLogo,
   EmailIcon,
@@ -381,7 +382,7 @@ export default function LoginScreen({ navigation }: any) {
             </TouchableOpacity>
 
             <View style={styles.footerContainer}>
-              <Text style={{ color: theme.colors.placeholder, fontSize: 13 }}>Don't have a garage account? </Text>
+              <Text style={[styles.footerText, { color: theme.colors.placeholder }]}>Don't have a garage account? </Text>
               <TouchableOpacity onPress={() => navigation.navigate('Signup')}>
                 <Text style={[styles.signupText, { color: theme.colors.primary, fontSize: 13 }]}>Register Garage</Text>
               </TouchableOpacity>
@@ -549,8 +550,8 @@ const styles = StyleSheet.create({
     marginRight: 10,
   },
   topRejectionTitle: {
+    fontFamily: fonts.extraBold,
     fontSize: 13.5,
-    fontWeight: '800',
     color: '#EF4444',
   },
   topRejectionBadge: {
@@ -560,11 +561,12 @@ const styles = StyleSheet.create({
     borderRadius: 4,
   },
   topRejectionBadgeText: {
+    fontFamily: fonts.extraBold,
     color: '#FFFFFF',
     fontSize: 9.5,
-    fontWeight: '800',
   },
   topRejectionSubtitle: {
+    fontFamily: fonts.regular,
     fontSize: 11.5,
     marginTop: 2,
     lineHeight: 16,
@@ -584,12 +586,13 @@ const styles = StyleSheet.create({
     shadowRadius: 4,
   },
   title: {
+    fontFamily: fonts.black,
     fontSize: 26,
-    fontWeight: '900',
     letterSpacing: 0.5,
     marginBottom: 4,
   },
   subtitle: {
+    fontFamily: fonts.regular,
     fontSize: 13,
     textAlign: 'center',
   },
@@ -604,14 +607,14 @@ const styles = StyleSheet.create({
     shadowRadius: 8,
   },
   portalHeading: {
+    fontFamily: fonts.bold,
     fontSize: 18,
-    fontWeight: 'bold',
     marginBottom: 16,
     textAlign: 'center',
   },
   inputLabel: {
+    fontFamily: fonts.semiBold,
     fontSize: 13.5,
-    fontWeight: '600',
     marginBottom: 6,
     marginLeft: 2,
   },
@@ -628,6 +631,7 @@ const styles = StyleSheet.create({
     marginRight: 8,
   },
   input: {
+    fontFamily: fonts.medium,
     flex: 1,
     height: '100%',
     fontSize: 14.5,
@@ -649,17 +653,21 @@ const styles = StyleSheet.create({
     shadowRadius: 4,
   },
   buttonText: {
+    fontFamily: fonts.bold,
     color: '#FFFFFF',
     fontSize: 15.5,
-    fontWeight: 'bold',
   },
   footerContainer: {
     flexDirection: 'row',
     justifyContent: 'center',
     marginTop: 20,
   },
+  footerText: {
+    fontFamily: fonts.regular,
+    fontSize: 13,
+  },
   signupText: {
-    fontWeight: 'bold',
+    fontFamily: fonts.bold,
   },
   errorContainer: {
     flexDirection: 'row',
@@ -670,8 +678,8 @@ const styles = StyleSheet.create({
     marginBottom: 14,
   },
   errorText: {
+    fontFamily: fonts.bold,
     fontSize: 12.5,
-    fontWeight: 'bold',
     flex: 1,
   },
   modalOverlay: {
@@ -694,10 +702,11 @@ const styles = StyleSheet.create({
     borderBottomWidth: 1,
   },
   modalTitle: {
+    fontFamily: fonts.extraBold,
     fontSize: 15.5,
-    fontWeight: '800',
   },
   modalSubtitle: {
+    fontFamily: fonts.regular,
     fontSize: 11.5,
     marginTop: 2,
   },
@@ -718,18 +727,19 @@ const styles = StyleSheet.create({
     marginBottom: 14,
   },
   masterNoticeTitle: {
+    fontFamily: fonts.bold,
     fontSize: 12,
-    fontWeight: 'bold',
     color: '#EF4444',
   },
   masterNoticeText: {
+    fontFamily: fonts.regular,
     fontSize: 12,
     color: '#EF4444',
     marginTop: 2,
   },
   docSectionTitle: {
+    fontFamily: fonts.extraBold,
     fontSize: 13.5,
-    fontWeight: '800',
     marginBottom: 10,
   },
   emptyDocsBox: {
@@ -741,11 +751,12 @@ const styles = StyleSheet.create({
     justifyContent: 'center',
   },
   emptyDocsTitle: {
+    fontFamily: fonts.extraBold,
     fontSize: 15,
-    fontWeight: '800',
     marginTop: 10,
   },
   emptyDocsSubtitle: {
+    fontFamily: fonts.regular,
     fontSize: 12,
     marginTop: 4,
     textAlign: 'center',
@@ -769,10 +780,11 @@ const styles = StyleSheet.create({
     marginRight: 10,
   },
   rejectedDocName: {
+    fontFamily: fonts.bold,
     fontSize: 13.5,
-    fontWeight: '700',
   },
   rejectedDocUrl: {
+    fontFamily: fonts.regular,
     fontSize: 11,
     marginTop: 2,
   },
@@ -783,8 +795,8 @@ const styles = StyleSheet.create({
     borderRadius: 6,
   },
   rejectedBadgeText: {
+    fontFamily: fonts.extraBold,
     fontSize: 10.5,
-    fontWeight: '800',
     color: '#EF4444',
   },
   rejectionReasonBox: {
@@ -797,15 +809,15 @@ const styles = StyleSheet.create({
     marginTop: 10,
   },
   rejectionReasonLabel: {
+    fontFamily: fonts.bold,
     fontSize: 11,
-    fontWeight: 'bold',
     color: '#EF4444',
   },
   rejectionReasonText: {
+    fontFamily: fonts.mediumItalic,
     fontSize: 11.5,
     color: '#EF4444',
     marginTop: 1,
-    fontStyle: 'italic',
   },
   reuploadBtn: {
     flexDirection: 'row',
@@ -816,8 +828,8 @@ const styles = StyleSheet.create({
     marginTop: 10,
   },
   reuploadBtnText: {
+    fontFamily: fonts.bold,
     color: '#FFFFFF',
     fontSize: 12.5,
-    fontWeight: '700',
   },
 });

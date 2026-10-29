@@ -2,6 +2,7 @@ import React from 'react';
 import { View, StyleSheet, ScrollView, TouchableOpacity, Text } from 'react-native';
 import MaterialCommunityIcons from 'react-native-vector-icons/MaterialCommunityIcons';
 import { useAppTheme } from '../context/ThemeContext';
+import { fonts } from '../theme/theme';
 
 const HISTORICAL_CHECKS = [
   {
@@ -173,11 +174,12 @@ const styles = StyleSheet.create({
   },
   title: {
     fontSize: 24,
-    fontWeight: '800',
+    fontFamily: fonts.extraBold,
     marginBottom: 6,
   },
   subtitle: {
     fontSize: 14,
+    fontFamily: fonts.regular,
     lineHeight: 20,
   },
   listContainer: {
@@ -225,12 +227,12 @@ const styles = StyleSheet.create({
   },
   ukText: {
     color: '#FFFFFF',
-    fontWeight: 'bold',
+    fontFamily: fonts.bold,
     fontSize: 6,
   },
   plateText: {
     fontSize: 12,
-    fontWeight: 'bold',
+    fontFamily: fonts.bold,
     color: '#000000',
     paddingHorizontal: 8,
     letterSpacing: 0.5,
@@ -239,12 +241,13 @@ const styles = StyleSheet.create({
     paddingLeft: 2,
   },
   makeModelText: {
-    fontWeight: 'bold',
+    fontFamily: fonts.bold,
     fontSize: 15,
     marginBottom: 2,
   },
   dateText: {
     fontSize: 12,
+    fontFamily: fonts.regular,
   },
   statusBadge: {
     flexDirection: 'row',
@@ -259,6 +262,6 @@ const styles = StyleSheet.create({
   },
   statusText: {
     fontSize: 11,
-    fontWeight: 'bold',
+    fontFamily: fonts.bold,
   },
 });

@@ -18,6 +18,7 @@ import GarageSetupScreen from '../screens/GarageSetupScreen';
 import SuperAdminCategoriesScreen from '../screens/SuperAdminCategoriesScreen';
 import MainTabNavigator from './MainTabNavigator';
 import { useAppTheme } from '../context/ThemeContext';
+import { fonts } from '../theme/theme';
 
 const Stack = createNativeStackNavigator();
 
@@ -33,7 +34,7 @@ export default function RootNavigator() {
         },
         headerTintColor: theme.colors.text,
         headerTitleStyle: {
-          fontWeight: 'bold',
+          fontFamily: fonts.bold,
         },
         headerShadowVisible: false,
       }}

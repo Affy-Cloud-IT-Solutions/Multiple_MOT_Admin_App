@@ -21,6 +21,7 @@ import { useFocusEffect } from '@react-navigation/native';
 import { SafeAreaView } from 'react-native-safe-area-context';
 import { useAppTheme } from '../context/ThemeContext';
 import { useAppValues } from '../context/DataContext';
+import { fonts } from '../theme/theme';
 
 const { width, height } = Dimensions.get('window');
 
@@ -665,7 +666,7 @@ export default function AdminServicesScreen({ navigation }: any) {
                         <View style={[styles.catOptionIcon, { backgroundColor: catInfo.bg }]}>
                           <MaterialCommunityIcons name={catInfo.icon as any} size={18} color={catInfo.text} />
                         </View>
-                        <Text style={[styles.catOptionText, { color: isSelected ? theme.colors.primary : theme.colors.text, fontWeight: isSelected ? '700' : '500' }]}>
+                        <Text style={[styles.catOptionText, { color: isSelected ? theme.colors.primary : theme.colors.text, fontFamily: isSelected ? fonts.bold : fonts.medium }]}>
                           {cat}
                         </Text>
                       </View>
@@ -745,7 +746,7 @@ export default function AdminServicesScreen({ navigation }: any) {
                     style={{ flexDirection: 'row', alignItems: 'center' }}
                   >
                     <MaterialCommunityIcons name="cog-outline" size={13} color={theme.colors.primary} style={{ marginRight: 2 }} />
-                    <Text style={{ fontSize: 11, color: theme.colors.primary, fontWeight: '700' }}>Manage Categories</Text>
+                    <Text style={{ fontFamily: fonts.bold, fontSize: 11, color: theme.colors.primary }}>Manage Categories</Text>
                   </TouchableOpacity>
                 )}
               </View>
@@ -771,7 +772,7 @@ export default function AdminServicesScreen({ navigation }: any) {
                         color={isSelected ? '#FFFFFF' : meta.text}
                         style={{ marginRight: 5 }}
                       />
-                      <Text style={{ color: isSelected ? '#FFFFFF' : theme.colors.text, fontSize: 12, fontWeight: '700' }}>
+                      <Text style={{ fontFamily: fonts.bold, color: isSelected ? '#FFFFFF' : theme.colors.text, fontSize: 12 }}>
                         {cat}
                       </Text>
                     </TouchableOpacity>
@@ -893,8 +894,8 @@ const styles = StyleSheet.create({
     gap: 8,
   },
   navTitle: {
+    fontFamily: fonts.bold,
     fontSize: 17,
-    fontWeight: '700',
     letterSpacing: -0.3,
   },
   smallAddBtn: {
@@ -906,8 +907,8 @@ const styles = StyleSheet.create({
     gap: 3,
   },
   smallAddBtnText: {
+    fontFamily: fonts.bold,
     color: '#FFFFFF',
-    fontWeight: '700',
     fontSize: 11.5,
   },
   searchFilterContainer: {
@@ -928,6 +929,7 @@ const styles = StyleSheet.create({
     height: 38,
   },
   searchInput: {
+    fontFamily: fonts.regular,
     flex: 1,
     fontSize: 13,
     paddingVertical: 0,
@@ -963,8 +965,8 @@ const styles = StyleSheet.create({
     borderWidth: 1,
   },
   activeFilterChipText: {
+    fontFamily: fonts.semiBold,
     fontSize: 11,
-    fontWeight: '600',
   },
   listContent: {
     padding: 16,
@@ -977,9 +979,9 @@ const styles = StyleSheet.create({
     paddingVertical: 60,
   },
   loadingText: {
+    fontFamily: fonts.semiBold,
     marginTop: 10,
     fontSize: 12,
-    fontWeight: '600',
   },
   emptyCard: {
     padding: 28,
@@ -990,11 +992,12 @@ const styles = StyleSheet.create({
     marginTop: 20,
   },
   emptyTitle: {
+    fontFamily: fonts.bold,
     fontSize: 15,
-    fontWeight: '700',
     marginBottom: 4,
   },
   emptySubtitle: {
+    fontFamily: fonts.regular,
     fontSize: 12,
     textAlign: 'center',
     lineHeight: 17,
@@ -1029,8 +1032,8 @@ const styles = StyleSheet.create({
     marginRight: 6,
   },
   serviceNameText: {
+    fontFamily: fonts.bold,
     fontSize: 13.5,
-    fontWeight: '700',
     letterSpacing: -0.2,
     marginBottom: 2,
   },
@@ -1045,8 +1048,8 @@ const styles = StyleSheet.create({
     marginTop: 2,
   },
   categoryBadgeText: {
+    fontFamily: fonts.bold,
     fontSize: 10,
-    fontWeight: '700',
     letterSpacing: 0.1,
   },
   cardRightControls: {
@@ -1083,8 +1086,8 @@ const styles = StyleSheet.create({
     paddingVertical: 7,
   },
   dropdownItemText: {
+    fontFamily: fonts.semiBold,
     fontSize: 12,
-    fontWeight: '600',
   },
   dropdownDivider: {
     height: 1,
@@ -1105,13 +1108,13 @@ const styles = StyleSheet.create({
     borderWidth: 1,
   },
   priceTagCurrency: {
+    fontFamily: fonts.bold,
     fontSize: 12.5,
-    fontWeight: '700',
     marginRight: 1,
   },
   priceTagAmount: {
+    fontFamily: fonts.extraBold,
     fontSize: 15.5,
-    fontWeight: '800',
     letterSpacing: -0.3,
   },
   durationChip: {
@@ -1123,8 +1126,8 @@ const styles = StyleSheet.create({
     borderWidth: 0.8,
   },
   durationChipText: {
+    fontFamily: fonts.semiBold,
     fontSize: 11,
-    fontWeight: '600',
   },
   statusPill: {
     flexDirection: 'row',
@@ -1141,10 +1144,11 @@ const styles = StyleSheet.create({
     borderRadius: 2.5,
   },
   statusPillText: {
+    fontFamily: fonts.bold,
     fontSize: 10.5,
-    fontWeight: '700',
   },
   descriptionText: {
+    fontFamily: fonts.regular,
     fontSize: 11,
     lineHeight: 15,
     marginTop: 6,
@@ -1180,8 +1184,8 @@ const styles = StyleSheet.create({
     marginBottom: 8,
   },
   sheetTitle: {
+    fontFamily: fonts.bold,
     fontSize: 16,
-    fontWeight: '700',
   },
   categoryOptionsGrid: {
     gap: 6,
@@ -1204,6 +1208,7 @@ const styles = StyleSheet.create({
     justifyContent: 'center',
   },
   catOptionText: {
+    fontFamily: fonts.medium,
     fontSize: 13,
   },
   sheetFooter: {
@@ -1218,8 +1223,8 @@ const styles = StyleSheet.create({
     alignItems: 'center',
   },
   resetFilterText: {
+    fontFamily: fonts.semiBold,
     fontSize: 13,
-    fontWeight: '600',
   },
   modalOverlay: {
     flex: 1,
@@ -1242,18 +1247,19 @@ const styles = StyleSheet.create({
     borderBottomWidth: 1,
   },
   modalTitle: {
+    fontFamily: fonts.bold,
     fontSize: 15,
-    fontWeight: '700',
   },
   modalFormContent: {
     padding: 14,
   },
   fieldLabel: {
+    fontFamily: fonts.bold,
     fontSize: 11.5,
-    fontWeight: '700',
     marginBottom: 5,
   },
   formInput: {
+    fontFamily: fonts.regular,
     borderWidth: 1,
     borderRadius: 8,
     paddingHorizontal: 10,
@@ -1261,6 +1267,7 @@ const styles = StyleSheet.create({
     fontSize: 12.5,
   },
   formTextArea: {
+    fontFamily: fonts.regular,
     borderWidth: 1,
     borderRadius: 8,
     paddingHorizontal: 10,
@@ -1288,11 +1295,12 @@ const styles = StyleSheet.create({
     paddingHorizontal: 8,
   },
   currencyPrefix: {
+    fontFamily: fonts.bold,
     fontSize: 13,
-    fontWeight: '700',
     marginRight: 4,
   },
   prefixInput: {
+    fontFamily: fonts.regular,
     flex: 1,
     paddingVertical: 7,
     fontSize: 12.5,
@@ -1305,10 +1313,11 @@ const styles = StyleSheet.create({
     marginTop: 12,
   },
   toggleActiveTitle: {
+    fontFamily: fonts.bold,
     fontSize: 11.5,
-    fontWeight: '700',
   },
   toggleActiveSubtitle: {
+    fontFamily: fonts.regular,
     fontSize: 10,
     marginTop: 1,
   },
@@ -1326,7 +1335,7 @@ const styles = StyleSheet.create({
     alignItems: 'center',
   },
   cancelBtnText: {
-    fontWeight: '600',
+    fontFamily: fonts.semiBold,
     fontSize: 12,
   },
   saveBtn: {
@@ -1338,8 +1347,8 @@ const styles = StyleSheet.create({
     borderRadius: 8,
   },
   saveBtnText: {
+    fontFamily: fonts.bold,
     color: '#FFFFFF',
-    fontWeight: '700',
     fontSize: 12,
   },
 });

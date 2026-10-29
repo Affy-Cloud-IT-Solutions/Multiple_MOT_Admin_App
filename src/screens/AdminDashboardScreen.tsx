@@ -4,6 +4,7 @@ import MaterialCommunityIcons from 'react-native-vector-icons/MaterialCommunityI
 import AsyncStorage from '@react-native-async-storage/async-storage';
 import { useAppTheme } from '../context/ThemeContext';
 import { useAppValues } from '../context/DataContext';
+import { fonts } from '../theme/theme';
 
 const { width } = Dimensions.get('window');
 
@@ -503,8 +504,31 @@ export default function AdminDashboardScreen({ navigation }: any) {
           </View>
         ) : (
           bookedMots.slice(0, 5).map((booking) => {
-            const cleanMake = (booking.makeModel || 'Vehicle').split(' (Slot:')[0]?.split(' at ')[0].trim();
-            const slotInfo = booking.slotTime || (booking.makeModel?.match(/Slot:\s*([^\n\r]+)/i)?.[1]) || '';
+            const cleanMake = (booking.makeModel || 'Vehicle')
+              .split(' (Slot:')[0]
+              ?.split(' at ')[0]
+              ?.split(' - Slot:')[0]
+              ?.split(' - MOT Slot:')[0]
+              ?.split(' - Workshop Drop-off')[0]
+              ?.trim();
+
+            const isMot = booking.hasMot !== false && (
+              booking.hasMot === true ||
+              (booking.serviceName || '').toUpperCase().includes('MOT') ||
+              (booking.slotTime && booking.slotTime !== 'Full Day Drop-off') ||
+              /Slot:\s*\d{1,2}:\d{2}/i.test(booking.makeModel || '')
+            );
+
+            let slotInfo = booking.slotTime || (booking.makeModel?.match(/(?:MOT\s+)?Slot:\s*([^\n\r&]+)/i)?.[1]) || '';
+            if (slotInfo && slotInfo.includes(' & Service:')) {
+              slotInfo = slotInfo.split(' & Service:')[0].trim();
+            }
+            if (isMot && slotInfo && slotInfo !== 'Full Day Drop-off' && !slotInfo.toLowerCase().startsWith('slot') && !slotInfo.toLowerCase().startsWith('mot slot')) {
+              slotInfo = `MOT Slot: ${slotInfo}`;
+            } else if (!isMot && (!slotInfo || slotInfo === 'Full Day Drop-off')) {
+              slotInfo = 'Workshop Drop-off';
+            }
+
             const rawStatus = (booking.status || 'Booked').toLowerCase();
             const formattedDate = formatBookingDate(booking.date);
 
@@ -606,13 +630,13 @@ const styles = StyleSheet.create({
     paddingBottom: 16,
   },
   title: {
+    fontFamily: fonts.bold,
     fontSize: 24,
-    fontWeight: '700',
     letterSpacing: -0.5,
   },
   subtitle: {
+    fontFamily: fonts.regular,
     fontSize: 13,
-    fontWeight: '400',
     marginTop: 2,
     letterSpacing: -0.2,
   },
@@ -645,9 +669,9 @@ const styles = StyleSheet.create({
     borderColor: '#FFFFFF',
   },
   bellBadgeText: {
+    fontFamily: fonts.bold,
     color: '#FFFFFF',
     fontSize: 9.5,
-    fontWeight: 'bold',
   },
   statsGrid: {
     paddingHorizontal: 16,
@@ -678,20 +702,20 @@ const styles = StyleSheet.create({
     flex: 1,
   },
   statValue: {
+    fontFamily: fonts.bold,
     fontSize: 16,
-    fontWeight: '700',
     letterSpacing: -0.3,
     marginBottom: 1,
   },
   statLabel: {
+    fontFamily: fonts.semiBold,
     fontSize: 9.5,
-    fontWeight: '600',
     letterSpacing: 0.1,
     textTransform: 'uppercase',
   },
   statSubtitle: {
+    fontFamily: fonts.medium,
     fontSize: 8,
-    fontWeight: '500',
     letterSpacing: 0.2,
     textTransform: 'uppercase',
     marginTop: 1,
@@ -707,14 +731,14 @@ const styles = StyleSheet.create({
     marginBottom: 12,
   },
   sectionTitle: {
+    fontFamily: fonts.bold,
     fontSize: 17,
-    fontWeight: '700',
     letterSpacing: -0.2,
     marginBottom: 12,
   },
   viewAllText: {
+    fontFamily: fonts.semiBold,
     fontSize: 12.5,
-    fontWeight: '600',
   },
   quickActionsGrid: {
     flexDirection: 'row',
@@ -737,11 +761,12 @@ const styles = StyleSheet.create({
     marginBottom: 8,
   },
   quickActionTitle: {
+    fontFamily: fonts.semiBold,
     fontSize: 13,
-    fontWeight: '600',
     marginBottom: 2,
   },
   quickActionSubtitle: {
+    fontFamily: fonts.regular,
     fontSize: 11,
   },
   emptyState: {
@@ -752,10 +777,11 @@ const styles = StyleSheet.create({
     gap: 6,
   },
   emptyText: {
+    fontFamily: fonts.semiBold,
     fontSize: 15,
-    fontWeight: '600',
   },
   emptySubtext: {
+    fontFamily: fonts.regular,
     fontSize: 12,
     textAlign: 'center',
   },
@@ -787,15 +813,15 @@ const styles = StyleSheet.create({
     paddingVertical: 2,
   },
   plateText: {
+    fontFamily: fonts.bold,
     color: '#000',
-    fontWeight: '700',
     fontSize: 11,
     letterSpacing: 0.5,
   },
   vehicleName: {
+    fontFamily: fonts.semiBold,
     flex: 1,
     fontSize: 13,
-    fontWeight: '600',
   },
   statusBadge: {
     paddingHorizontal: 8,
@@ -803,8 +829,8 @@ const styles = StyleSheet.create({
     borderRadius: 6,
   },
   statusBadgeText: {
+    fontFamily: fonts.semiBold,
     fontSize: 11,
-    fontWeight: '600',
   },
   bookingDetails: {
     gap: 4,
@@ -815,6 +841,7 @@ const styles = StyleSheet.create({
     gap: 6,
   },
   detailText: {
+    fontFamily: fonts.regular,
     flex: 1,
     fontSize: 12,
   },
@@ -843,8 +870,8 @@ const styles = StyleSheet.create({
     gap: 5,
   },
   gettingStartedTag: {
+    fontFamily: fonts.extraBold,
     fontSize: 11,
-    fontWeight: '800',
     letterSpacing: 0.6,
     color: '#EA580C',
   },
@@ -859,13 +886,14 @@ const styles = StyleSheet.create({
     borderRadius: 6,
   },
   percentBadgeText: {
+    fontFamily: fonts.bold,
     fontSize: 10.5,
-    fontWeight: '700',
   },
   hideIconBtn: {
     padding: 2,
   },
   gettingStartedSubtitle: {
+    fontFamily: fonts.regular,
     fontSize: 11.5,
     marginBottom: 8,
     lineHeight: 15,
@@ -899,8 +927,8 @@ const styles = StyleSheet.create({
     paddingRight: 8,
   },
   taskTitle: {
+    fontFamily: fonts.semiBold,
     fontSize: 12.5,
-    fontWeight: '600',
   },
   emptyCheckbox: {
     width: 18,
@@ -912,12 +940,13 @@ const styles = StyleSheet.create({
     marginTop: 6,
   },
   completedHeader: {
+    fontFamily: fonts.bold,
     fontSize: 10,
-    fontWeight: '700',
     letterSpacing: 0.6,
     marginBottom: 2,
   },
   completedTaskTitle: {
+    fontFamily: fonts.regular,
     fontSize: 12.5,
     color: '#9CA3AF',
     textDecorationLine: 'line-through',
@@ -938,8 +967,8 @@ const styles = StyleSheet.create({
     gap: 4,
   },
   collapseToggleText: {
+    fontFamily: fonts.semiBold,
     fontSize: 11.5,
-    fontWeight: '600',
   },
   unhidePill: {
     flexDirection: 'row',
@@ -974,8 +1003,8 @@ const styles = StyleSheet.create({
     marginBottom: 4,
   },
   unhideTitle: {
+    fontFamily: fonts.bold,
     fontSize: 13,
-    fontWeight: '700',
     letterSpacing: -0.2,
   },
   unhidePercentBadge: {
@@ -984,8 +1013,8 @@ const styles = StyleSheet.create({
     borderRadius: 5,
   },
   unhidePercentText: {
+    fontFamily: fonts.bold,
     fontSize: 10.5,
-    fontWeight: '700',
   },
   unhideMiniProgressTrack: {
     height: 4,

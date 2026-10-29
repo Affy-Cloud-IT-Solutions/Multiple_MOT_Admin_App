@@ -21,6 +21,7 @@ import { pick, types } from '@react-native-documents/picker';
 import AsyncStorage from '@react-native-async-storage/async-storage';
 import { useAppTheme } from '../context/ThemeContext';
 import { useAppValues, BASE_URL } from '../context/DataContext';
+import { fonts } from '../theme/theme';
 
 const { width } = Dimensions.get('window');
 
@@ -946,10 +947,11 @@ const styles = StyleSheet.create({
   },
   headerTitle: {
     fontSize: 18,
-    fontWeight: '700',
+    fontFamily: fonts.bold,
   },
   headerSubtitle: {
     fontSize: 12,
+    fontFamily: fonts.regular,
     marginTop: 2,
   },
   refreshButton: {
@@ -975,10 +977,11 @@ const styles = StyleSheet.create({
   },
   statusTitle: {
     fontSize: 15,
-    fontWeight: '700',
+    fontFamily: fonts.bold,
   },
   statusSubtitle: {
     fontSize: 12,
+    fontFamily: fonts.regular,
     marginTop: 4,
     lineHeight: 17,
   },
@@ -1004,7 +1007,7 @@ const styles = StyleSheet.create({
   },
   tabText: {
     fontSize: 13,
-    fontWeight: '600',
+    fontFamily: fonts.semiBold,
   },
   sectionCard: {
     borderRadius: 14,
@@ -1022,10 +1025,11 @@ const styles = StyleSheet.create({
   },
   sectionTitle: {
     fontSize: 16,
-    fontWeight: '700',
+    fontFamily: fonts.bold,
   },
   sectionDesc: {
     fontSize: 12,
+    fontFamily: fonts.regular,
     marginTop: 2,
   },
   fieldGroup: {
@@ -1033,7 +1037,7 @@ const styles = StyleSheet.create({
   },
   fieldLabel: {
     fontSize: 13,
-    fontWeight: '600',
+    fontFamily: fonts.semiBold,
     marginBottom: 6,
   },
   input: {
@@ -1042,6 +1046,7 @@ const styles = StyleSheet.create({
     borderRadius: 10,
     paddingHorizontal: 12,
     fontSize: 14,
+    fontFamily: fonts.regular,
   },
   rowFields: {
     flexDirection: 'row',
@@ -1054,7 +1059,7 @@ const styles = StyleSheet.create({
   },
   linkLabel: {
     fontSize: 12,
-    fontWeight: '600',
+    fontFamily: fonts.semiBold,
     marginBottom: 6,
   },
   linkRow: {
@@ -1065,6 +1070,7 @@ const styles = StyleSheet.create({
     flex: 1,
     height: 40,
     fontSize: 13,
+    fontFamily: fonts.regular,
     paddingHorizontal: 8,
   },
   linkFetchBtn: {
@@ -1075,7 +1081,7 @@ const styles = StyleSheet.create({
   },
   linkFetchBtnText: {
     color: '#FFFFFF',
-    fontWeight: '700',
+    fontFamily: fonts.bold,
     fontSize: 12,
   },
   saveBtn: {
@@ -1089,7 +1095,7 @@ const styles = StyleSheet.create({
   },
   saveBtnText: {
     color: '#FFFFFF',
-    fontWeight: '700',
+    fontFamily: fonts.bold,
     fontSize: 14,
   },
   // Services Styles
@@ -1112,7 +1118,7 @@ const styles = StyleSheet.create({
   },
   serviceName: {
     fontSize: 14,
-    fontWeight: '700',
+    fontFamily: fonts.bold,
   },
   categoryBadge: {
     alignSelf: 'flex-start',
@@ -1124,7 +1130,7 @@ const styles = StyleSheet.create({
   },
   categoryBadgeText: {
     fontSize: 10,
-    fontWeight: '700',
+    fontFamily: fonts.bold,
     color: '#0284C7',
   },
   priceRow: {
@@ -1139,7 +1145,7 @@ const styles = StyleSheet.create({
   },
   priceLabel: {
     fontSize: 12,
-    fontWeight: '600',
+    fontFamily: fonts.semiBold,
   },
   priceInputWrapper: {
     flexDirection: 'row',
@@ -1152,12 +1158,12 @@ const styles = StyleSheet.create({
   },
   currencyPrefix: {
     fontSize: 14,
-    fontWeight: '700',
+    fontFamily: fonts.bold,
     marginRight: 4,
   },
   priceInput: {
     fontSize: 14,
-    fontWeight: '700',
+    fontFamily: fonts.bold,
     padding: 0,
     minWidth: 50,
   },
@@ -1172,13 +1178,13 @@ const styles = StyleSheet.create({
     gap: 6,
   },
   addCustomBtnText: {
-    fontWeight: '700',
+    fontFamily: fonts.bold,
     fontSize: 13,
   },
   // Document Styles
   docSubheader: {
     fontSize: 14,
-    fontWeight: '700',
+    fontFamily: fonts.bold,
     marginTop: 10,
     marginBottom: 12,
   },
@@ -1198,20 +1204,21 @@ const styles = StyleSheet.create({
   },
   docLabel: {
     fontSize: 13,
-    fontWeight: '600',
+    fontFamily: fonts.semiBold,
   },
   docStatusRow: {
     marginTop: 3,
   },
   docStatusText: {
     fontSize: 11,
-    fontWeight: '700',
+    fontFamily: fonts.bold,
   },
   rejectDocReason: {
     fontSize: 11,
     color: '#DC2626',
     marginTop: 2,
     fontStyle: 'italic',
+    fontFamily: fonts.regular,
   },
   uploadSmallBtn: {
     padding: 8,
@@ -1229,7 +1236,7 @@ const styles = StyleSheet.create({
   },
   submitReviewBtnText: {
     color: '#FFFFFF',
-    fontWeight: '700',
+    fontFamily: fonts.bold,
     fontSize: 15,
   },
   // Modal Styles
@@ -1248,7 +1255,7 @@ const styles = StyleSheet.create({
   },
   modalTitle: {
     fontSize: 16,
-    fontWeight: '700',
+    fontFamily: fonts.bold,
     marginBottom: 14,
   },
   modalActionRow: {
@@ -1265,7 +1272,7 @@ const styles = StyleSheet.create({
     justifyContent: 'center',
   },
   modalCancelText: {
-    fontWeight: '600',
+    fontFamily: fonts.semiBold,
     fontSize: 14,
   },
   modalAddBtn: {
@@ -1277,7 +1284,7 @@ const styles = StyleSheet.create({
   },
   modalAddText: {
     color: '#FFFFFF',
-    fontWeight: '700',
+    fontFamily: fonts.bold,
     fontSize: 14,
   },
 });

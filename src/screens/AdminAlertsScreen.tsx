@@ -2,6 +2,7 @@ import React, { useState } from 'react';
 import { View, StyleSheet, ScrollView, Text, TouchableOpacity, Alert, Modal, TextInput, ActivityIndicator, Linking } from 'react-native';
 import MaterialCommunityIcons from 'react-native-vector-icons/MaterialCommunityIcons';
 import { useAppTheme } from '../context/ThemeContext';
+import { fonts } from '../theme/theme';
 import { useAppValues } from '../context/DataContext';
 
 const STANDARD_SLOTS = [
@@ -38,12 +39,14 @@ const getSlotTimeDisplay = (item: any) => {
   if (item?.isDateOnly || item?.hasMot === false || item?.slotTime === 'Full Day Drop-off' || item?.slotTime === 'Drop-off (Full Day)') {
     return 'Full-Day Workshop Drop-off (08:00 – 18:00)';
   }
-  if (item.slotTime) return item.slotTime;
-  if (item.makeModel) {
-    const match = item.makeModel.match(/Slot:\s*([^\n\r]+)/i);
-    if (match) return match[1].trim();
+  let slotTime = item.slotTime || '';
+  if (!slotTime && item.makeModel) {
+    const match = item.makeModel.match(/(?:MOT\s+)?Slot:\s*([^\n\r&]+)/i);
+    if (match) slotTime = match[1].trim();
+  } else if (slotTime && slotTime.includes(' & Service:')) {
+    slotTime = slotTime.split(' & Service:')[0].replace(/^(?:MOT\s+)?Slot:\s*/i, '').trim();
   }
-  return '45-Min MOT Slot';
+  return slotTime || '45-Min MOT Slot';
 };
 
 const formatBookingDate = (dateVal: any) => {
@@ -181,7 +184,7 @@ export default function AdminAlertsScreen() {
 
                 <View style={styles.cardBody}>
                   <Text style={[styles.bodyText, { color: theme.colors.text }]}>
-                    Customer <Text style={{ fontWeight: 'bold' }}>{item.customerName}</Text>{' '}
+                    Customer <Text style={{ fontFamily: fonts.bold }}>{item.customerName}</Text>{' '}
                     {item.type === 'NEW_VEHICLE' && 'wishes to register a new vehicle:'}
                     {item.type === 'SOLD' && 'reported they sold their vehicle:'}
                     {item.type === 'BOOKED' && ((item.isDateOnly || item.hasMot === false) ? 'requested service workshop booking for:' : 'requested MOT booking for:')}
@@ -196,7 +199,7 @@ export default function AdminAlertsScreen() {
                           activeOpacity={0.7}
                         >
                           <MaterialCommunityIcons name="phone" size={11} color={theme.colors.secondary} style={{ marginRight: 4 }} />
-                          <Text style={{ fontSize: 11, fontWeight: '700', color: theme.colors.secondary }}>{custPhone}</Text>
+                          <Text style={{ fontSize: 11, fontFamily: fonts.bold, color: theme.colors.secondary }}>{custPhone}</Text>
                         </TouchableOpacity>
                       ) : null}
                       {custEmail ? (
@@ -206,7 +209,7 @@ export default function AdminAlertsScreen() {
                           activeOpacity={0.7}
                         >
                           <MaterialCommunityIcons name="email-outline" size={11} color="#059669" style={{ marginRight: 4 }} />
-                          <Text style={{ fontSize: 11, fontWeight: '600', color: '#059669' }}>{custEmail}</Text>
+                          <Text style={{ fontSize: 11, fontFamily: fonts.semiBold, color: '#059669' }}>{custEmail}</Text>
                         </TouchableOpacity>
                       ) : null}
                     </View>
@@ -228,7 +231,7 @@ export default function AdminAlertsScreen() {
                         const sName = typeof s === 'string' ? s : s?.name || '';
                         return (
                           <View key={sIdx} style={{ backgroundColor: theme.colors.secondary + '15', paddingHorizontal: 6, paddingVertical: 2, borderRadius: 4 }}>
-                            <Text style={{ fontSize: 10.5, color: theme.colors.secondary, fontWeight: '600' }}>{sName}</Text>
+                            <Text style={{ fontSize: 10.5, color: theme.colors.secondary, fontFamily: fonts.semiBold }}>{sName}</Text>
                           </View>
                         );
                       })}
@@ -245,25 +248,34 @@ export default function AdminAlertsScreen() {
                             color={theme.colors.secondary}
                             style={{ marginRight: 6 }}
                           />
-                          <Text style={{ fontSize: 13, fontWeight: 'bold', color: theme.colors.text }}>
+                          <Text style={{ fontSize: 13, fontFamily: fonts.bold, color: theme.colors.text }}>
                             {(item.isDateOnly || item.hasMot === false) ? 'Drop-off Date: ' : 'Requested Date: '}
                             {formatBookingDate(item.date)}
                           </Text>
                         </View>
                         <View style={[styles.slotNumberBadge, { backgroundColor: theme.colors.secondary }]}>
-                          <Text style={{ fontSize: 11, fontWeight: 'bold', color: '#FFFFFF' }}>
+                          <Text style={{ fontSize: 11, fontFamily: fonts.bold, color: '#FFFFFF' }}>
                             {getSlotDisplay(item)}
                           </Text>
                         </View>
                       </View>
                       <View style={{ flexDirection: 'row', alignItems: 'center', marginTop: 6 }}>
                         <MaterialCommunityIcons name="clock-outline" size={14} color={theme.colors.placeholder} style={{ marginRight: 6 }} />
-                        <Text style={{ fontSize: 12, color: theme.colors.placeholder }}>
+                        <Text style={{ fontSize: 12, fontFamily: fonts.regular, color: theme.colors.placeholder }}>
                           {(item.isDateOnly || item.hasMot === false) ? 'Intake: ' : 'Requested Slot: '}
-                          <Text style={{ color: theme.colors.text, fontWeight: '700' }}>{getSlotTimeDisplay(item)}</Text>
+                          <Text style={{ color: theme.colors.text, fontFamily: fonts.bold }}>{getSlotTimeDisplay(item)}</Text>
                           {item.stationName ? ` • Bay: ${item.stationName}` : ''}
                         </Text>
                       </View>
+                      {item.serviceName && (
+                        <View style={{ flexDirection: 'row', alignItems: 'center', marginTop: 4 }}>
+                          <MaterialCommunityIcons name="wrench-outline" size={14} color={theme.colors.placeholder} style={{ marginRight: 6 }} />
+                          <Text style={{ fontSize: 12, fontFamily: fonts.regular, color: theme.colors.placeholder }}>
+                            Service: <Text style={{ color: theme.colors.text, fontFamily: fonts.bold }}>{item.serviceName}</Text>
+                            {item.price ? ` • £${Number(item.price).toFixed(2)}` : ''}
+                          </Text>
+                        </View>
+                      )}
                     </View>
                   )}
                 </View>
@@ -359,11 +371,12 @@ const styles = StyleSheet.create({
   },
   title: {
     fontSize: 24,
-    fontWeight: '800',
+    fontFamily: fonts.extraBold,
     marginBottom: 4,
   },
   subtitle: {
     fontSize: 13,
+    fontFamily: fonts.regular,
   },
   listContainer: {
     padding: 16,
@@ -375,6 +388,7 @@ const styles = StyleSheet.create({
   },
   emptyText: {
     fontSize: 14,
+    fontFamily: fonts.regular,
     fontStyle: 'italic',
   },
   alertCard: {
@@ -396,7 +410,7 @@ const styles = StyleSheet.create({
     paddingBottom: 8,
   },
   typeText: {
-    fontWeight: 'bold',
+    fontFamily: fonts.bold,
     fontSize: 14,
   },
   cardBody: {
@@ -405,6 +419,7 @@ const styles = StyleSheet.create({
   },
   bodyText: {
     fontSize: 13.5,
+    fontFamily: fonts.regular,
     lineHeight: 18,
   },
   vehicleRow: {
@@ -426,12 +441,12 @@ const styles = StyleSheet.create({
   },
   plateText: {
     color: '#000',
-    fontWeight: 'bold',
+    fontFamily: fonts.bold,
     fontSize: 11,
     letterSpacing: 0.5,
   },
   makeModelText: {
-    fontWeight: 'bold',
+    fontFamily: fonts.bold,
     fontSize: 13,
   },
   divider: {
@@ -457,7 +472,7 @@ const styles = StyleSheet.create({
   },
   actionBtnText: {
     fontSize: 13,
-    fontWeight: 'bold',
+    fontFamily: fonts.bold,
   },
   modalOverlay: {
     flex: 1,
@@ -480,11 +495,12 @@ const styles = StyleSheet.create({
   },
   modalTitle: {
     fontSize: 16,
-    fontWeight: 'bold',
+    fontFamily: fonts.bold,
     marginBottom: 8,
   },
   modalSubtitle: {
     fontSize: 12,
+    fontFamily: fonts.regular,
     lineHeight: 16,
     marginBottom: 14,
   },
@@ -493,6 +509,7 @@ const styles = StyleSheet.create({
     borderRadius: 8,
     padding: 10,
     fontSize: 13,
+    fontFamily: fonts.regular,
     height: 70,
     textAlignVertical: 'top',
     marginBottom: 16,
@@ -517,7 +534,7 @@ const styles = StyleSheet.create({
   },
   modalBtnText: {
     fontSize: 12,
-    fontWeight: 'bold',
+    fontFamily: fonts.bold,
   },
   slotDetailsCard: {
     marginTop: 10,

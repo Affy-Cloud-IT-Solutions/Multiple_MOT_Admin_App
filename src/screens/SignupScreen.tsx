@@ -14,6 +14,7 @@ import {
 import MaterialCommunityIcons from 'react-native-vector-icons/MaterialCommunityIcons';
 import { useAppTheme } from '../context/ThemeContext';
 import { useAppValues, BASE_URL } from '../context/DataContext';
+import { fonts } from '../theme/theme';
 import {
   validatePhoneNumber,
   validateEmail,
@@ -349,12 +350,13 @@ const styles = StyleSheet.create({
     marginBottom: 8,
   },
   title: {
+    fontFamily: fonts.extraBold,
     fontSize: 22,
-    fontWeight: '800',
     letterSpacing: -0.3,
     marginBottom: 4,
   },
   subtitle: {
+    fontFamily: fonts.regular,
     fontSize: 13,
     textAlign: 'center',
     lineHeight: 18,
@@ -373,10 +375,10 @@ const styles = StyleSheet.create({
     gap: 8,
   },
   errorText: {
+    fontFamily: fonts.semiBold,
     flex: 1,
     color: '#DC2626',
     fontSize: 12,
-    fontWeight: '600',
   },
   formCard: {
     borderWidth: 1,
@@ -388,8 +390,8 @@ const styles = StyleSheet.create({
     marginBottom: 12,
   },
   label: {
+    fontFamily: fonts.semiBold,
     fontSize: 12,
-    fontWeight: '600',
     marginBottom: 5,
   },
   inputWrapper: {
@@ -404,6 +406,7 @@ const styles = StyleSheet.create({
     marginRight: 8,
   },
   input: {
+    fontFamily: fonts.medium,
     flex: 1,
     fontSize: 13,
     paddingVertical: 0,
@@ -424,9 +427,9 @@ const styles = StyleSheet.create({
     gap: 8,
   },
   submitButtonText: {
+    fontFamily: fonts.bold,
     color: '#FFFFFF',
     fontSize: 14,
-    fontWeight: '700',
   },
   footerRow: {
     flexDirection: 'row',
@@ -435,10 +438,11 @@ const styles = StyleSheet.create({
     marginTop: 4,
   },
   footerText: {
+    fontFamily: fonts.regular,
     fontSize: 13,
   },
   loginLink: {
+    fontFamily: fonts.bold,
     fontSize: 13,
-    fontWeight: '700',
   },
 });

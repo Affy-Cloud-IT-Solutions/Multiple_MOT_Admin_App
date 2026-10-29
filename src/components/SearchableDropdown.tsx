@@ -211,7 +211,7 @@ export default function SearchableDropdown({
                         style={[
                           styles.itemText,
                           { color: theme.colors.text },
-                          isSelected && { color: theme.colors.secondary, fontWeight: 'bold' },
+                          isSelected && { color: theme.colors.secondary, fontFamily: fonts.bold },
                         ]}
                       >
                         {item}
@@ -245,6 +245,8 @@ export default function SearchableDropdown({
   );
 }
 
+import { fonts } from '../theme/theme';
+
 const styles = StyleSheet.create({
   container: {
     width: '100%',
@@ -263,6 +265,7 @@ const styles = StyleSheet.create({
     opacity: 0.55,
   },
   selectedText: {
+    fontFamily: fonts.medium,
     fontSize: 14,
     flex: 1,
     marginRight: 8,
@@ -287,8 +290,8 @@ const styles = StyleSheet.create({
     borderBottomWidth: 1,
   },
   headerTitle: {
+    fontFamily: fonts.bold,
     fontSize: 16,
-    fontWeight: 'bold',
   },
   closeButton: {
     padding: 4,
@@ -305,6 +308,7 @@ const styles = StyleSheet.create({
     marginRight: 6,
   },
   searchInput: {
+    fontFamily: fonts.regular,
     flex: 1,
     fontSize: 14,
     padding: 0,
@@ -327,6 +331,7 @@ const styles = StyleSheet.create({
     borderBottomWidth: 1,
   },
   itemText: {
+    fontFamily: fonts.regular,
     fontSize: 14,
     flex: 1,
   },
@@ -335,6 +340,7 @@ const styles = StyleSheet.create({
     alignItems: 'center',
   },
   emptyText: {
+    fontFamily: fonts.regular,
     fontSize: 14,
   },
   footerSpinner: {

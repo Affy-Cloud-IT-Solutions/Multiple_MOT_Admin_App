@@ -16,6 +16,7 @@ import {
 } from 'react-native';
 import MaterialCommunityIcons from 'react-native-vector-icons/MaterialCommunityIcons';
 import { useAppTheme } from '../context/ThemeContext';
+import { fonts } from '../theme/theme';
 import { useAppValues, AlertNotification } from '../context/DataContext';
 import { SafeAreaView } from 'react-native-safe-area-context';
 
@@ -79,8 +80,10 @@ const getMotSlotDisplay = (item: any): string => {
   const num = getSlotNumber(item);
   let timeStr = item?.slotTime || '';
   if (!timeStr && item?.makeModel) {
-    const match = item.makeModel.match(/Slot:\s*([^\n\r]+)/i);
+    const match = item.makeModel.match(/(?:MOT\s+)?Slot:\s*([^\n\r&]+)/i);
     if (match) timeStr = match[1].trim();
+  } else if (timeStr && timeStr.includes(' & Service:')) {
+    timeStr = timeStr.split(' & Service:')[0].replace(/^(?:MOT\s+)?Slot:\s*/i, '').trim();
   }
 
   if (num && timeStr && timeStr !== 'Full Day Drop-off' && timeStr !== 'Drop-off (Full Day)') {
@@ -90,7 +93,7 @@ const getMotSlotDisplay = (item: any): string => {
     return `Slot #${num}`;
   }
   if (timeStr && timeStr !== 'Full Day Drop-off' && timeStr !== 'Drop-off (Full Day)') {
-    return `Slot: ${timeStr}`;
+    return `MOT Slot: ${timeStr}`;
   }
   return 'MOT Slot';
 };
@@ -724,9 +727,19 @@ export default function BookedMotsScreen({ navigation }: any) {
             );
             const custName = item.customerName || (customer ? `${customer.firstName} ${customer.lastName}` : 'Customer');
             const custPhone = item.customerMobile || customer?.mobile || '';
-            const cleanMake = item.makeModel?.split(' (Slot:')[0]?.split(' at ')[0]?.split(' - Slot:')[0]?.trim() || item.makeModel || 'Vehicle';
+            const cleanMake = item.makeModel?.split(' (Slot:')[0]?.split(' at ')[0]?.split(' - Slot:')[0]?.split(' - MOT Slot:')[0]?.split(' - Workshop Drop-off')[0]?.trim() || item.makeModel || 'Vehicle';
             const isMot = isMotBooking(item);
             const isDateOnly = !isMot;
+
+            const servicesList: any[] = Array.isArray(item.services) ? item.services : [];
+            const otherServices = servicesList.filter((s: any) => {
+              const name = (typeof s === 'string' ? s : s?.name || '').toUpperCase();
+              const cat = (typeof s === 'object' ? s?.category || '' : '').toUpperCase();
+              return !name.includes('MOT') && cat !== 'MOT';
+            });
+            const otherServicesNames = otherServices.map((s: any) => typeof s === 'string' ? s : s?.name || '').filter(Boolean).join(', ') ||
+              (item.makeModel?.includes('& Service:') ? item.makeModel.split('& Service:')[1]?.trim() : '');
+            const hasBothMotAndService = isMot && (otherServices.length > 0 || Boolean(otherServicesNames));
 
             return (
               <View
@@ -775,7 +788,7 @@ export default function BookedMotsScreen({ navigation }: any) {
                         size={13}
                         color="#2563EB"
                       />
-                      <Text style={[styles.infoChipText, { color: '#2563EB', fontWeight: '700' }]}>
+                      <Text style={[styles.infoChipText, { color: '#2563EB', fontFamily: fonts.bold }]}>
                         {getMotSlotDisplay(item)}
                       </Text>
                     </View>
@@ -792,11 +805,25 @@ export default function BookedMotsScreen({ navigation }: any) {
                     </View>
                   )}
 
+                  {/* If both MOT slot and other service are booked together */}
+                  {hasBothMotAndService && (
+                    <View style={[styles.infoChip, { backgroundColor: '#10B98115', borderColor: '#10B98140' }]}>
+                      <MaterialCommunityIcons
+                        name="wrench-outline"
+                        size={13}
+                        color="#059669"
+                      />
+                      <Text style={[styles.infoChipText, { color: '#059669', fontFamily: fonts.bold }]} numberOfLines={1}>
+                        + Service: {otherServicesNames}
+                      </Text>
+                    </View>
+                  )}
+
                   {/* Bay chip (if station assigned) */}
                   {item.stationName ? (
                     <View style={[styles.infoChip, { backgroundColor: '#10B98115', borderColor: '#10B98140' }]}>
                       <MaterialCommunityIcons name="garage" size={13} color="#059669" />
-                      <Text style={[styles.infoChipText, { color: '#059669', fontWeight: '600' }]} numberOfLines={1}>
+                      <Text style={[styles.infoChipText, { color: '#059669', fontFamily: fonts.semiBold }]} numberOfLines={1}>
                         {item.stationName}
                       </Text>
                     </View>
@@ -852,7 +879,7 @@ export default function BookedMotsScreen({ navigation }: any) {
                   <View style={styles.compactAlertBanner}>
                     <MaterialCommunityIcons name="alert-circle-outline" size={13} color="#EF4444" />
                     <Text style={styles.compactAlertText} numberOfLines={2}>
-                      <Text style={{ fontWeight: '700', color: '#EF4444' }}>Declined: </Text>
+                      <Text style={{ fontFamily: fonts.bold, color: '#EF4444' }}>Declined: </Text>
                       {item.rejectionReason}
                     </Text>
                   </View>
@@ -863,7 +890,7 @@ export default function BookedMotsScreen({ navigation }: any) {
                   <View style={[styles.compactAlertBanner, { backgroundColor: '#DC262610', borderColor: '#DC262625' }]}>
                     <MaterialCommunityIcons name="calendar-remove" size={13} color="#DC2626" />
                     <Text style={[styles.compactAlertText, { color: theme.colors.text }]} numberOfLines={2}>
-                      <Text style={{ fontWeight: '700', color: '#DC2626' }}>Cancelled by {item.cancelledBy || 'Customer'}: </Text>
+                      <Text style={{ fontFamily: fonts.bold, color: '#DC2626' }}>Cancelled by {item.cancelledBy || 'Customer'}: </Text>
                       {item.cancellationReason || 'Slot has been released.'}
                     </Text>
                   </View>
@@ -963,7 +990,7 @@ export default function BookedMotsScreen({ navigation }: any) {
                       activeOpacity={0.7}
                     >
                       <MaterialCommunityIcons name="calendar-clock" size={13} color={theme.colors.secondary} style={{ marginRight: 4 }} />
-                      <Text style={{ fontSize: 12, fontWeight: '700', color: theme.colors.secondary }}>Reschedule</Text>
+                      <Text style={{ fontSize: 12, fontFamily: fonts.bold, color: theme.colors.secondary }}>Reschedule</Text>
                     </TouchableOpacity>
 
                     <TouchableOpacity
@@ -1117,7 +1144,7 @@ export default function BookedMotsScreen({ navigation }: any) {
                           styles.filterTagText,
                           {
                             color: isSelected ? '#FFFFFF' : theme.colors.text,
-                            fontWeight: isSelected ? '700' : '600',
+                            fontFamily: isSelected ? fonts.bold : fonts.semiBold,
                           }
                         ]}
                       >
@@ -1176,7 +1203,7 @@ export default function BookedMotsScreen({ navigation }: any) {
                       styles.calendarBtnMainText,
                       {
                         color: selectedCustomDate ? theme.colors.secondary : theme.colors.text,
-                        fontWeight: selectedCustomDate ? '700' : '600'
+                        fontFamily: selectedCustomDate ? fonts.bold : fonts.semiBold,
                       }
                     ]}>
                       {selectedCustomDate ? formatYMDToDisplay(selectedCustomDate) : 'Pick Date from Calendar'}
@@ -1276,7 +1303,7 @@ export default function BookedMotsScreen({ navigation }: any) {
                 <View style={[styles.activeDateTag, { backgroundColor: theme.colors.background, borderColor: theme.colors.border }]}>
                   <MaterialCommunityIcons name="calendar-check" size={14} color="#10B981" />
                   <Text style={[styles.activeDateTagText, { color: theme.colors.text }]}>
-                    Selected: <Text style={{ fontWeight: '800', color: theme.colors.secondary }}>{formatYMDToDisplay(selectedCustomDate)}</Text>
+                    Selected: <Text style={{ fontFamily: fonts.extraBold, color: theme.colors.secondary }}>{formatYMDToDisplay(selectedCustomDate)}</Text>
                   </Text>
                 </View>
               )}
@@ -1354,7 +1381,7 @@ export default function BookedMotsScreen({ navigation }: any) {
                               : isToday
                               ? theme.colors.secondary
                               : theme.colors.text,
-                            fontWeight: isSelected || isToday || hasBookings ? '800' : '600',
+                            fontFamily: isSelected || isToday || hasBookings ? fonts.extraBold : fonts.semiBold,
                           }
                         ]}
                       >
@@ -1423,11 +1450,12 @@ const styles = StyleSheet.create({
   },
   navTitle: {
     fontSize: 17,
-    fontWeight: '700',
+    fontFamily: fonts.bold,
     letterSpacing: -0.3,
   },
   navSubtitle: {
     fontSize: 11.5,
+    fontFamily: fonts.regular,
     marginTop: 1,
   },
   refreshIconBtn: {
@@ -1458,6 +1486,7 @@ const styles = StyleSheet.create({
   searchInput: {
     flex: 1,
     fontSize: 13,
+    fontFamily: fonts.regular,
     padding: 0,
   },
   filterIconBtn: {
@@ -1495,7 +1524,7 @@ const styles = StyleSheet.create({
   },
   activeFilterPillText: {
     fontSize: 12,
-    fontWeight: '700',
+    fontFamily: fonts.bold,
   },
   clearFilterCross: {
     marginLeft: 4,
@@ -1534,7 +1563,7 @@ const styles = StyleSheet.create({
   },
   bottomSheetTitle: {
     fontSize: 17,
-    fontWeight: '700',
+    fontFamily: fonts.bold,
     letterSpacing: -0.3,
   },
   sheetCloseBtn: {
@@ -1549,7 +1578,7 @@ const styles = StyleSheet.create({
   },
   sheetSectionLabel: {
     fontSize: 11,
-    fontWeight: '700',
+    fontFamily: fonts.bold,
     letterSpacing: 0.5,
     marginBottom: 8,
     textTransform: 'uppercase',
@@ -1569,6 +1598,7 @@ const styles = StyleSheet.create({
   },
   filterTagText: {
     fontSize: 12.5,
+    fontFamily: fonts.medium,
     marginRight: 6,
   },
   filterTagBadge: {
@@ -1578,7 +1608,7 @@ const styles = StyleSheet.create({
   },
   filterTagBadgeText: {
     fontSize: 10.5,
-    fontWeight: '700',
+    fontFamily: fonts.bold,
   },
   calendarOpenBtn: {
     flexDirection: 'row',
@@ -1604,9 +1634,11 @@ const styles = StyleSheet.create({
   },
   calendarBtnMainText: {
     fontSize: 13,
+    fontFamily: fonts.semiBold,
   },
   calendarBtnSubText: {
     fontSize: 11,
+    fontFamily: fonts.regular,
     marginTop: 1,
   },
   calendarClearBtn: {
@@ -1634,7 +1666,7 @@ const styles = StyleSheet.create({
   },
   sheetResetBtnText: {
     fontSize: 13,
-    fontWeight: '600',
+    fontFamily: fonts.semiBold,
   },
   sheetApplyBtn: {
     flex: 2,
@@ -1646,7 +1678,7 @@ const styles = StyleSheet.create({
   sheetApplyBtnText: {
     color: '#FFFFFF',
     fontSize: 13.5,
-    fontWeight: '700',
+    fontFamily: fonts.bold,
   },
   calendarModalCard: {
     borderRadius: 20,
@@ -1675,11 +1707,12 @@ const styles = StyleSheet.create({
   },
   calendarTitle: {
     fontSize: 16,
-    fontWeight: '800',
+    fontFamily: fonts.extraBold,
     letterSpacing: -0.2,
   },
   calSubTitle: {
     fontSize: 11,
+    fontFamily: fonts.regular,
     marginTop: 1,
   },
   calToolbarRow: {
@@ -1701,7 +1734,7 @@ const styles = StyleSheet.create({
   },
   todayQuickBtnText: {
     fontSize: 12,
-    fontWeight: '700',
+    fontFamily: fonts.bold,
   },
   activeDateTag: {
     flexDirection: 'row',
@@ -1714,6 +1747,7 @@ const styles = StyleSheet.create({
   },
   activeDateTagText: {
     fontSize: 12,
+    fontFamily: fonts.regular,
   },
   weekdayRow: {
     flexDirection: 'row',
@@ -1727,7 +1761,7 @@ const styles = StyleSheet.create({
     width: '14.28%',
     textAlign: 'center',
     fontSize: 11.5,
-    fontWeight: '700',
+    fontFamily: fonts.bold,
     textTransform: 'uppercase',
   },
   daysGrid: {
@@ -1750,6 +1784,7 @@ const styles = StyleSheet.create({
   },
   dayText: {
     fontSize: 13,
+    fontFamily: fonts.medium,
   },
   todayDot: {
     width: 4,
@@ -1785,7 +1820,7 @@ const styles = StyleSheet.create({
   },
   legendText: {
     fontSize: 11,
-    fontWeight: '600',
+    fontFamily: fonts.semiBold,
   },
   closeCalModalBtn: {
     marginTop: 14,
@@ -1796,7 +1831,7 @@ const styles = StyleSheet.create({
   },
   closeCalModalBtnText: {
     fontSize: 13,
-    fontWeight: '600',
+    fontFamily: fonts.semiBold,
   },
   scrollContent: {
     padding: 16,
@@ -1814,11 +1849,12 @@ const styles = StyleSheet.create({
   },
   emptyText: {
     fontSize: 15,
-    fontWeight: '700',
+    fontFamily: fonts.bold,
     marginBottom: 4,
   },
   emptySubtext: {
     fontSize: 12,
+    fontFamily: fonts.regular,
     textAlign: 'center',
   },
   bookingCard: {
@@ -1857,13 +1893,13 @@ const styles = StyleSheet.create({
   },
   plateText: {
     color: '#000',
-    fontWeight: '800',
+    fontFamily: fonts.extraBold,
     fontSize: 11,
     letterSpacing: 0.5,
   },
   vehicleModelText: {
     fontSize: 13,
-    fontWeight: '700',
+    fontFamily: fonts.bold,
     flex: 1,
   },
   statusBadge: {
@@ -1876,7 +1912,7 @@ const styles = StyleSheet.create({
   },
   statusText: {
     fontSize: 10,
-    fontWeight: '700',
+    fontFamily: fonts.bold,
   },
   infoChipsRow: {
     flexDirection: 'row',
@@ -1896,7 +1932,7 @@ const styles = StyleSheet.create({
   },
   infoChipText: {
     fontSize: 11,
-    fontWeight: '600',
+    fontFamily: fonts.semiBold,
   },
   customerServiceRow: {
     flexDirection: 'row',
@@ -1917,7 +1953,7 @@ const styles = StyleSheet.create({
   },
   customerMetaName: {
     fontSize: 12,
-    fontWeight: '600',
+    fontFamily: fonts.semiBold,
   },
   phoneChipCompact: {
     flexDirection: 'row',
@@ -1931,7 +1967,7 @@ const styles = StyleSheet.create({
   },
   phoneChipTextCompact: {
     fontSize: 10.5,
-    fontWeight: '700',
+    fontFamily: fonts.bold,
   },
   serviceTagBadge: {
     flexDirection: 'row',
@@ -1944,7 +1980,7 @@ const styles = StyleSheet.create({
   },
   serviceTagText: {
     fontSize: 10.5,
-    fontWeight: '700',
+    fontFamily: fonts.bold,
     color: '#8B5CF6',
   },
   multiServicesRow: {
@@ -1960,7 +1996,7 @@ const styles = StyleSheet.create({
   },
   multiServicePillText: {
     fontSize: 10,
-    fontWeight: '600',
+    fontFamily: fonts.semiBold,
   },
   compactAlertBanner: {
     flexDirection: 'row',
@@ -1976,6 +2012,7 @@ const styles = StyleSheet.create({
   },
   compactAlertText: {
     fontSize: 11,
+    fontFamily: fonts.regular,
     lineHeight: 15,
     flex: 1,
   },
@@ -2004,7 +2041,7 @@ const styles = StyleSheet.create({
   cardRejectBtnText: {
     color: '#EF4444',
     fontSize: 11.5,
-    fontWeight: '700',
+    fontFamily: fonts.bold,
   },
   cardConfirmBtn: {
     elevation: 1,
@@ -2012,7 +2049,7 @@ const styles = StyleSheet.create({
   cardConfirmBtnText: {
     color: '#FFFFFF',
     fontSize: 11.5,
-    fontWeight: '700',
+    fontFamily: fonts.bold,
   },
   cardCancelBookingBtn: {
     flexDirection: 'row',
@@ -2025,7 +2062,7 @@ const styles = StyleSheet.create({
   },
   cardCancelBookingText: {
     fontSize: 10.5,
-    fontWeight: '700',
+    fontFamily: fonts.bold,
     color: '#FFFFFF',
   },
   modalOverlay: {
@@ -2061,15 +2098,16 @@ const styles = StyleSheet.create({
   },
   modalTitle: {
     fontSize: 15,
-    fontWeight: '700',
+    fontFamily: fonts.bold,
   },
   modalSubtitle: {
     fontSize: 11.5,
+    fontFamily: fonts.regular,
     marginTop: 1,
   },
   presetTitle: {
     fontSize: 11,
-    fontWeight: '600',
+    fontFamily: fonts.semiBold,
     marginBottom: 6,
     textTransform: 'uppercase',
   },
@@ -2087,13 +2125,14 @@ const styles = StyleSheet.create({
   },
   presetChipText: {
     fontSize: 10.5,
-    fontWeight: '600',
+    fontFamily: fonts.semiBold,
   },
   modalInput: {
     borderWidth: 1,
     borderRadius: 8,
     padding: 10,
     fontSize: 12.5,
+    fontFamily: fonts.regular,
     height: 60,
     textAlignVertical: 'top',
     marginBottom: 14,
@@ -2118,7 +2157,7 @@ const styles = StyleSheet.create({
   },
   modalBtnText: {
     fontSize: 12,
-    fontWeight: '700',
+    fontFamily: fonts.bold,
   },
 });
 

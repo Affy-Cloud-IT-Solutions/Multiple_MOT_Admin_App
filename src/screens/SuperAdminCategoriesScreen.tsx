@@ -16,6 +16,7 @@ import MaterialCommunityIcons from 'react-native-vector-icons/MaterialCommunityI
 import { SafeAreaView } from 'react-native-safe-area-context';
 import { useAppTheme } from '../context/ThemeContext';
 import { useAppValues, ServiceCategory } from '../context/DataContext';
+import { fonts } from '../theme/theme';
 
 const { width } = Dimensions.get('window');
 
@@ -199,7 +200,7 @@ export default function SuperAdminCategoriesScreen({ navigation }: any) {
           </Text>
           <TouchableOpacity onPress={onRefresh} style={{ flexDirection: 'row', alignItems: 'center' }}>
             <MaterialCommunityIcons name="refresh" size={14} color={theme.colors.primary} style={{ marginRight: 4 }} />
-            <Text style={{ fontSize: 12, color: theme.colors.primary, fontWeight: '600' }}>Refresh</Text>
+            <Text style={{ fontFamily: fonts.semiBold, fontSize: 12, color: theme.colors.primary }}>Refresh</Text>
           </TouchableOpacity>
         </View>
 
@@ -468,10 +469,11 @@ const styles = StyleSheet.create({
     padding: 4,
   },
   headerTitle: {
+    fontFamily: fonts.bold,
     fontSize: 16,
-    fontWeight: '700',
   },
   headerSubtitle: {
+    fontFamily: fonts.regular,
     fontSize: 11,
     marginTop: 1,
   },
@@ -483,9 +485,9 @@ const styles = StyleSheet.create({
     borderRadius: 8,
   },
   addBtnText: {
+    fontFamily: fonts.bold,
     color: '#FFFFFF',
     fontSize: 13,
-    fontWeight: '700',
   },
   scrollContent: {
     padding: 16,
@@ -500,8 +502,8 @@ const styles = StyleSheet.create({
     paddingHorizontal: 2,
   },
   countText: {
+    fontFamily: fonts.bold,
     fontSize: 12,
-    fontWeight: '700',
     textTransform: 'uppercase',
     letterSpacing: 0.5,
   },
@@ -517,12 +519,13 @@ const styles = StyleSheet.create({
     marginTop: 20,
   },
   emptyTitle: {
+    fontFamily: fonts.bold,
     fontSize: 15,
-    fontWeight: '700',
     marginTop: 12,
     marginBottom: 4,
   },
   emptySubtitle: {
+    fontFamily: fonts.regular,
     fontSize: 12,
     textAlign: 'center',
   },
@@ -553,8 +556,8 @@ const styles = StyleSheet.create({
     marginBottom: 2,
   },
   categoryName: {
+    fontFamily: fonts.bold,
     fontSize: 14,
-    fontWeight: '700',
   },
   defaultBadge: {
     paddingHorizontal: 6,
@@ -563,11 +566,12 @@ const styles = StyleSheet.create({
     borderWidth: 0.8,
   },
   defaultBadgeText: {
+    fontFamily: fonts.bold,
     fontSize: 9.5,
-    fontWeight: '700',
     textTransform: 'uppercase',
   },
   categoryDesc: {
+    fontFamily: fonts.regular,
     fontSize: 11.5,
     lineHeight: 16,
   },
@@ -604,10 +608,11 @@ const styles = StyleSheet.create({
     justifyContent: 'center',
   },
   modalTitle: {
+    fontFamily: fonts.bold,
     fontSize: 15,
-    fontWeight: '700',
   },
   modalSubtitle: {
+    fontFamily: fonts.regular,
     fontSize: 11,
   },
   modalFormContent: {
@@ -615,13 +620,14 @@ const styles = StyleSheet.create({
     paddingBottom: 24,
   },
   fieldLabel: {
+    fontFamily: fonts.bold,
     fontSize: 12,
-    fontWeight: '700',
     marginBottom: 6,
     textTransform: 'uppercase',
     letterSpacing: 0.3,
   },
   formInput: {
+    fontFamily: fonts.regular,
     height: 44,
     borderRadius: 8,
     borderWidth: 1,
@@ -629,6 +635,7 @@ const styles = StyleSheet.create({
     fontSize: 13.5,
   },
   formTextArea: {
+    fontFamily: fonts.regular,
     minHeight: 60,
     borderRadius: 8,
     borderWidth: 1,
@@ -651,8 +658,8 @@ const styles = StyleSheet.create({
     justifyContent: 'center',
   },
   iconGridLabel: {
+    fontFamily: fonts.semiBold,
     fontSize: 10,
-    fontWeight: '600',
     marginTop: 4,
   },
   colorRow: {
@@ -703,8 +710,8 @@ const styles = StyleSheet.create({
     borderColor: '#FFFFFF',
   },
   previewTitle: {
+    fontFamily: fonts.bold,
     fontSize: 13,
-    fontWeight: '700',
     marginBottom: 6,
   },
   previewSelectPill: {
@@ -717,8 +724,8 @@ const styles = StyleSheet.create({
     gap: 2,
   },
   previewSelectText: {
+    fontFamily: fonts.bold,
     fontSize: 10.5,
-    fontWeight: '700',
   },
   modalActionsRow: {
     flexDirection: 'row',
@@ -735,8 +742,8 @@ const styles = StyleSheet.create({
     justifyContent: 'center',
   },
   cancelBtnText: {
+    fontFamily: fonts.semiBold,
     fontSize: 13.5,
-    fontWeight: '600',
   },
   saveBtn: {
     flex: 1.6,
@@ -746,8 +753,8 @@ const styles = StyleSheet.create({
     justifyContent: 'center',
   },
   saveBtnText: {
+    fontFamily: fonts.bold,
     color: '#FFFFFF',
     fontSize: 13.5,
-    fontWeight: '700',
   },
 });

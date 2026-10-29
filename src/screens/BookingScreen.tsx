@@ -13,6 +13,7 @@ import {
 import MaterialCommunityIcons from 'react-native-vector-icons/MaterialCommunityIcons';
 import Toast from 'react-native-toast-message';
 import { useAppTheme } from '../context/ThemeContext';
+import { fonts } from '../theme/theme';
 import { useAppValues, BASE_URL } from '../context/DataContext';
 import { SafeAreaView } from 'react-native-safe-area-context';
 
@@ -387,7 +388,7 @@ export default function BookingScreen({ route, navigation }: any) {
                     style={[
                       styles.dayCellText,
                       { color: theme.colors.text },
-                      isSelected && { color: '#FFFFFF', fontWeight: 'bold' },
+                      isSelected && { color: '#FFFFFF', fontFamily: fonts.bold },
                       !selectable && { color: theme.colors.placeholder + '40' }
                     ]}
                   >
@@ -413,7 +414,7 @@ export default function BookingScreen({ route, navigation }: any) {
         {loadingSlots ? (
           <View style={[styles.emptyNoticeCard, { backgroundColor: theme.colors.card, borderColor: theme.colors.border }]}>
             <ActivityIndicator size="small" color={theme.colors.secondary} style={{ marginRight: 8 }} />
-            <Text style={{ color: theme.colors.placeholder, fontSize: 13 }}>
+            <Text style={{ color: theme.colors.placeholder, fontSize: 13, fontFamily: fonts.regular }}>
               Checking free slots...
             </Text>
           </View>
@@ -421,10 +422,10 @@ export default function BookingScreen({ route, navigation }: any) {
           <View style={[styles.emptyNoticeCard, { backgroundColor: theme.colors.card, borderColor: theme.colors.border }]}>
             <MaterialCommunityIcons name="calendar-remove" size={24} color={theme.colors.error} />
             <View style={{ marginLeft: 10, flex: 1 }}>
-              <Text style={{ color: theme.colors.text, fontSize: 13.5, fontWeight: '700' }}>
+              <Text style={{ color: theme.colors.text, fontSize: 13.5, fontFamily: fonts.bold }}>
                 No Free Slots Available
               </Text>
-              <Text style={{ color: theme.colors.placeholder, fontSize: 12, marginTop: 2 }}>
+              <Text style={{ color: theme.colors.placeholder, fontSize: 12, fontFamily: fonts.regular, marginTop: 2 }}>
                 All MOT slots are fully booked or closed on this date. Please select another date.
               </Text>
             </View>
@@ -451,14 +452,14 @@ export default function BookingScreen({ route, navigation }: any) {
                 >
                   <View style={{ flex: 1 }}>
                     <View style={{ flexDirection: 'row', alignItems: 'center', justifyContent: 'space-between' }}>
-                      <Text style={[styles.timeLabel, { color: theme.colors.text, fontSize: 14, fontWeight: '800' }]}>
+                      <Text style={[styles.timeLabel, { color: theme.colors.text, fontSize: 14, fontFamily: fonts.extraBold }]}>
                         {slot.time}
                       </Text>
                       {isSelected ? (
                         <MaterialCommunityIcons name="check-circle" size={16} color={theme.colors.secondary} />
                       ) : (
                         <View style={{ backgroundColor: '#10B98115', paddingHorizontal: 5, paddingVertical: 1, borderRadius: 4 }}>
-                          <Text style={{ color: '#10B981', fontSize: 10, fontWeight: '700' }}>
+                          <Text style={{ color: '#10B981', fontSize: 10, fontFamily: fonts.bold }}>
                             {slot.availableCount} Open
                           </Text>
                         </View>
@@ -541,12 +542,12 @@ const styles = StyleSheet.create({
   },
   backBtnText: {
     fontSize: 14,
-    fontWeight: 'bold',
+    fontFamily: fonts.bold,
     marginLeft: 4,
   },
   navTitle: {
     fontSize: 16,
-    fontWeight: 'bold',
+    fontFamily: fonts.bold,
   },
   scrollContent: {
     padding: 16,
@@ -592,7 +593,7 @@ const styles = StyleSheet.create({
   },
   ukPlateGbText: {
     color: '#FFFFFF',
-    fontWeight: '900',
+    fontFamily: fonts.extraBold,
     fontSize: 8,
     letterSpacing: 0.5,
   },
@@ -604,21 +605,22 @@ const styles = StyleSheet.create({
   },
   ukPlateNumberText: {
     color: '#000000',
-    fontWeight: '900',
+    fontFamily: fonts.extraBold,
     fontSize: 14,
     letterSpacing: 1.5,
   },
   vehicleMakeModel: {
     fontSize: 16,
-    fontWeight: '800',
+    fontFamily: fonts.extraBold,
     marginBottom: 2,
   },
   vehicleSubText: {
     fontSize: 12,
+    fontFamily: fonts.regular,
   },
   sectionHeading: {
     fontSize: 14,
-    fontWeight: 'bold',
+    fontFamily: fonts.bold,
     textTransform: 'uppercase',
     letterSpacing: 0.5,
     marginBottom: 12,
@@ -645,7 +647,7 @@ const styles = StyleSheet.create({
   },
   calendarTitle: {
     fontSize: 15,
-    fontWeight: 'bold',
+    fontFamily: fonts.bold,
   },
   weekdayRow: {
     flexDirection: 'row',
@@ -659,7 +661,7 @@ const styles = StyleSheet.create({
     width: '14.2%',
     textAlign: 'center',
     fontSize: 11,
-    fontWeight: '600',
+    fontFamily: fonts.semiBold,
   },
   daysGrid: {
     flexDirection: 'row',
@@ -674,6 +676,7 @@ const styles = StyleSheet.create({
   },
   dayCellText: {
     fontSize: 13,
+    fontFamily: fonts.regular,
   },
   timePickerContainer: {
     flexDirection: 'row',
@@ -698,10 +701,11 @@ const styles = StyleSheet.create({
   },
   timeLabel: {
     fontSize: 12,
-    fontWeight: 'bold',
+    fontFamily: fonts.bold,
   },
   timeText: {
     fontSize: 11,
+    fontFamily: fonts.regular,
     marginTop: 1,
   },
   notesInput: {
@@ -709,6 +713,7 @@ const styles = StyleSheet.create({
     borderRadius: 10,
     padding: 12,
     fontSize: 13,
+    fontFamily: fonts.regular,
     height: 90,
     textAlignVertical: 'top',
     marginBottom: 28,
@@ -733,7 +738,7 @@ const styles = StyleSheet.create({
   },
   submitBtnText: {
     color: '#FFFFFF',
-    fontWeight: 'bold',
+    fontFamily: fonts.bold,
     fontSize: 14,
   },
   rescheduleNotice: {
@@ -747,6 +752,7 @@ const styles = StyleSheet.create({
   rescheduleNoticeText: {
     flex: 1,
     fontSize: 12,
+    fontFamily: fonts.regular,
     lineHeight: 16,
   },
 });

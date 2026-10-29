@@ -10,6 +10,7 @@ import {
 } from 'react-native';
 import MaterialCommunityIcons from 'react-native-vector-icons/MaterialCommunityIcons';
 import { useAppTheme } from '../context/ThemeContext';
+import { fonts } from '../theme/theme';
 
 export default function ResultScreen({ route, navigation }: any) {
   const { theme } = useAppTheme();
@@ -94,7 +95,7 @@ export default function ResultScreen({ route, navigation }: any) {
 
           <Text style={[styles.expiryText, { color: theme.colors.text }]}>
             {isPass ? 'Expiry Date:' : 'Status Detail:'}{' '}
-            <Text style={{ fontWeight: 'bold' }}>{vehicle.expiryDate}</Text>
+            <Text style={{ fontFamily: fonts.bold }}>{vehicle.expiryDate}</Text>
           </Text>
         </View>
       </View>
@@ -220,24 +221,25 @@ const styles = StyleSheet.create({
   },
   ukText: {
     color: '#FFFFFF',
-    fontWeight: 'bold',
+    fontFamily: fonts.bold,
     fontSize: 8,
   },
   plateText: {
     fontSize: 20,
-    fontWeight: 'bold',
+    fontFamily: fonts.bold,
     color: '#000000',
     paddingHorizontal: 16,
     letterSpacing: 1.5,
   },
   vehicleTitle: {
     fontSize: 22,
-    fontWeight: 'bold',
+    fontFamily: fonts.bold,
     marginBottom: 4,
     textAlign: 'center',
   },
   vehicleSpec: {
     fontSize: 14,
+    fontFamily: fonts.regular,
     textAlign: 'center',
   },
   card: {
@@ -266,15 +268,16 @@ const styles = StyleSheet.create({
   },
   statusText: {
     fontSize: 24,
-    fontWeight: 'bold',
+    fontFamily: fonts.bold,
     marginBottom: 8,
   },
   expiryText: {
     fontSize: 15,
+    fontFamily: fonts.regular,
   },
   cardTitle: {
     fontSize: 16,
-    fontWeight: 'bold',
+    fontFamily: fonts.bold,
     marginBottom: 12,
   },
   detailRow: {
@@ -283,7 +286,7 @@ const styles = StyleSheet.create({
     paddingVertical: 12,
   },
   detailValue: {
-    fontWeight: '500',
+    fontFamily: fonts.medium,
   },
   divider: {
     height: 1,
@@ -316,6 +319,7 @@ const styles = StyleSheet.create({
   },
   itemText: {
     fontSize: 14,
+    fontFamily: fonts.regular,
     lineHeight: 20,
     flex: 1,
   },
@@ -337,6 +341,6 @@ const styles = StyleSheet.create({
   saveButtonText: {
     color: '#FFFFFF',
     fontSize: 16,
-    fontWeight: 'bold',
+    fontFamily: fonts.bold,
   },
 });

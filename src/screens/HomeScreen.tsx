@@ -14,6 +14,7 @@ import {
 } from 'react-native';
 import MaterialCommunityIcons from 'react-native-vector-icons/MaterialCommunityIcons';
 import { useAppTheme } from '../context/ThemeContext';
+import { fonts } from '../theme/theme';
 
 const MOCK_VEHICLES: Record<string, any> = {
   'AB18 CDE': {
@@ -252,12 +253,13 @@ const styles = StyleSheet.create({
     paddingHorizontal: 8,
   },
   bannerTitle: {
+    fontFamily: fonts.black,
     fontSize: 26,
-    fontWeight: '900',
     marginBottom: 8,
     textAlign: 'center',
   },
   bannerSubtitle: {
+    fontFamily: fonts.regular,
     fontSize: 14,
     textAlign: 'center',
     lineHeight: 20,
@@ -274,8 +276,8 @@ const styles = StyleSheet.create({
     marginBottom: 24,
   },
   inputLabel: {
+    fontFamily: fonts.bold,
     fontSize: 15,
-    fontWeight: 'bold',
     marginBottom: 12,
   },
   plateOuterContainer: {
@@ -297,14 +299,14 @@ const styles = StyleSheet.create({
     alignItems: 'center',
   },
   ukPlateStripText: {
+    fontFamily: fonts.bold,
     color: '#FFFFFF',
-    fontWeight: 'bold',
     fontSize: 10,
   },
   plateInput: {
+    fontFamily: fonts.bold,
     flex: 1,
     fontSize: 22,
-    fontWeight: 'bold',
     color: '#000000',
     textAlign: 'center',
     letterSpacing: 2,
@@ -323,16 +325,16 @@ const styles = StyleSheet.create({
     shadowRadius: 4,
   },
   searchButtonText: {
+    fontFamily: fonts.bold,
     color: '#FFFFFF',
     fontSize: 16,
-    fontWeight: 'bold',
   },
   recentSection: {
     marginTop: 8,
   },
   sectionTitle: {
+    fontFamily: fonts.bold,
     fontSize: 18,
-    fontWeight: 'bold',
     marginBottom: 16,
   },
   recentCard: {
@@ -366,8 +368,8 @@ const styles = StyleSheet.create({
     marginRight: 12,
   },
   recentPlateText: {
+    fontFamily: fonts.bold,
     color: '#000',
-    fontWeight: 'bold',
     fontSize: 12,
     letterSpacing: 0.5,
   },
@@ -375,10 +377,11 @@ const styles = StyleSheet.create({
     flex: 1,
   },
   vehicleText: {
-    fontWeight: 'bold',
+    fontFamily: fonts.bold,
     fontSize: 14,
   },
   vehicleCheckDate: {
+    fontFamily: fonts.regular,
     fontSize: 12,
     marginTop: 2,
   },
@@ -390,7 +393,7 @@ const styles = StyleSheet.create({
     alignItems: 'center',
   },
   statusText: {
+    fontFamily: fonts.bold,
     fontSize: 12,
-    fontWeight: 'bold',
   },
 });

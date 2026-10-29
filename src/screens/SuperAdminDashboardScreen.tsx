@@ -12,6 +12,7 @@ import {
 import MaterialCommunityIcons from 'react-native-vector-icons/MaterialCommunityIcons';
 import { useAppTheme } from '../context/ThemeContext';
 import { useAppValues, BASE_URL } from '../context/DataContext';
+import { fonts } from '../theme/theme';
 
 const { width } = Dimensions.get('window');
 
@@ -235,7 +236,7 @@ export default function SuperAdminDashboardScreen({ navigation }: any) {
               Manage Service Categories
             </Text>
             <View style={{ backgroundColor: '#10B98118', paddingHorizontal: 6, paddingVertical: 1.5, borderRadius: 4 }}>
-              <Text style={{ color: '#10B981', fontSize: 10, fontWeight: '700' }}>Master</Text>
+              <Text style={{ fontFamily: fonts.bold, color: '#10B981', fontSize: 10 }}>Master</Text>
             </View>
           </View>
           <Text style={[styles.catManageSubtitle, { color: theme.colors.placeholder }]}>
@@ -279,7 +280,7 @@ export default function SuperAdminDashboardScreen({ navigation }: any) {
                       {garage.name}
                     </Text>
                     <View style={{ backgroundColor: '#F59E0B20', paddingHorizontal: 8, paddingVertical: 2, borderRadius: 6 }}>
-                      <Text style={{ color: '#F59E0B', fontSize: 10.5, fontWeight: 'bold' }}>Pending Review</Text>
+                      <Text style={{ fontFamily: fonts.bold, color: '#F59E0B', fontSize: 10.5 }}>Pending Review</Text>
                     </View>
                   </View>
                   <Text style={[styles.pendingGarageLocation, { color: theme.colors.placeholder }]} numberOfLines={1}>
@@ -441,19 +442,19 @@ const styles = StyleSheet.create({
     marginBottom: 6,
   },
   roleTagText: {
+    fontFamily: fonts.extraBold,
     fontSize: 10,
-    fontWeight: '800',
     color: '#6366F1',
     letterSpacing: 0.8,
   },
   title: {
+    fontFamily: fonts.extraBold,
     fontSize: 24,
-    fontWeight: '800',
     letterSpacing: -0.5,
   },
   subtitle: {
+    fontFamily: fonts.regular,
     fontSize: 13,
-    fontWeight: '400',
     marginTop: 2,
   },
   refreshButton: {
@@ -493,19 +494,19 @@ const styles = StyleSheet.create({
     flex: 1,
   },
   statValue: {
+    fontFamily: fonts.extraBold,
     fontSize: 18,
-    fontWeight: '800',
     letterSpacing: -0.3,
   },
   statLabel: {
+    fontFamily: fonts.bold,
     fontSize: 10,
-    fontWeight: '700',
     textTransform: 'uppercase',
     letterSpacing: 0.2,
   },
   statSubtitle: {
+    fontFamily: fonts.semiBold,
     fontSize: 9,
-    fontWeight: '600',
     marginTop: 2,
   },
   section: {
@@ -519,13 +520,13 @@ const styles = StyleSheet.create({
     marginBottom: 12,
   },
   sectionTitle: {
+    fontFamily: fonts.bold,
     fontSize: 17,
-    fontWeight: '700',
     letterSpacing: -0.2,
   },
   viewAllText: {
+    fontFamily: fonts.bold,
     fontSize: 13,
-    fontWeight: '700',
   },
   badgePulse: {
     backgroundColor: '#EF4444',
@@ -536,9 +537,9 @@ const styles = StyleSheet.create({
     justifyContent: 'center',
   },
   badgePulseText: {
+    fontFamily: fonts.extraBold,
     color: '#FFFFFF',
     fontSize: 11,
-    fontWeight: '800',
   },
   pendingCard: {
     borderRadius: 12,
@@ -560,15 +561,17 @@ const styles = StyleSheet.create({
     justifyContent: 'center',
   },
   pendingGarageName: {
+    fontFamily: fonts.bold,
     fontSize: 16,
-    fontWeight: '700',
     marginBottom: 2,
   },
   pendingGarageLocation: {
+    fontFamily: fonts.regular,
     fontSize: 12,
     marginBottom: 2,
   },
   pendingGaragePhone: {
+    fontFamily: fonts.regular,
     fontSize: 11,
   },
   pendingCardActions: {
@@ -593,9 +596,9 @@ const styles = StyleSheet.create({
     borderColor: '#EF444440',
   },
   actionBtnText: {
+    fontFamily: fonts.bold,
     color: '#FFFFFF',
     fontSize: 12.5,
-    fontWeight: '700',
   },
   emptyCard: {
     borderRadius: 12,
@@ -605,8 +608,8 @@ const styles = StyleSheet.create({
     gap: 8,
   },
   emptyText: {
+    fontFamily: fonts.medium,
     fontSize: 13,
-    fontWeight: '500',
   },
   garageSummaryCard: {
     borderRadius: 12,
@@ -628,12 +631,13 @@ const styles = StyleSheet.create({
     justifyContent: 'center',
   },
   garageTitle: {
+    fontFamily: fonts.bold,
     fontSize: 15,
-    fontWeight: '700',
     flex: 1,
     marginRight: 8,
   },
   garageAddress: {
+    fontFamily: fonts.regular,
     fontSize: 12,
     marginTop: 2,
   },
@@ -643,8 +647,8 @@ const styles = StyleSheet.create({
     borderRadius: 6,
   },
   statusChipText: {
+    fontFamily: fonts.bold,
     fontSize: 11,
-    fontWeight: '700',
   },
   garageMetricsRow: {
     flexDirection: 'row',
@@ -658,8 +662,8 @@ const styles = StyleSheet.create({
     gap: 4,
   },
   metricText: {
+    fontFamily: fonts.semiBold,
     fontSize: 11.5,
-    fontWeight: '600',
   },
   categoryManageCard: {
     flexDirection: 'row',
@@ -678,10 +682,11 @@ const styles = StyleSheet.create({
     justifyContent: 'center',
   },
   catManageTitle: {
+    fontFamily: fonts.bold,
     fontSize: 14,
-    fontWeight: '700',
   },
   catManageSubtitle: {
+    fontFamily: fonts.regular,
     fontSize: 11.5,
     marginTop: 2,
     lineHeight: 16,

@@ -16,6 +16,7 @@ import {
 import MaterialCommunityIcons from 'react-native-vector-icons/MaterialCommunityIcons';
 import { useAppTheme } from '../context/ThemeContext';
 import { useAppValues, BASE_URL, Garage } from '../context/DataContext';
+import { fonts } from '../theme/theme';
 
 const { width: SCREEN_WIDTH, height: SCREEN_HEIGHT } = Dimensions.get('window');
 
@@ -256,7 +257,7 @@ export default function GarageVerificationReviewScreen({ route, navigation }: an
                 color={garage.verificationStatus === 'Verified' ? '#10B981' : '#F59E0B'}
                 style={{ marginRight: 4 }}
               />
-              <Text style={{ fontSize: 12, fontWeight: '700', color: garage.verificationStatus === 'Verified' ? '#10B981' : '#F59E0B' }}>
+              <Text style={{ fontSize: 12, fontFamily: fonts.bold, color: garage.verificationStatus === 'Verified' ? '#10B981' : '#F59E0B' }}>
                 {garage.verificationStatus || 'Pending'}
               </Text>
             </View>
@@ -410,7 +411,7 @@ export default function GarageVerificationReviewScreen({ route, navigation }: an
             <View style={[styles.credentialBox, { width: '100%', backgroundColor: '#10B98110', borderColor: '#10B98140' }]}>
               <View style={{ flexDirection: 'row', alignItems: 'center', marginBottom: 4 }}>
                 <MaterialCommunityIcons name="check-decagram" size={16} color="#10B981" style={{ marginRight: 6 }} />
-                <Text style={{ fontSize: 12.5, fontWeight: '700', color: '#10B981' }}>Legal MOT Declaration Signed</Text>
+                <Text style={{ fontSize: 12.5, fontFamily: fonts.bold, color: '#10B981' }}>Legal MOT Declaration Signed</Text>
               </View>
               <Text style={{ fontSize: 11.5, color: theme.colors.placeholder }}>
                 Applicant legally declared compliance with DVLA MOT testing standards and genuine authorization.
@@ -629,7 +630,7 @@ export default function GarageVerificationReviewScreen({ route, navigation }: an
           <View style={{ flexDirection: 'row', alignItems: 'center', backgroundColor: '#10B98115', borderRadius: 10, padding: 12, borderWidth: 1, borderColor: '#10B98140' }}>
             <MaterialCommunityIcons name="check-decagram" size={26} color="#10B981" style={{ marginRight: 10 }} />
             <View style={{ flex: 1 }}>
-              <Text style={{ fontSize: 14, fontWeight: '700', color: '#10B981' }}>Garage Application Approved</Text>
+              <Text style={{ fontSize: 14, fontFamily: fonts.bold, color: '#10B981' }}>Garage Application Approved</Text>
               <Text style={{ fontSize: 11.5, color: theme.colors.placeholder, marginTop: 2 }}>
                 Full operational credentials verified. Garage is active for public bookings.
               </Text>
@@ -641,7 +642,7 @@ export default function GarageVerificationReviewScreen({ route, navigation }: an
           <View style={{ flexDirection: 'row', alignItems: 'center', backgroundColor: '#EF444415', borderRadius: 10, padding: 12, borderWidth: 1, borderColor: '#EF444440' }}>
             <MaterialCommunityIcons name="close-circle" size={26} color="#EF4444" style={{ marginRight: 10 }} />
             <View style={{ flex: 1 }}>
-              <Text style={{ fontSize: 14, fontWeight: '700', color: '#EF4444' }}>Garage Application Rejected</Text>
+              <Text style={{ fontSize: 14, fontFamily: fonts.bold, color: '#EF4444' }}>Garage Application Rejected</Text>
               <Text style={{ fontSize: 11.5, color: theme.colors.text, marginTop: 2 }}>
                 {garage.rejectionReason || 'Application has been rejected. Applicant must submit new credentials.'}
               </Text>
@@ -670,7 +671,7 @@ export default function GarageVerificationReviewScreen({ route, navigation }: an
             </View>
 
             <Text style={[styles.modalDocName, { color: theme.colors.text }]}>
-              Document: <Text style={{ fontWeight: 'bold' }}>{rejectingDoc?.name}</Text>
+              Document: <Text style={{ fontFamily: fonts.bold }}>{rejectingDoc?.name}</Text>
             </Text>
 
             <Text style={[styles.modalLabel, { color: theme.colors.placeholder, marginTop: 10 }]}>
@@ -901,7 +902,7 @@ const styles = StyleSheet.create({
   loadingText: {
     marginTop: 12,
     fontSize: 14,
-    fontWeight: '600',
+    fontFamily: fonts.semiBold,
   },
   header: {
     flexDirection: 'row',
@@ -920,10 +921,11 @@ const styles = StyleSheet.create({
   },
   headerTitle: {
     fontSize: 16,
-    fontWeight: '800',
+    fontFamily: fonts.extraBold,
   },
   headerSubtitle: {
     fontSize: 12,
+    fontFamily: fonts.regular,
     marginTop: 1,
   },
   statusBadge: {
@@ -933,7 +935,7 @@ const styles = StyleSheet.create({
   },
   statusBadgeText: {
     fontSize: 11.5,
-    fontWeight: '800',
+    fontFamily: fonts.extraBold,
   },
   scrollContent: {
     padding: 16,
@@ -953,10 +955,11 @@ const styles = StyleSheet.create({
   },
   summaryTitle: {
     fontSize: 15,
-    fontWeight: '800',
+    fontFamily: fonts.extraBold,
   },
   summarySubtitle: {
     fontSize: 12,
+    fontFamily: fonts.regular,
     marginTop: 2,
   },
   verificationPill: {
@@ -987,11 +990,12 @@ const styles = StyleSheet.create({
   },
   rejectionNoticeHeading: {
     fontSize: 12,
-    fontWeight: 'bold',
+    fontFamily: fonts.bold,
     color: '#EF4444',
   },
   rejectionNoticeText: {
     fontSize: 12,
+    fontFamily: fonts.regular,
     color: '#EF4444',
     marginTop: 2,
   },
@@ -1008,10 +1012,11 @@ const styles = StyleSheet.create({
   },
   sectionTitle: {
     fontSize: 15,
-    fontWeight: '800',
+    fontFamily: fonts.extraBold,
   },
   sectionHelper: {
     fontSize: 11.5,
+    fontFamily: fonts.regular,
     marginBottom: 12,
     lineHeight: 16,
   },
@@ -1026,12 +1031,12 @@ const styles = StyleSheet.create({
   },
   detailLabel: {
     fontSize: 11,
-    fontWeight: '600',
+    fontFamily: fonts.semiBold,
     marginBottom: 2,
   },
   detailValue: {
     fontSize: 13,
-    fontWeight: '700',
+    fontFamily: fonts.bold,
   },
   credentialBox: {
     width: '48%',
@@ -1042,7 +1047,7 @@ const styles = StyleSheet.create({
   },
   credentialValue: {
     fontSize: 13.5,
-    fontWeight: '800',
+    fontFamily: fonts.extraBold,
     marginTop: 2,
   },
   photoList: {
@@ -1073,7 +1078,7 @@ const styles = StyleSheet.create({
   photoBadgeText: {
     color: '#FFFFFF',
     fontSize: 9.5,
-    fontWeight: 'bold',
+    fontFamily: fonts.bold,
   },
   emptyBox: {
     borderWidth: 1,
@@ -1085,6 +1090,7 @@ const styles = StyleSheet.create({
   },
   emptyBoxText: {
     fontSize: 12,
+    fontFamily: fonts.regular,
     marginTop: 6,
   },
   docAuditCard: {
@@ -1107,10 +1113,11 @@ const styles = StyleSheet.create({
   },
   docTitleText: {
     fontSize: 13.5,
-    fontWeight: '700',
+    fontFamily: fonts.bold,
   },
   docSubtitleText: {
     fontSize: 11,
+    fontFamily: fonts.regular,
     marginTop: 2,
   },
   docStatusBadge: {
@@ -1120,7 +1127,7 @@ const styles = StyleSheet.create({
   },
   docStatusBadgeText: {
     fontSize: 11,
-    fontWeight: '800',
+    fontFamily: fonts.extraBold,
   },
   docRejectionBanner: {
     flexDirection: 'row',
@@ -1133,7 +1140,7 @@ const styles = StyleSheet.create({
   },
   docRejectionHeading: {
     fontSize: 11,
-    fontWeight: 'bold',
+    fontFamily: fonts.bold,
     color: '#EF4444',
   },
   docRejectionText: {
@@ -1141,6 +1148,7 @@ const styles = StyleSheet.create({
     color: '#EF4444',
     marginTop: 1,
     fontStyle: 'italic',
+    fontFamily: fonts.regular,
   },
   docActionRow: {
     flexDirection: 'row',
@@ -1162,7 +1170,7 @@ const styles = StyleSheet.create({
   },
   previewDocBtnText: {
     fontSize: 11.5,
-    fontWeight: '700',
+    fontFamily: fonts.bold,
   },
   approveDocBtn: {
     flexDirection: 'row',
@@ -1174,7 +1182,7 @@ const styles = StyleSheet.create({
   },
   approveDocBtnText: {
     fontSize: 11.5,
-    fontWeight: '700',
+    fontFamily: fonts.bold,
   },
   rejectDocBtn: {
     flexDirection: 'row',
@@ -1186,7 +1194,7 @@ const styles = StyleSheet.create({
   },
   rejectDocBtnText: {
     fontSize: 11.5,
-    fontWeight: '700',
+    fontFamily: fonts.bold,
   },
   bottomDecisionBar: {
     position: 'absolute',
@@ -1205,10 +1213,11 @@ const styles = StyleSheet.create({
   },
   decisionSummaryTitle: {
     fontSize: 13.5,
-    fontWeight: '800',
+    fontFamily: fonts.extraBold,
   },
   decisionSummarySubtitle: {
     fontSize: 11,
+    fontFamily: fonts.regular,
     marginTop: 2,
   },
   decisionButtonRow: {
@@ -1227,7 +1236,7 @@ const styles = StyleSheet.create({
   masterRejectBtnText: {
     color: '#FFFFFF',
     fontSize: 13,
-    fontWeight: '800',
+    fontFamily: fonts.extraBold,
   },
   masterApproveBtn: {
     flex: 1.3,
@@ -1240,7 +1249,7 @@ const styles = StyleSheet.create({
   masterApproveBtnText: {
     color: '#FFFFFF',
     fontSize: 13,
-    fontWeight: '800',
+    fontFamily: fonts.extraBold,
   },
   modalOverlay: {
     flex: 1,
@@ -1261,20 +1270,22 @@ const styles = StyleSheet.create({
   },
   modalHeading: {
     fontSize: 16,
-    fontWeight: '800',
+    fontFamily: fonts.extraBold,
   },
   modalDocName: {
     fontSize: 13,
+    fontFamily: fonts.regular,
     marginTop: 4,
   },
   modalSubtitleText: {
     fontSize: 12,
+    fontFamily: fonts.regular,
     lineHeight: 16,
     marginTop: 4,
   },
   modalLabel: {
     fontSize: 11.5,
-    fontWeight: '700',
+    fontFamily: fonts.bold,
   },
   presetChip: {
     borderWidth: 1,
@@ -1285,13 +1296,14 @@ const styles = StyleSheet.create({
   },
   presetText: {
     fontSize: 11.5,
-    fontWeight: '600',
+    fontFamily: fonts.semiBold,
   },
   rejectionTextInput: {
     borderWidth: 1,
     borderRadius: 8,
     padding: 10,
     fontSize: 12.5,
+    fontFamily: fonts.regular,
     textAlignVertical: 'top',
     marginTop: 6,
   },
@@ -1310,7 +1322,7 @@ const styles = StyleSheet.create({
   },
   modalCancelBtnText: {
     fontSize: 13,
-    fontWeight: '700',
+    fontFamily: fonts.bold,
   },
   modalConfirmRejectBtn: {
     flex: 1.5,
@@ -1323,7 +1335,7 @@ const styles = StyleSheet.create({
   modalConfirmRejectBtnText: {
     color: '#FFFFFF',
     fontSize: 13,
-    fontWeight: '800',
+    fontFamily: fonts.extraBold,
   },
   previewModalOverlay: {
     flex: 1,
@@ -1346,10 +1358,11 @@ const styles = StyleSheet.create({
   },
   previewModalTitle: {
     fontSize: 15,
-    fontWeight: '800',
+    fontFamily: fonts.extraBold,
   },
   previewModalSubtitle: {
     fontSize: 11.5,
+    fontFamily: fonts.regular,
     marginTop: 2,
   },
   closePreviewBtn: {
@@ -1376,12 +1389,13 @@ const styles = StyleSheet.create({
   },
   pdfDocTitle: {
     fontSize: 15,
-    fontWeight: '800',
+    fontFamily: fonts.extraBold,
     marginTop: 12,
     textAlign: 'center',
   },
   pdfDocUrl: {
     fontSize: 11.5,
+    fontFamily: fonts.regular,
     marginTop: 4,
     textAlign: 'center',
     marginBottom: 20,
@@ -1396,7 +1410,7 @@ const styles = StyleSheet.create({
   openLinkBtnText: {
     color: '#FFFFFF',
     fontSize: 13,
-    fontWeight: '700',
+    fontFamily: fonts.bold,
   },
   photoModalOverlay: {
     flex: 1,
@@ -1432,6 +1446,6 @@ const styles = StyleSheet.create({
   photoCaptionText: {
     color: '#FFFFFF',
     fontSize: 12,
-    fontWeight: 'bold',
+    fontFamily: fonts.bold,
   },
 });

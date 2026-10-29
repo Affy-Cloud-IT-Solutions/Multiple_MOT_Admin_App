@@ -13,6 +13,7 @@ import MaterialCommunityIcons from 'react-native-vector-icons/MaterialCommunityI
 import { useAppTheme } from '../context/ThemeContext';
 import { useAppValues } from '../context/DataContext';
 import { SafeAreaView } from 'react-native-safe-area-context';
+import { fonts } from '../theme/theme';
 
 export default function StaffListScreen({ navigation }: any) {
   const { theme } = useAppTheme();
@@ -161,7 +162,7 @@ const styles = StyleSheet.create({
   },
   navTitle: {
     fontSize: 18,
-    fontWeight: 'bold',
+    fontFamily: fonts.bold,
     flex: 1,
   },
   badgeCount: {
@@ -172,7 +173,7 @@ const styles = StyleSheet.create({
   },
   badgeText: {
     fontSize: 12,
-    fontWeight: 'bold',
+    fontFamily: fonts.bold,
   },
   centered: {
     flex: 1,
@@ -190,7 +191,7 @@ const styles = StyleSheet.create({
   },
   emptyText: {
     fontSize: 14,
-    fontWeight: '500',
+    fontFamily: fonts.medium,
   },
   staffCard: {
     flexDirection: 'row',
@@ -214,17 +215,18 @@ const styles = StyleSheet.create({
   },
   avatarText: {
     fontSize: 16,
-    fontWeight: 'bold',
+    fontFamily: fonts.bold,
   },
   staffMeta: {
     flex: 1,
   },
   staffName: {
     fontSize: 15,
-    fontWeight: 'bold',
+    fontFamily: fonts.bold,
   },
   staffEmail: {
     fontSize: 12.5,
+    fontFamily: fonts.regular,
     marginTop: 1,
   },
   deleteBtn: {

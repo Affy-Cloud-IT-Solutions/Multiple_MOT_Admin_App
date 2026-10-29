@@ -19,6 +19,7 @@ import { useAppValues, BASE_URL } from '../context/DataContext';
 import SearchableDropdown from '../components/SearchableDropdown';
 import { SafeAreaView } from 'react-native-safe-area-context';
 import { validateMotExpiryDate } from '../utils/validationUtils';
+import { fonts } from '../theme/theme';
 
 if (Platform.OS === 'android' && UIManager.setLayoutAnimationEnabledExperimental) {
   UIManager.setLayoutAnimationEnabledExperimental(true);
@@ -472,15 +473,15 @@ export default function CustomerPortalScreen({ route, navigation }: any) {
                       
                       <View style={[styles.infoRow, { marginTop: 6, justifyContent: 'flex-start', alignItems: 'center' }]}>
                         <MaterialCommunityIcons name="calendar-check-outline" size={16} color={theme.colors.placeholder} style={{ marginRight: 6 }} />
-                        <Text style={{ color: theme.colors.placeholder, fontSize: 13 }}>MOT: </Text>
-                        <Text style={{ color: theme.colors.text, fontWeight: 'bold', fontSize: 13 }}>{formatShortDate(v.motExpiryDate)}</Text>
+                        <Text style={{ color: theme.colors.placeholder, fontSize: 13, fontFamily: fonts.regular }}>MOT: </Text>
+                        <Text style={{ color: theme.colors.text, fontFamily: fonts.bold, fontSize: 13 }}>{formatShortDate(v.motExpiryDate)}</Text>
                       </View>
                       
                       {v.lastServiceDate && (
                         <View style={[styles.infoRow, { marginTop: 6, justifyContent: 'flex-start', alignItems: 'center' }]}>
                           <MaterialCommunityIcons name="wrench-outline" size={16} color={theme.colors.placeholder} style={{ marginRight: 6 }} />
-                          <Text style={{ color: theme.colors.placeholder, fontSize: 13 }}>Last Service: </Text>
-                          <Text style={{ color: theme.colors.text, fontSize: 13 }}>{formatShortDate(v.lastServiceDate)}</Text>
+                          <Text style={{ color: theme.colors.placeholder, fontSize: 13, fontFamily: fonts.regular }}>Last Service: </Text>
+                          <Text style={{ color: theme.colors.text, fontSize: 13, fontFamily: fonts.regular }}>{formatShortDate(v.lastServiceDate)}</Text>
                         </View>
                       )}
 
@@ -507,7 +508,7 @@ export default function CustomerPortalScreen({ route, navigation }: any) {
                                   color: bookingAlert.status === 'Approved' ? theme.colors.success :
                                          bookingAlert.status === 'Pending' ? theme.colors.warning :
                                          theme.colors.placeholder,
-                                  fontWeight: 'bold'
+                                  fontFamily: fonts.bold
                                 }
                               ]}>
                                 {bookingAlert.status === 'Pending' ? 'Pending Confirmation' : 
@@ -532,7 +533,7 @@ export default function CustomerPortalScreen({ route, navigation }: any) {
                           <View style={[styles.bookingDetailsContainer, { backgroundColor: theme.colors.error + '10', borderColor: theme.colors.error }]}>
                             <View style={styles.bookingDetailsHeader}>
                               <MaterialCommunityIcons name="alert-circle" size={16} color={theme.colors.error} style={{ marginRight: 6 }} />
-                              <Text style={[styles.bookingDetailsTitle, { color: theme.colors.error, fontWeight: 'bold' }]}>Booking Rejected</Text>
+                              <Text style={[styles.bookingDetailsTitle, { color: theme.colors.error, fontFamily: fonts.bold }]}>Booking Rejected</Text>
                             </View>
                             <View style={styles.bookingInfoRow}>
                               <Text style={[styles.bookingInfoLabel, { color: theme.colors.placeholder }]}>Slot/Date:</Text>
@@ -542,7 +543,7 @@ export default function CustomerPortalScreen({ route, navigation }: any) {
                             </View>
                             <View style={styles.bookingInfoRow}>
                               <Text style={[styles.bookingInfoLabel, { color: theme.colors.placeholder }]}>Reason:</Text>
-                              <Text style={[styles.bookingInfoValue, { color: theme.colors.error, fontWeight: 'bold', flex: 1, textAlign: 'right' }]}>
+                              <Text style={[styles.bookingInfoValue, { color: theme.colors.error, fontFamily: fonts.bold, flex: 1, textAlign: 'right' }]}>
                                 {bookingAlert.rejectionReason || 'No reason provided.'}
                               </Text>
                             </View>
@@ -563,7 +564,7 @@ export default function CustomerPortalScreen({ route, navigation }: any) {
                     {v.status === 'Pending' ? (
                       <View style={[styles.pendingApprovalBox, { backgroundColor: theme.colors.warning + '10', borderColor: theme.colors.warning + '30' }]}>
                         <MaterialCommunityIcons name="clock-outline" size={16} color={theme.colors.warning} style={{ marginRight: 6 }} />
-                        <Text style={{ color: theme.colors.text, fontSize: 12, fontWeight: 'bold', flex: 1 }}>
+                        <Text style={{ color: theme.colors.text, fontSize: 12, fontFamily: fonts.bold, flex: 1 }}>
                           Awaiting registration approval from garage staff. Booking will be enabled once approved.
                         </Text>
                       </View>
@@ -571,14 +572,14 @@ export default function CustomerPortalScreen({ route, navigation }: any) {
                       <View style={[styles.pendingApprovalBox, { backgroundColor: theme.colors.error + '10', borderColor: theme.colors.error + '30', flexDirection: 'column', alignItems: 'flex-start' }]}>
                         <View style={{ flexDirection: 'row', alignItems: 'center' }}>
                           <MaterialCommunityIcons name="close-circle-outline" size={16} color={theme.colors.error} style={{ marginRight: 6 }} />
-                          <Text style={{ color: theme.colors.text, fontSize: 12, fontWeight: 'bold', flex: 1 }}>
+                          <Text style={{ color: theme.colors.text, fontSize: 12, fontFamily: fonts.bold, flex: 1 }}>
                             Vehicle registration rejected by garage staff. You cannot book an MOT for this vehicle.
                           </Text>
                         </View>
                         {v.rejectionReason ? (
                           <View style={{ marginTop: 6, paddingLeft: 22 }}>
-                            <Text style={{ fontSize: 11, color: theme.colors.error, fontWeight: 'bold' }}>Rejection Reason:</Text>
-                            <Text style={{ fontSize: 12, color: theme.colors.text, marginTop: 2 }}>{v.rejectionReason}</Text>
+                            <Text style={{ fontSize: 11, color: theme.colors.error, fontFamily: fonts.bold }}>Rejection Reason:</Text>
+                            <Text style={{ fontSize: 12, color: theme.colors.text, marginTop: 2, fontFamily: fonts.regular }}>{v.rejectionReason}</Text>
                           </View>
                         ) : null}
                       </View>
@@ -711,14 +712,14 @@ export default function CustomerPortalScreen({ route, navigation }: any) {
                         {item.rescheduled && (
                           <View style={{ flexDirection: 'row', alignItems: 'center', marginTop: 6 }}>
                             <MaterialCommunityIcons name="clock-alert-outline" size={12} color={theme.colors.primary} style={{ marginRight: 4 }} />
-                            <Text style={{ fontSize: 11, fontWeight: 'bold', color: theme.colors.primary }}>Rescheduled</Text>
+                            <Text style={{ fontSize: 11, fontFamily: fonts.bold, color: theme.colors.primary }}>Rescheduled</Text>
                           </View>
                         )}
 
                         {isRejected && (
                           <View style={[styles.rejectionReasonBox, { backgroundColor: theme.colors.error + '10', borderColor: theme.colors.error }]}>
-                            <Text style={{ fontSize: 11, color: theme.colors.error, fontWeight: 'bold' }}>Rejection Reason:</Text>
-                            <Text style={{ fontSize: 12, color: theme.colors.text, marginTop: 2 }}>
+                            <Text style={{ fontSize: 11, color: theme.colors.error, fontFamily: fonts.bold }}>Rejection Reason:</Text>
+                            <Text style={{ fontSize: 12, color: theme.colors.text, marginTop: 2, fontFamily: fonts.regular }}>
                               {item.rejectionReason || 'No reason provided.'}
                             </Text>
                           </View>
@@ -763,17 +764,17 @@ export default function CustomerPortalScreen({ route, navigation }: any) {
               <View style={[styles.profileRow, { borderBottomColor: theme.colors.border }]}>
                 <View style={{ flexDirection: 'row', alignItems: 'center' }}>
                   <MaterialCommunityIcons name="email-outline" size={18} color={theme.colors.placeholder} style={{ marginRight: 10 }} />
-                  <Text style={{ color: theme.colors.text, fontSize: 13 }}>Email</Text>
+                  <Text style={{ color: theme.colors.text, fontSize: 13, fontFamily: fonts.regular }}>Email</Text>
                 </View>
-                <Text style={{ color: theme.colors.placeholder, fontSize: 13, fontWeight: '500' }}>{customer.email}</Text>
+                <Text style={{ color: theme.colors.placeholder, fontSize: 13, fontFamily: fonts.medium }}>{customer.email}</Text>
               </View>
 
               <View style={[styles.profileRow, { borderBottomColor: 'transparent' }]}>
                 <View style={{ flexDirection: 'row', alignItems: 'center' }}>
                   <MaterialCommunityIcons name="phone-outline" size={18} color={theme.colors.placeholder} style={{ marginRight: 10 }} />
-                  <Text style={{ color: theme.colors.text, fontSize: 13 }}>Mobile</Text>
+                  <Text style={{ color: theme.colors.text, fontSize: 13, fontFamily: fonts.regular }}>Mobile</Text>
                 </View>
-                <Text style={{ color: theme.colors.placeholder, fontSize: 13, fontWeight: '500' }}>{customer.mobile}</Text>
+                <Text style={{ color: theme.colors.placeholder, fontSize: 13, fontFamily: fonts.medium }}>{customer.mobile}</Text>
               </View>
             </View>
 
@@ -878,7 +879,7 @@ export default function CustomerPortalScreen({ route, navigation }: any) {
               style={[styles.profileLogoutBtn, { backgroundColor: theme.colors.error, borderWidth: 1, borderColor: theme.colors.error }]}
             >
               <MaterialCommunityIcons name="logout" size={18} color={"#fff"} style={{ marginRight: 6 }} />
-              <Text style={{ color: "#fff", fontWeight: 'bold', fontSize: 14 }}>Sign Out</Text>
+              <Text style={{ color: "#fff", fontFamily: fonts.bold, fontSize: 14 }}>Sign Out</Text>
             </TouchableOpacity>
           </ScrollView>
         )}
@@ -955,13 +956,13 @@ const styles = StyleSheet.create({
     width: 100,
   },
   backBtnText: {
-    fontWeight: 'bold',
+    fontFamily: fonts.bold,
     fontSize: 13,
     marginLeft: 4,
   },
   navTitle: {
     fontSize: 18,
-    fontWeight: 'bold',
+    fontFamily: fonts.bold,
     textAlign: 'left',
   },
   rightActionsRow: {
@@ -990,16 +991,17 @@ const styles = StyleSheet.create({
   },
   welcomeTitle: {
     fontSize: 24,
-    fontWeight: '900',
+    fontFamily: fonts.black,
     marginBottom: 6,
   },
   welcomeSubtitle: {
     fontSize: 14,
+    fontFamily: fonts.regular,
     lineHeight: 20,
   },
   sectionHeading: {
     fontSize: 18,
-    fontWeight: 'bold',
+    fontFamily: fonts.bold,
     marginBottom: 16,
   },
   formCard: {
@@ -1015,7 +1017,7 @@ const styles = StyleSheet.create({
   },
   formTitle: {
     fontSize: 15,
-    fontWeight: 'bold',
+    fontFamily: fonts.bold,
     marginBottom: 14,
   },
   formRow: {
@@ -1024,7 +1026,7 @@ const styles = StyleSheet.create({
   },
   label: {
     fontSize: 12,
-    fontWeight: '600',
+    fontFamily: fonts.semiBold,
     marginBottom: 4,
   },
   input: {
@@ -1033,6 +1035,7 @@ const styles = StyleSheet.create({
     borderRadius: 6,
     paddingHorizontal: 10,
     fontSize: 13,
+    fontFamily: fonts.regular,
     marginBottom: 12,
   },
   submitButton: {
@@ -1044,7 +1047,7 @@ const styles = StyleSheet.create({
   },
   submitButtonText: {
     color: '#FFFFFF',
-    fontWeight: 'bold',
+    fontFamily: fonts.bold,
     fontSize: 13,
   },
   formActionsRow: {
@@ -1061,7 +1064,7 @@ const styles = StyleSheet.create({
     alignItems: 'center',
   },
   cancelFormBtnText: {
-    fontWeight: 'bold',
+    fontFamily: fonts.bold,
     fontSize: 13,
   },
   submitFormBtn: {
@@ -1079,6 +1082,7 @@ const styles = StyleSheet.create({
   emptyText: {
     fontSize: 14,
     fontStyle: 'italic',
+    fontFamily: fonts.regular,
     textAlign: 'center',
     lineHeight: 20,
   },
@@ -1110,13 +1114,13 @@ const styles = StyleSheet.create({
   },
   plateText: {
     color: '#000',
-    fontWeight: 'bold',
+    fontFamily: fonts.bold,
     fontSize: 11,
     letterSpacing: 0.5,
   },
   makeModelText: {
     fontSize: 15,
-    fontWeight: 'bold',
+    fontFamily: fonts.bold,
   },
   vehicleBody: {
     paddingHorizontal: 14,
@@ -1153,7 +1157,7 @@ const styles = StyleSheet.create({
   },
   actionBtnText: {
     fontSize: 13,
-    fontWeight: 'bold',
+    fontFamily: fonts.bold,
   },
   bookedBadge: {
     flexDirection: 'row',
@@ -1166,7 +1170,7 @@ const styles = StyleSheet.create({
   },
   bookedBadgeText: {
     fontSize: 10,
-    fontWeight: 'bold',
+    fontFamily: fonts.bold,
   },
   bookingDetailsContainer: {
     marginTop: 12,
@@ -1184,7 +1188,7 @@ const styles = StyleSheet.create({
   },
   bookingDetailsTitle: {
     fontSize: 13,
-    fontWeight: 'bold',
+    fontFamily: fonts.bold,
   },
   bookingInfoRow: {
     flexDirection: 'row',
@@ -1193,10 +1197,11 @@ const styles = StyleSheet.create({
   },
   bookingInfoLabel: {
     fontSize: 12,
+    fontFamily: fonts.regular,
   },
   bookingInfoValue: {
     fontSize: 12,
-    fontWeight: '500',
+    fontFamily: fonts.medium,
   },
   smallPlate: {
     backgroundColor: '#FFD300',
@@ -1208,7 +1213,7 @@ const styles = StyleSheet.create({
   },
   smallPlateText: {
     color: '#000',
-    fontWeight: 'bold',
+    fontFamily: fonts.bold,
     fontSize: 10,
     letterSpacing: 0.5,
   },
@@ -1228,7 +1233,7 @@ const styles = StyleSheet.create({
   },
   tabLabel: {
     fontSize: 10,
-    fontWeight: '600',
+    fontFamily: fonts.semiBold,
     marginTop: 2,
   },
   historyCard: {
@@ -1255,14 +1260,14 @@ const styles = StyleSheet.create({
     paddingVertical: 1.5,
   },
   statusText: {
-    fontWeight: 'bold',
+    fontFamily: fonts.bold,
   },
   historyCardBody: {
     marginBottom: 8,
   },
   historyVehicleText: {
     fontSize: 14,
-    fontWeight: 'bold',
+    fontFamily: fonts.bold,
   },
   rejectionReasonBox: {
     marginTop: 8,
@@ -1272,6 +1277,7 @@ const styles = StyleSheet.create({
   },
   historyDate: {
     fontSize: 10,
+    fontFamily: fonts.regular,
     textAlign: 'right',
   },
   profileHeaderCard: {
@@ -1289,7 +1295,7 @@ const styles = StyleSheet.create({
   },
   profileSectionTitle: {
     fontSize: 11,
-    fontWeight: 'bold',
+    fontFamily: fonts.bold,
     textTransform: 'uppercase',
     letterSpacing: 0.8,
     marginBottom: 8,
@@ -1309,7 +1315,7 @@ const styles = StyleSheet.create({
   },
   contactPillText: {
     fontSize: 10,
-    fontWeight: 'bold',
+    fontFamily: fonts.bold,
   },
   profileAvatar: {
     width: 60,
@@ -1326,11 +1332,11 @@ const styles = StyleSheet.create({
   avatarText: {
     color: '#FFFFFF',
     fontSize: 22,
-    fontWeight: 'bold',
+    fontFamily: fonts.bold,
   },
   profileName: {
     fontSize: 18,
-    fontWeight: 'bold',
+    fontFamily: fonts.bold,
     flexShrink: 1,
   },
   profileInfoCard: {

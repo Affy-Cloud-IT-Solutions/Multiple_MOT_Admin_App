@@ -14,6 +14,7 @@ import {
 import MaterialCommunityIcons from 'react-native-vector-icons/MaterialCommunityIcons';
 import { useAppTheme } from '../context/ThemeContext';
 import { useAppValues } from '../context/DataContext';
+import { fonts } from '../theme/theme';
 import {
   validateFirstName,
   validateLastName,
@@ -870,7 +871,7 @@ const styles = StyleSheet.create({
   },
   avatarText: {
     fontSize: 22,
-    fontWeight: '700',
+    fontFamily: fonts.bold,
   },
   headerMeta: {
     flex: 1,
@@ -878,7 +879,7 @@ const styles = StyleSheet.create({
   },
   userName: {
     fontSize: 18,
-    fontWeight: '700',
+    fontFamily: fonts.bold,
     marginBottom: 2,
   },
   userEmailRow: {
@@ -888,6 +889,7 @@ const styles = StyleSheet.create({
   },
   userEmail: {
     fontSize: 12,
+    fontFamily: fonts.regular,
     marginLeft: 6,
   },
   roleBadge: {
@@ -901,7 +903,7 @@ const styles = StyleSheet.create({
   },
   roleBadgeText: {
     fontSize: 10,
-    fontWeight: '600',
+    fontFamily: fonts.semiBold,
   },
   statsGrid: {
     flexDirection: 'row',
@@ -932,18 +934,18 @@ const styles = StyleSheet.create({
   },
   statNumber: {
     fontSize: 18,
-    fontWeight: '700',
+    fontFamily: fonts.bold,
     marginBottom: 2,
   },
   statNumberText: {
     fontSize: 13,
-    fontWeight: '600',
+    fontFamily: fonts.semiBold,
     marginBottom: 2,
     textAlign: 'center',
   },
   statLabel: {
     fontSize: 9,
-    fontWeight: '600',
+    fontFamily: fonts.semiBold,
     textTransform: 'uppercase',
     letterSpacing: 0.5,
   },
@@ -952,7 +954,7 @@ const styles = StyleSheet.create({
   },
   sectionTitle: {
     fontSize: 16,
-    fontWeight: '700',
+    fontFamily: fonts.bold,
     marginBottom: 12,
     letterSpacing: 0.3,
   },
@@ -985,14 +987,14 @@ const styles = StyleSheet.create({
   },
   infoLabel: {
     fontSize: 10,
-    fontWeight: '600',
+    fontFamily: fonts.semiBold,
     textTransform: 'uppercase',
     letterSpacing: 0.3,
     marginBottom: 1,
   },
   infoValue: {
     fontSize: 14,
-    fontWeight: '600',
+    fontFamily: fonts.semiBold,
   },
   settingRow: {
     flexDirection: 'row',
@@ -1016,10 +1018,11 @@ const styles = StyleSheet.create({
   },
   settingTitle: {
     fontSize: 14,
-    fontWeight: '600',
+    fontFamily: fonts.semiBold,
   },
   settingSubtitle: {
     fontSize: 11,
+    fontFamily: fonts.regular,
     marginTop: 1,
   },
   settingDivider: {
@@ -1036,10 +1039,11 @@ const styles = StyleSheet.create({
   },
   adminTitle: {
     fontSize: 15,
-    fontWeight: '600',
+    fontFamily: fonts.semiBold,
   },
   adminSubtitle: {
     fontSize: 12,
+    fontFamily: fonts.regular,
     marginBottom: 14,
     paddingHorizontal: 14,
     lineHeight: 16,
@@ -1061,6 +1065,7 @@ const styles = StyleSheet.create({
     flex: 1,
     height: '100%',
     fontSize: 14,
+    fontFamily: fonts.regular,
     paddingVertical: 0,
   },
   createStaffButton: {
@@ -1080,7 +1085,7 @@ const styles = StyleSheet.create({
   },
   createStaffText: {
     color: '#FFFFFF',
-    fontWeight: '600',
+    fontFamily: fonts.semiBold,
     fontSize: 14,
   },
   viewStaffButton: {
@@ -1096,7 +1101,7 @@ const styles = StyleSheet.create({
     gap: 8,
   },
   viewStaffText: {
-    fontWeight: '600',
+    fontFamily: fonts.semiBold,
     fontSize: 14,
   },
   actionButtonContainer: {
@@ -1112,11 +1117,12 @@ const styles = StyleSheet.create({
   },
   actionButtonText: {
     fontSize: 15,
-    fontWeight: '600',
+    fontFamily: fonts.semiBold,
   },
   versionText: {
     textAlign: 'center',
     fontSize: 11,
+    fontFamily: fonts.regular,
     marginBottom: 20,
     letterSpacing: 0.3,
   },

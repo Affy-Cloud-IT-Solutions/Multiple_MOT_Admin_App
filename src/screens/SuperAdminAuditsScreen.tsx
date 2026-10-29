@@ -11,6 +11,7 @@ import {
 import MaterialCommunityIcons from 'react-native-vector-icons/MaterialCommunityIcons';
 import { useAppTheme } from '../context/ThemeContext';
 import { useAppValues } from '../context/DataContext';
+import { fonts } from '../theme/theme';
 
 export default function SuperAdminAuditsScreen({ navigation }: any) {
   const { theme } = useAppTheme();
@@ -238,13 +239,13 @@ const styles = StyleSheet.create({
     paddingBottom: 10,
   },
   title: {
+    fontFamily: fonts.extraBold,
     fontSize: 24,
-    fontWeight: '800',
     letterSpacing: -0.5,
   },
   subtitle: {
+    fontFamily: fonts.regular,
     fontSize: 13,
-    fontWeight: '400',
     marginTop: 2,
   },
   refreshBtn: {
@@ -273,6 +274,7 @@ const styles = StyleSheet.create({
     height: 44,
   },
   searchInput: {
+    fontFamily: fonts.regular,
     flex: 1,
     fontSize: 14,
     marginLeft: 8,
@@ -290,8 +292,8 @@ const styles = StyleSheet.create({
     borderWidth: 1,
   },
   filterChipText: {
+    fontFamily: fonts.bold,
     fontSize: 12,
-    fontWeight: '700',
   },
   listContent: {
     paddingHorizontal: 16,
@@ -319,15 +321,17 @@ const styles = StyleSheet.create({
     marginBottom: 4,
   },
   activityTitle: {
+    fontFamily: fonts.bold,
     fontSize: 14,
-    fontWeight: '700',
     flex: 1,
     marginRight: 8,
   },
   timestampText: {
+    fontFamily: fonts.regular,
     fontSize: 11,
   },
   detailsText: {
+    fontFamily: fonts.regular,
     fontSize: 12.5,
     lineHeight: 17,
   },
@@ -340,10 +344,11 @@ const styles = StyleSheet.create({
     gap: 8,
   },
   emptyStateTitle: {
+    fontFamily: fonts.bold,
     fontSize: 16,
-    fontWeight: '700',
   },
   emptyStateSubtitle: {
+    fontFamily: fonts.regular,
     fontSize: 13,
     textAlign: 'center',
   },

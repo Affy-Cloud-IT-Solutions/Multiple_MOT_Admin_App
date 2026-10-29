@@ -1,8 +1,39 @@
 import { DefaultTheme, DarkTheme } from '@react-navigation/native';
 
+export const fonts = {
+  regular: 'Urbanist-Regular',
+  medium: 'Urbanist-Medium',
+  semiBold: 'Urbanist-SemiBold',
+  bold: 'Urbanist-Bold',
+  extraBold: 'Urbanist-ExtraBold',
+  heavy: 'Urbanist-ExtraBold',
+  black: 'Urbanist-Black',
+  light: 'Urbanist-Light',
+  extraLight: 'Urbanist-ExtraLight',
+  thin: 'Urbanist-Thin',
+  italic: 'Urbanist-Italic',
+  boldItalic: 'Urbanist-BoldItalic',
+  semiBoldItalic: 'Urbanist-SemiBoldItalic',
+  mediumItalic: 'Urbanist-MediumItalic',
+} as const;
+
+export const typography = {
+  regular: { fontFamily: fonts.regular },
+  medium: { fontFamily: fonts.medium },
+  semiBold: { fontFamily: fonts.semiBold },
+  bold: { fontFamily: fonts.bold },
+  extraBold: { fontFamily: fonts.extraBold },
+  black: { fontFamily: fonts.black },
+  light: { fontFamily: fonts.light },
+  extraLight: { fontFamily: fonts.extraLight },
+  thin: { fontFamily: fonts.thin },
+};
+
 export const CustomLightTheme = {
   ...DefaultTheme,
   dark: false,
+  fonts,
+  typography,
   colors: {
     ...DefaultTheme.colors,
     primary: '#0F172A', // Slate 900
@@ -25,6 +56,8 @@ export const CustomLightTheme = {
 export const CustomDarkTheme = {
   ...DarkTheme,
   dark: true,
+  fonts,
+  typography,
   colors: {
     ...DarkTheme.colors,
     primary: '#F8FAFC', // Slate 50

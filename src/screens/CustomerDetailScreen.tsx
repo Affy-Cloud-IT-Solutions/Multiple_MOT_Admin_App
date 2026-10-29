@@ -17,6 +17,7 @@ import {
 } from 'react-native';
 import MaterialCommunityIcons from 'react-native-vector-icons/MaterialCommunityIcons';
 import { useAppTheme } from '../context/ThemeContext';
+import { fonts } from '../theme/theme';
 import { useAppValues, BASE_URL } from '../context/DataContext';
 import { SafeAreaView } from 'react-native-safe-area-context';
 import { validateMotExpiryDate } from '../utils/validationUtils';
@@ -79,7 +80,7 @@ export default function CustomerDetailScreen({ route, navigation }: any) {
       <SafeAreaView style={[styles.container, { backgroundColor: theme.colors.background, justifyContent: 'center', alignItems: 'center' }]}>
         <Text style={{ color: theme.colors.text }}>Customer not found.</Text>
         <TouchableOpacity onPress={() => navigation.goBack()} style={{ marginTop: 12 }}>
-          <Text style={{ color: theme.colors.primary, fontWeight: 'bold' }}>Go Back</Text>
+          <Text style={{ color: theme.colors.primary, fontFamily: fonts.bold }}>Go Back</Text>
         </TouchableOpacity>
       </SafeAreaView>
     );
@@ -294,7 +295,7 @@ export default function CustomerDetailScreen({ route, navigation }: any) {
                       
                       {isRejected && v.rejectionReason && (
                         <View style={[styles.rejectionReasonBox, { backgroundColor: theme.colors.error + '10', borderColor: theme.colors.error }]}>
-                          <Text style={{ fontSize: 11, color: theme.colors.error, fontWeight: 'bold' }}>Rejection Reason:</Text>
+                          <Text style={{ fontSize: 11, color: theme.colors.error, fontFamily: fonts.bold }}>Rejection Reason:</Text>
                           <Text style={{ fontSize: 12, color: theme.colors.text, marginTop: 2 }}>{v.rejectionReason}</Text>
                         </View>
                       )}
@@ -375,14 +376,14 @@ export default function CustomerDetailScreen({ route, navigation }: any) {
 
                       {isRejected && b.rejectionReason && (
                         <View style={[styles.rejectionReasonBox, { backgroundColor: theme.colors.error + '10', borderColor: theme.colors.error }]}>
-                          <Text style={{ fontSize: 11, color: theme.colors.error, fontWeight: 'bold' }}>Rejection Reason:</Text>
+                          <Text style={{ fontSize: 11, color: theme.colors.error, fontFamily: fonts.bold }}>Rejection Reason:</Text>
                           <Text style={{ fontSize: 12, color: theme.colors.text, marginTop: 2 }}>{b.rejectionReason}</Text>
                         </View>
                       )}
 
                       {isCancelled && (
                         <View style={[styles.rejectionReasonBox, { backgroundColor: '#DC262610', borderColor: '#DC262630' }]}>
-                          <Text style={{ fontSize: 11, color: '#DC2626', fontWeight: 'bold' }}>Cancelled by {b.cancelledBy || 'Customer'}:</Text>
+                          <Text style={{ fontSize: 11, color: '#DC2626', fontFamily: fonts.bold }}>Cancelled by {b.cancelledBy || 'Customer'}:</Text>
                           <Text style={{ fontSize: 12, color: theme.colors.text, marginTop: 2 }}>{b.cancellationReason || 'Slot has been released.'}</Text>
                         </View>
                       )}
@@ -390,7 +391,7 @@ export default function CustomerDetailScreen({ route, navigation }: any) {
                       {b.rescheduled && (
                         <View style={[styles.rescheduledBadge, { backgroundColor: theme.colors.primary + '15', borderColor: theme.colors.primary + '40' }]}>
                           <MaterialCommunityIcons name="clock-alert-outline" size={12} color={theme.colors.primary} style={{ marginRight: 4 }} />
-                          <Text style={{ fontSize: 10, fontWeight: 'bold', color: theme.colors.primary }}>Rescheduled</Text>
+                          <Text style={{ fontSize: 10, fontFamily: fonts.bold, color: theme.colors.primary }}>Rescheduled</Text>
                         </View>
                       )}
                     </View>
@@ -458,7 +459,7 @@ const styles = StyleSheet.create({
   },
   navTitle: {
     fontSize: 18,
-    fontWeight: 'bold',
+    fontFamily: fonts.bold,
     flex: 1,
   },
   profileBlock: {
@@ -480,7 +481,7 @@ const styles = StyleSheet.create({
   },
   avatarText: {
     fontSize: 22,
-    fontWeight: 'bold',
+    fontFamily: fonts.bold,
     color: '#FFFFFF',
   },
   profileMetaInfo: {
@@ -488,7 +489,7 @@ const styles = StyleSheet.create({
   },
   profileName: {
     fontSize: 18,
-    fontWeight: 'bold',
+    fontFamily: fonts.bold,
     marginBottom: 4,
   },
   contactCol: {
@@ -501,6 +502,7 @@ const styles = StyleSheet.create({
   },
   contactText: {
     fontSize: 12.5,
+    fontFamily: fonts.regular,
   },
   badgeRow: {
     flexDirection: 'row',
@@ -529,14 +531,14 @@ const styles = StyleSheet.create({
   },
   tabLabel: {
     fontSize: 12,
-    fontWeight: 'bold',
+    fontFamily: fonts.bold,
   },
   scrollContent: {
     padding: 16,
   },
   sectionTitle: {
     fontSize: 15,
-    fontWeight: 'bold',
+    fontFamily: fonts.bold,
     marginBottom: 12,
   },
   emptyState: {
@@ -547,6 +549,7 @@ const styles = StyleSheet.create({
   },
   emptyText: {
     fontSize: 13.5,
+    fontFamily: fonts.regular,
   },
   card: {
     borderWidth: 1,
@@ -575,7 +578,7 @@ const styles = StyleSheet.create({
   },
   plateText: {
     color: '#000',
-    fontWeight: 'bold',
+    fontFamily: fonts.bold,
     fontSize: 11,
     letterSpacing: 0.5,
   },
@@ -589,7 +592,7 @@ const styles = StyleSheet.create({
   },
   smallPlateText: {
     color: '#000',
-    fontWeight: 'bold',
+    fontFamily: fonts.bold,
     fontSize: 9.5,
   },
   statusBadge: {
@@ -600,14 +603,14 @@ const styles = StyleSheet.create({
   },
   statusText: {
     fontSize: 9.5,
-    fontWeight: 'bold',
+    fontFamily: fonts.bold,
   },
   cardBody: {
     gap: 2,
   },
   makeModelText: {
     fontSize: 14,
-    fontWeight: 'bold',
+    fontFamily: fonts.bold,
   },
   rejectionReasonBox: {
     marginTop: 8,
@@ -617,7 +620,7 @@ const styles = StyleSheet.create({
   },
   bookingVehicleTitle: {
     fontSize: 14,
-    fontWeight: 'bold',
+    fontFamily: fonts.bold,
   },
   rescheduleBtn: {
     flexDirection: 'row',
@@ -641,7 +644,7 @@ const styles = StyleSheet.create({
   },
   auditActivity: {
     fontSize: 13.5,
-    fontWeight: 'bold',
+    fontFamily: fonts.bold,
   },
   modalOverlay: {
     flex: 1,
@@ -664,11 +667,12 @@ const styles = StyleSheet.create({
   },
   modalTitle: {
     fontSize: 16,
-    fontWeight: 'bold',
+    fontFamily: fonts.bold,
     marginBottom: 8,
   },
   modalSubtitle: {
     fontSize: 12,
+    fontFamily: fonts.regular,
     lineHeight: 16,
     marginBottom: 14,
   },
@@ -678,6 +682,7 @@ const styles = StyleSheet.create({
     paddingHorizontal: 10,
     paddingVertical: 6,
     fontSize: 13,
+    fontFamily: fonts.regular,
     height: 40,
     marginBottom: 14,
   },
@@ -715,7 +720,7 @@ const styles = StyleSheet.create({
   },
   modalBtnText: {
     fontSize: 12,
-    fontWeight: 'bold',
+    fontFamily: fonts.bold,
   },
   rescheduledBadge: {
     flexDirection: 'row',
