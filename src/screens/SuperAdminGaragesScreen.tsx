@@ -239,6 +239,11 @@ export default function SuperAdminGaragesScreen({ navigation }: any) {
     return matchesFilter && matchesSearch;
   });
 
+  // Until the garage sets its location, address/GPS are only the schema's central-London defaults
+  const selectedLocationSet = Boolean(
+    selectedGarage?.profileCompletion?.steps?.location ?? selectedGarage?.locationConfigured
+  );
+
   const getStatusColor = (status: string) => {
     switch (status) {
       case 'Approved':
@@ -477,19 +482,21 @@ export default function SuperAdminGaragesScreen({ navigation }: any) {
                     
                     <View style={styles.infoRow}>
                       <MaterialCommunityIcons name="map-marker" size={16} color="#EF4444" style={styles.infoIcon} />
-                      <Text style={[styles.infoText, { color: theme.colors.text }]}>
-                        {selectedGarage.address}{selectedGarage.city ? `, ${selectedGarage.city}` : ''} {selectedGarage.postcode || ''}
+                      <Text style={[styles.infoText, { color: selectedLocationSet ? theme.colors.text : '#F59E0B' }]}>
+                        {selectedLocationSet
+                          ? `${[selectedGarage.address, selectedGarage.city].filter(Boolean).join(', ')} ${selectedGarage.postcode || ''}`.trim() || 'Not provided'
+                          : 'Location pending – not set up yet'}
                       </Text>
                     </View>
 
-                    {(selectedGarage.latitude !== undefined || selectedGarage.longitude !== undefined) && (
-                      <View style={styles.infoRow}>
-                        <MaterialCommunityIcons name="crosshairs-gps" size={16} color="#0284C7" style={styles.infoIcon} />
-                        <Text style={[styles.infoText, { color: theme.colors.placeholder }]}>
-                          GPS: {selectedGarage.latitude || 51.5074}, {selectedGarage.longitude || -0.1278}
-                        </Text>
-                      </View>
-                    )}
+                    <View style={styles.infoRow}>
+                      <MaterialCommunityIcons name="crosshairs-gps" size={16} color="#0284C7" style={styles.infoIcon} />
+                      <Text style={[styles.infoText, { color: selectedLocationSet ? theme.colors.placeholder : '#F59E0B' }]}>
+                        {selectedLocationSet && selectedGarage.latitude != null && selectedGarage.longitude != null
+                          ? `GPS: ${selectedGarage.latitude}, ${selectedGarage.longitude}`
+                          : 'GPS: Pending'}
+                      </Text>
+                    </View>
 
                     {selectedGarage.phone ? (
                       <View style={styles.infoRow}>

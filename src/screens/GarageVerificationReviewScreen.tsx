@@ -98,6 +98,27 @@ export default function GarageVerificationReviewScreen({ route, navigation }: an
   const rejectedDocsCount = docs.filter(d => d.status === 'Rejected').length;
   const pendingDocsCount = docs.filter(d => !d.status || d.status === 'Pending').length;
 
+  // Profile setup progress - same 4-item checklist the garage admin sees (registration + location + services + documents).
+  // Prefer the backend's result; fall back to the setup flags for an older API.
+  const completionSteps = garage.profileCompletion?.steps || {
+    location: Boolean(garage.locationConfigured),
+    services: Boolean((garage as any).servicesConfigured),
+    documents: Boolean((garage as any).documentsConfigured) || docs.length > 0
+  };
+  const setupChecklist = [
+    { key: 'registration', label: 'Initial registration details', done: true },
+    { key: 'location', label: 'Garage location', done: Boolean(completionSteps.location) },
+    { key: 'services', label: 'Services & pricing', done: Boolean(completionSteps.services) },
+    { key: 'documents', label: 'MOT & DVLA documents', done: Boolean(completionSteps.documents) }
+  ];
+  const profilePercent = typeof garage.profileCompletion?.percent === 'number'
+    ? garage.profileCompletion.percent
+    : Math.round((setupChecklist.filter(s => s.done).length / setupChecklist.length) * 100);
+  const profileColor = profilePercent === 100 ? '#10B981' : '#EA580C';
+  // Until the garage sets its location, the stored address/GPS are only schema defaults (central London)
+  const locationSet = Boolean(completionSteps.location);
+  const garagePhotos = (garage.images || []).filter(Boolean);
+
   // Single Document Approval Handler
   const handleApproveDocument = async (doc: any) => {
     const docId = doc.id || doc._id;
@@ -289,6 +310,46 @@ export default function GarageVerificationReviewScreen({ route, navigation }: an
           ) : null}
         </View>
 
+        {/* PROFILE SETUP PROGRESS */}
+        <View style={[styles.sectionCard, { backgroundColor: theme.colors.card, borderColor: theme.colors.border }]}>
+          <View style={styles.summaryTopRow}>
+            <View style={{ flexDirection: 'row', alignItems: 'center', flex: 1 }}>
+              <MaterialCommunityIcons name="progress-check" size={20} color={profileColor} style={{ marginRight: 8 }} />
+              <Text style={[styles.sectionTitle, { color: theme.colors.text }]}>Profile Completion</Text>
+            </View>
+            <View style={[styles.verificationPill, { backgroundColor: profileColor + '20' }]}>
+              <Text style={{ fontSize: 12, fontFamily: fonts.bold, color: profileColor }}>{profilePercent}% Complete</Text>
+            </View>
+          </View>
+
+          <View style={[styles.progressBarBg, { backgroundColor: theme.colors.border }]}>
+            <View style={[styles.progressBarFill, { width: `${profilePercent}%`, backgroundColor: profileColor }]} />
+          </View>
+
+          <View style={{ marginTop: 10 }}>
+            {setupChecklist.map(step => (
+              <View key={step.key} style={styles.checklistRow}>
+                <MaterialCommunityIcons
+                  name={step.done ? 'check-circle' : 'clock-outline'}
+                  size={16}
+                  color={step.done ? '#10B981' : '#F59E0B'}
+                  style={{ marginRight: 8 }}
+                />
+                <Text style={[styles.checklistLabel, { color: theme.colors.text }]}>{step.label}</Text>
+                <Text style={[styles.checklistStatus, { color: step.done ? '#10B981' : '#F59E0B' }]}>
+                  {step.done ? 'Done' : 'Pending'}
+                </Text>
+              </View>
+            ))}
+          </View>
+
+          {garage.isVisibleToCustomers === false && garage.status === 'Approved' ? (
+            <Text style={[styles.sectionHelper, { color: theme.colors.placeholder, marginTop: 8, marginBottom: 0 }]}>
+              Hidden from customers until the profile is 100% complete.
+            </Text>
+          ) : null}
+        </View>
+
         {/* SECTION 1: GARAGE & OWNER PROFILE */}
         <View style={[styles.sectionCard, { backgroundColor: theme.colors.card, borderColor: theme.colors.border }]}>
           <View style={styles.sectionHeaderRow}>
@@ -321,16 +382,24 @@ export default function GarageVerificationReviewScreen({ route, navigation }: an
 
             <View style={[styles.detailItem, { width: '100%' }]}>
               <Text style={[styles.detailLabel, { color: theme.colors.placeholder }]}>Full Address & Postcode</Text>
-              <Text style={[styles.detailValue, { color: theme.colors.text }]}>
-                {garage.address}{garage.city ? `, ${garage.city}` : ''}{garage.postcode ? ` (${garage.postcode})` : ''}
-              </Text>
+              {locationSet ? (
+                <Text style={[styles.detailValue, { color: theme.colors.text }]}>
+                  {[garage.address, garage.city].filter(Boolean).join(', ') || 'Not provided'}{garage.postcode ? ` (${garage.postcode})` : ''}
+                </Text>
+              ) : (
+                <Text style={[styles.detailValue, styles.pendingValue]}>Pending – not set up yet</Text>
+              )}
             </View>
 
             <View style={[styles.detailItem, { width: '100%' }]}>
               <Text style={[styles.detailLabel, { color: theme.colors.placeholder }]}>GPS Coordinates</Text>
-              <Text style={[styles.detailValue, { color: theme.colors.text }]}>
-                Latitude: {garage.latitude || '51.5074'} | Longitude: {garage.longitude || '-0.1278'}
-              </Text>
+              {locationSet && garage.latitude != null && garage.longitude != null ? (
+                <Text style={[styles.detailValue, { color: theme.colors.text }]}>
+                  Latitude: {garage.latitude} | Longitude: {garage.longitude}
+                </Text>
+              ) : (
+                <Text style={[styles.detailValue, styles.pendingValue]}>Pending – not set up yet</Text>
+              )}
             </View>
 
             {garage.description ? (
@@ -347,16 +416,18 @@ export default function GarageVerificationReviewScreen({ route, navigation }: an
           <View style={styles.sectionHeaderRow}>
             <MaterialCommunityIcons name="camera-image" size={20} color="#0284C7" style={{ marginRight: 8 }} />
             <Text style={[styles.sectionTitle, { color: theme.colors.text }]}>
-              Facility & Bay Photos ({garage.images ? garage.images.length : 0})
+              Facility & Bay Photos ({garagePhotos.length})
             </Text>
           </View>
-          <Text style={[styles.sectionHelper, { color: theme.colors.placeholder }]}>
-            Tap any photo to open full-screen inspector to inspect workshop cleanliness, testing bays, and exterior frontage.
-          </Text>
+          {garagePhotos.length > 0 ? (
+            <Text style={[styles.sectionHelper, { color: theme.colors.placeholder }]}>
+              Tap any photo to open full-screen inspector to inspect workshop cleanliness, testing bays, and exterior frontage.
+            </Text>
+          ) : null}
 
-          {garage.images && garage.images.length > 0 ? (
+          {garagePhotos.length > 0 ? (
             <ScrollView horizontal showsHorizontalScrollIndicator={false} contentContainerStyle={styles.photoList}>
-              {garage.images.map((imgUrl, idx) => (
+              {garagePhotos.map((imgUrl, idx) => (
                 <TouchableOpacity
                   key={idx}
                   activeOpacity={0.85}
@@ -376,7 +447,7 @@ export default function GarageVerificationReviewScreen({ route, navigation }: an
           ) : (
             <View style={[styles.emptyBox, { borderColor: theme.colors.border }]}>
               <MaterialCommunityIcons name="image-off-outline" size={28} color={theme.colors.placeholder} />
-              <Text style={[styles.emptyBoxText, { color: theme.colors.placeholder }]}>No facility photos uploaded.</Text>
+              <Text style={[styles.emptyBoxText, { color: theme.colors.placeholder }]}>No images uploaded yet.</Text>
             </View>
           )}
         </View>
@@ -869,16 +940,16 @@ export default function GarageVerificationReviewScreen({ route, navigation }: an
             <MaterialCommunityIcons name="close" size={26} color="#FFFFFF" />
           </TouchableOpacity>
 
-          {selectedPhotoIndex !== null && garage.images && garage.images[selectedPhotoIndex] ? (
+          {selectedPhotoIndex !== null && garagePhotos[selectedPhotoIndex] ? (
             <View style={styles.photoModalContent}>
               <Image
-                source={{ uri: garage.images[selectedPhotoIndex] }}
+                source={{ uri: garagePhotos[selectedPhotoIndex] }}
                 style={styles.fullPhoto}
                 resizeMode="contain"
               />
               <View style={styles.photoCaptionBar}>
                 <Text style={styles.photoCaptionText}>
-                  Facility Photo {selectedPhotoIndex + 1} of {garage.images.length}
+                  Facility Photo {selectedPhotoIndex + 1} of {garagePhotos.length}
                 </Text>
               </View>
             </View>
@@ -1036,6 +1107,23 @@ const styles = StyleSheet.create({
   },
   detailValue: {
     fontSize: 13,
+    fontFamily: fonts.bold,
+  },
+  pendingValue: {
+    color: '#F59E0B',
+  },
+  checklistRow: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    paddingVertical: 4,
+  },
+  checklistLabel: {
+    flex: 1,
+    fontSize: 12.5,
+    fontFamily: fonts.semiBold,
+  },
+  checklistStatus: {
+    fontSize: 11.5,
     fontFamily: fonts.bold,
   },
   credentialBox: {

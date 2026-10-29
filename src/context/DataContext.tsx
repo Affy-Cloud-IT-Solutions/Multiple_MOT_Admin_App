@@ -100,7 +100,7 @@ export interface Garage {
   servicesConfigured?: boolean;
   documentsConfigured?: boolean;
   /** Computed by the backend: which setup steps are done (location, services, documents) */
-  profileCompletion?: { complete: boolean; steps: { location: boolean; services: boolean; documents: boolean }; missing: string[] };
+  profileCompletion?: { complete: boolean; steps: { location: boolean; services: boolean; documents: boolean }; missing: string[]; percent?: number };
   /** Approved AND profile complete - only then do customers see this garage */
   isVisibleToCustomers?: boolean;
   verificationStatus?: 'Pending' | 'Verified' | 'Rejected' | 'Expired';
