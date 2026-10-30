@@ -10,11 +10,9 @@ import {
   TouchableOpacity,
   Text,
   ActivityIndicator,
-  Modal,
   Image,
 } from 'react-native';
 import MaterialCommunityIcons from 'react-native-vector-icons/MaterialCommunityIcons';
-import { pick, types, isErrorWithCode, errorCodes } from '@react-native-documents/picker';
 import { useAppTheme } from '../context/ThemeContext';
 import { useAppValues, BASE_URL } from '../context/DataContext';
 import { validateEmail, validatePassword } from '../utils/validationUtils';
@@ -37,17 +35,6 @@ export default function LoginScreen({ navigation }: any) {
   const [emailError, setEmailError] = useState(false);
   const [passwordError, setPasswordError] = useState(false);
   const [errorMessage, setErrorMessage] = useState<string | null>(null);
-
-  // Rejected documents & Application status states for Garage Admin
-  const [garageInfo, setGarageInfo] = useState<{
-    garageId: string;
-    garageName: string;
-    status: string;
-    rejectionReason?: string;
-  } | null>(null);
-  const [rejectedDocuments, setRejectedDocuments] = useState<any[]>([]);
-  const [reuploadModalVisible, setReuploadModalVisible] = useState(false);
-  const [uploadingDocId, setUploadingDocId] = useState<string | null>(null);
 
   useEffect(() => {
     const checkPersistedSession = async () => {
@@ -99,99 +86,6 @@ export default function LoginScreen({ navigation }: any) {
     checkPersistedSession();
   }, []);
 
-  // Helper for uploading file to backend
-  const uploadDocumentToBackend = async (fileUri: string, fileName: string, fileType: string) => {
-    const formData = new FormData();
-    formData.append('document', {
-      uri: Platform.OS === 'android' ? fileUri : fileUri.replace('file://', ''),
-      name: fileName || `reupload_${Date.now()}.pdf`,
-      type: fileType || 'application/pdf'
-    } as any);
-
-    const res = await fetch(`${BASE_URL}/upload/document`, {
-      method: 'POST',
-      body: formData
-    });
-
-    if (!res.ok) {
-      throw new Error('Could not upload file to server.');
-    }
-    const data = await res.json();
-    return data.url || fileUri;
-  };
-
-  // Pick & Re-upload replacement document
-  const handlePickAndResubmitDocument = async (doc: any) => {
-    const docId = doc._id || doc.id;
-    if (!docId || !garageInfo?.garageId) return;
-
-    try {
-      const results = await pick({
-        type: [types.pdf, types.images, types.doc, types.docx, types.plainText],
-        allowMultiSelection: false
-      });
-
-      if (!results || results.length === 0) return;
-      const file = results[0];
-      if (!file.uri) return;
-
-      setUploadingDocId(docId);
-
-      let uploadedUrl = file.uri;
-      try {
-        uploadedUrl = await uploadDocumentToBackend(
-          file.uri,
-          file.name || `${doc.name}.pdf`,
-          file.type || 'application/pdf'
-        );
-      } catch (uploadErr) {
-        console.warn('Backend upload fallback:', uploadErr);
-      }
-
-      // Call PUT API to resubmit the document
-      const res = await fetch(`${BASE_URL}/garages/${garageInfo.garageId}/documents/${docId}/resubmit`, {
-        method: 'PUT',
-        headers: { 'Content-Type': 'application/json' },
-        body: JSON.stringify({
-          newFileUrl: uploadedUrl,
-          name: doc.name
-        })
-      });
-
-      const data = await res.json();
-      if (!res.ok) {
-        throw new Error(data.error || 'Failed to resubmit document.');
-      }
-
-      // Update local rejected documents state
-      const remaining = rejectedDocuments.filter(d => (d._id || d.id) !== docId);
-      setRejectedDocuments(remaining);
-
-      if (remaining.length === 0) {
-        setGarageInfo(null);
-        setReuploadModalVisible(false);
-        Alert.alert(
-          'Documents Re-submitted!',
-          'All updated documents have been submitted successfully. Your registration is back under review by the Platform Super Admin.',
-          [{ text: 'Great!', style: 'default' }]
-        );
-      } else {
-        Alert.alert(
-          'Document Updated',
-          `"${doc.name}" has been replaced and submitted for review. ${remaining.length} document(s) remaining.`
-        );
-      }
-    } catch (err: any) {
-      if (isErrorWithCode(err) && err.code === errorCodes.OPERATION_CANCELED) {
-        return;
-      }
-      console.error('Re-upload error:', err);
-      Alert.alert('Re-upload Notice', err.message || 'Could not select or upload document.');
-    } finally {
-      setUploadingDocId(null);
-    }
-  };
-
   const handleLogin = async () => {
     const emailVal = validateEmail(email);
     if (emailVal.error) {
@@ -221,42 +115,10 @@ export default function LoginScreen({ navigation }: any) {
       setLoading(false);
 
       if (!response.ok) {
-        // If there are rejected documents requiring re-upload, open modal directly
-        const rejected = data.rejectedDocuments || [];
-        if (rejected.length > 0) {
-          setRejectedDocuments(rejected);
-          setGarageInfo({
-            garageId: data.garageId,
-            garageName: data.garageName,
-            status: data.status,
-            rejectionReason: data.rejectionReason
-          });
-          // Directly open re-upload action popup
-          setReuploadModalVisible(true);
-          return;
-        }
-
-        if (data.status === 'Pending') {
-          Alert.alert(
-            'Application Pending Approval',
-            data.error || 'Your garage registration is currently pending Super Admin review. You will be able to log in once your facility photos and MOT authorization documentation are approved.',
-            [{ text: 'Understood', style: 'default' }]
-          );
-        } else if (data.status === 'Rejected') {
-          Alert.alert(
-            'Application Rejected',
-            data.error || 'Your garage registration was rejected by the Platform Super Admin. Please contact support.',
-            [{ text: 'OK', style: 'default' }]
-          );
-        } else {
-          Alert.alert('Login Failed', data.error || 'Invalid credentials');
-        }
+        // Pending or rejected garages still sign in - their application status is shown on the dashboard
+        Alert.alert('Login Failed', data.error || 'Invalid credentials');
         return;
       }
-
-      // If login succeeded, clear any rejection state
-      setGarageInfo(null);
-      setRejectedDocuments([]);
 
       // Save tokens and user details to context
       setTokens(data.accessToken || data.token, data.refreshToken || null);
@@ -382,129 +244,6 @@ export default function LoginScreen({ navigation }: any) {
         </View>
       </ScrollView>
 
-      {/* RE-UPLOAD REJECTED DOCUMENTS MODAL */}
-      <Modal
-        visible={reuploadModalVisible}
-        transparent
-        animationType="slide"
-        onRequestClose={() => setReuploadModalVisible(false)}
-      >
-        <View style={styles.modalOverlay}>
-          <View style={[styles.modalContent, { backgroundColor: theme.colors.card }]}>
-            {/* Modal Header */}
-            <View style={[styles.modalHeader, { borderBottomColor: theme.colors.border }]}>
-              <View style={{ flex: 1, paddingRight: 8 }}>
-                <View style={{ flexDirection: 'row', alignItems: 'center', gap: 6 }}>
-                  <MaterialCommunityIcons name="file-document-edit-outline" size={22} color="#EF4444" />
-                  <Text style={[styles.modalTitle, { color: theme.colors.text }]}>
-                    Re-upload Rejected Documents
-                  </Text>
-                </View>
-                <Text style={[styles.modalSubtitle, { color: theme.colors.placeholder }]}>
-                  {garageInfo?.garageName || 'Garage Application'} • Please address the feedback below.
-                </Text>
-              </View>
-
-              <TouchableOpacity
-                onPress={() => setReuploadModalVisible(false)}
-                style={[styles.modalCloseBtn, { backgroundColor: theme.colors.background }]}
-              >
-                <MaterialCommunityIcons name="close" size={20} color={theme.colors.text} />
-              </TouchableOpacity>
-            </View>
-
-            <ScrollView contentContainerStyle={{ padding: 16 }} showsVerticalScrollIndicator={false}>
-              {/* Overall garage rejection note if any */}
-              {garageInfo?.rejectionReason ? (
-                <View style={styles.masterNoticeBox}>
-                  <MaterialCommunityIcons name="alert-circle" size={18} color="#EF4444" style={{ marginRight: 6, marginTop: 2 }} />
-                  <View style={{ flex: 1 }}>
-                    <Text style={styles.masterNoticeTitle}>Super Admin Review Feedback:</Text>
-                    <Text style={styles.masterNoticeText}>{garageInfo.rejectionReason}</Text>
-                  </View>
-                </View>
-              ) : null}
-
-              <Text style={[styles.docSectionTitle, { color: theme.colors.text }]}>
-                Rejected Document(s) Requiring New Copy:
-              </Text>
-
-              {rejectedDocuments.length === 0 ? (
-                <View style={[styles.emptyDocsBox, { borderColor: theme.colors.border }]}>
-                  <MaterialCommunityIcons name="check-decagram" size={36} color="#10B981" />
-                  <Text style={[styles.emptyDocsTitle, { color: theme.colors.text }]}>
-                    All Documents Re-submitted!
-                  </Text>
-                  <Text style={[styles.emptyDocsSubtitle, { color: theme.colors.placeholder }]}>
-                    Your application has been returned to Super Admin for authorization.
-                  </Text>
-                </View>
-              ) : (
-                rejectedDocuments.map((doc, dIdx) => {
-                  const docId = doc._id || doc.id;
-                  const isUploadingThis = uploadingDocId === docId;
-
-                  return (
-                    <View
-                      key={docId || dIdx}
-                      style={[styles.rejectedDocCard, { backgroundColor: theme.colors.background, borderColor: '#EF444460' }]}
-                    >
-                      <View style={styles.rejectedDocTop}>
-                        <View style={[styles.rejectedDocIconBox, { backgroundColor: '#EF444415' }]}>
-                          <MaterialCommunityIcons
-                            name={doc.fileUrl?.endsWith('.pdf') ? 'file-pdf-box' : 'file-document-outline'}
-                            size={24}
-                            color="#EF4444"
-                          />
-                        </View>
-                        <View style={{ flex: 1, paddingRight: 6 }}>
-                          <Text style={[styles.rejectedDocName, { color: theme.colors.text }]}>{doc.name}</Text>
-                          <Text style={[styles.rejectedDocUrl, { color: theme.colors.placeholder }]} numberOfLines={1}>
-                            Current: {doc.fileUrl}
-                          </Text>
-                        </View>
-                        <View style={styles.rejectedBadge}>
-                          <Text style={styles.rejectedBadgeText}>Needs Fix</Text>
-                        </View>
-                      </View>
-
-                      {/* Super Admin Rejection Reason Callout */}
-                      <View style={styles.rejectionReasonBox}>
-                        <MaterialCommunityIcons name="alert-outline" size={16} color="#EF4444" style={{ marginRight: 6, marginTop: 1 }} />
-                        <View style={{ flex: 1 }}>
-                          <Text style={styles.rejectionReasonLabel}>Reason for Rejection:</Text>
-                          <Text style={styles.rejectionReasonText}>
-                            "{doc.rejectionReason || 'Document is blurry or unreadable. Please re-upload a clear copy.'}"
-                          </Text>
-                        </View>
-                      </View>
-
-                      {/* Re-upload Action Button */}
-                      <TouchableOpacity
-                        onPress={() => handlePickAndResubmitDocument(doc)}
-                        disabled={isUploadingThis}
-                        style={[styles.reuploadBtn, { backgroundColor: theme.colors.primary, opacity: isUploadingThis ? 0.7 : 1 }]}
-                      >
-                        {isUploadingThis ? (
-                          <>
-                            <ActivityIndicator size="small" color="#FFFFFF" style={{ marginRight: 8 }} />
-                            <Text style={styles.reuploadBtnText}>Uploading New Document...</Text>
-                          </>
-                        ) : (
-                          <>
-                            <MaterialCommunityIcons name="upload" size={18} color="#FFFFFF" style={{ marginRight: 6 }} />
-                            <Text style={styles.reuploadBtnText}>Browse & Re-upload Clear Copy</Text>
-                          </>
-                        )}
-                      </TouchableOpacity>
-                    </View>
-                  );
-                })
-              )}
-            </ScrollView>
-          </View>
-        </View>
-      </Modal>
     </KeyboardAvoidingView>
   );
 }
@@ -525,50 +264,6 @@ const styles = StyleSheet.create({
     justifyContent: 'center',
     padding: 20,
     paddingTop: 30,
-  },
-  topRejectionBanner: {
-    flexDirection: 'row',
-    alignItems: 'center',
-    borderWidth: 1.5,
-    borderRadius: 12,
-    padding: 12,
-    marginBottom: 20,
-    elevation: 3,
-    shadowColor: '#EF4444',
-    shadowOffset: { width: 0, height: 2 },
-    shadowOpacity: 0.15,
-    shadowRadius: 4,
-  },
-  topRejectionIconBox: {
-    width: 40,
-    height: 40,
-    borderRadius: 8,
-    backgroundColor: '#EF444420',
-    alignItems: 'center',
-    justifyContent: 'center',
-    marginRight: 10,
-  },
-  topRejectionTitle: {
-    fontFamily: fonts.extraBold,
-    fontSize: 13.5,
-    color: '#EF4444',
-  },
-  topRejectionBadge: {
-    backgroundColor: '#EF4444',
-    paddingHorizontal: 6,
-    paddingVertical: 1.5,
-    borderRadius: 4,
-  },
-  topRejectionBadgeText: {
-    fontFamily: fonts.extraBold,
-    color: '#FFFFFF',
-    fontSize: 9.5,
-  },
-  topRejectionSubtitle: {
-    fontFamily: fonts.regular,
-    fontSize: 11.5,
-    marginTop: 2,
-    lineHeight: 16,
   },
   headerContainer: {
     alignItems: 'center',
@@ -680,155 +375,5 @@ const styles = StyleSheet.create({
     fontFamily: fonts.bold,
     fontSize: 12.5,
     flex: 1,
-  },
-  modalOverlay: {
-    flex: 1,
-    backgroundColor: 'rgba(0,0,0,0.7)',
-    justifyContent: 'flex-end',
-  },
-  modalContent: {
-    maxHeight: '85%',
-    borderTopLeftRadius: 20,
-    borderTopRightRadius: 20,
-    overflow: 'hidden',
-  },
-  modalHeader: {
-    flexDirection: 'row',
-    alignItems: 'center',
-    justifyContent: 'space-between',
-    paddingHorizontal: 16,
-    paddingVertical: 14,
-    borderBottomWidth: 1,
-  },
-  modalTitle: {
-    fontFamily: fonts.extraBold,
-    fontSize: 15.5,
-  },
-  modalSubtitle: {
-    fontFamily: fonts.regular,
-    fontSize: 11.5,
-    marginTop: 2,
-  },
-  modalCloseBtn: {
-    width: 32,
-    height: 32,
-    borderRadius: 16,
-    alignItems: 'center',
-    justifyContent: 'center',
-  },
-  masterNoticeBox: {
-    flexDirection: 'row',
-    backgroundColor: '#EF444415',
-    borderWidth: 1,
-    borderColor: '#EF444430',
-    borderRadius: 8,
-    padding: 10,
-    marginBottom: 14,
-  },
-  masterNoticeTitle: {
-    fontFamily: fonts.bold,
-    fontSize: 12,
-    color: '#EF4444',
-  },
-  masterNoticeText: {
-    fontFamily: fonts.regular,
-    fontSize: 12,
-    color: '#EF4444',
-    marginTop: 2,
-  },
-  docSectionTitle: {
-    fontFamily: fonts.extraBold,
-    fontSize: 13.5,
-    marginBottom: 10,
-  },
-  emptyDocsBox: {
-    borderWidth: 1,
-    borderStyle: 'dashed',
-    borderRadius: 10,
-    padding: 24,
-    alignItems: 'center',
-    justifyContent: 'center',
-  },
-  emptyDocsTitle: {
-    fontFamily: fonts.extraBold,
-    fontSize: 15,
-    marginTop: 10,
-  },
-  emptyDocsSubtitle: {
-    fontFamily: fonts.regular,
-    fontSize: 12,
-    marginTop: 4,
-    textAlign: 'center',
-  },
-  rejectedDocCard: {
-    borderWidth: 1,
-    borderRadius: 10,
-    padding: 12,
-    marginBottom: 12,
-  },
-  rejectedDocTop: {
-    flexDirection: 'row',
-    alignItems: 'center',
-  },
-  rejectedDocIconBox: {
-    width: 38,
-    height: 38,
-    borderRadius: 8,
-    alignItems: 'center',
-    justifyContent: 'center',
-    marginRight: 10,
-  },
-  rejectedDocName: {
-    fontFamily: fonts.bold,
-    fontSize: 13.5,
-  },
-  rejectedDocUrl: {
-    fontFamily: fonts.regular,
-    fontSize: 11,
-    marginTop: 2,
-  },
-  rejectedBadge: {
-    backgroundColor: '#EF444420',
-    paddingHorizontal: 8,
-    paddingVertical: 3,
-    borderRadius: 6,
-  },
-  rejectedBadgeText: {
-    fontFamily: fonts.extraBold,
-    fontSize: 10.5,
-    color: '#EF4444',
-  },
-  rejectionReasonBox: {
-    flexDirection: 'row',
-    backgroundColor: '#EF444415',
-    borderWidth: 1,
-    borderColor: '#EF444430',
-    borderRadius: 6,
-    padding: 8,
-    marginTop: 10,
-  },
-  rejectionReasonLabel: {
-    fontFamily: fonts.bold,
-    fontSize: 11,
-    color: '#EF4444',
-  },
-  rejectionReasonText: {
-    fontFamily: fonts.mediumItalic,
-    fontSize: 11.5,
-    color: '#EF4444',
-    marginTop: 1,
-  },
-  reuploadBtn: {
-    flexDirection: 'row',
-    alignItems: 'center',
-    justifyContent: 'center',
-    paddingVertical: 10,
-    borderRadius: 8,
-    marginTop: 10,
-  },
-  reuploadBtnText: {
-    fontFamily: fonts.bold,
-    color: '#FFFFFF',
-    fontSize: 12.5,
   },
 });

@@ -121,6 +121,38 @@ export default function AdminDashboardScreen({ navigation }: any) {
     },
   ];
 
+  // Super Admin rejection feedback: either the whole application (redo every step and resubmit)
+  // or individual documents (only those need a new copy)
+  const isGarageUser = user?.role === 'garage_admin' || user?.role === 'staff';
+  const isApplicationRejected = currentGarage?.status === 'Rejected';
+  const rejectedDocs = (currentGarage?.verificationDocuments || []).filter(d => d.status === 'Rejected');
+  const redoSteps = currentGarage?.redoSteps || [];
+  const redoTasks = [
+    {
+      id: 'location',
+      title: 'Location of your garage',
+      icon: 'map-marker-outline',
+      done: hasLocation && !redoSteps.includes('location'),
+      pendingLabel: 'Redo',
+    },
+    {
+      id: 'services',
+      title: 'Services & pricing rates',
+      icon: 'tag-outline',
+      done: hasServices && !redoSteps.includes('services'),
+      pendingLabel: 'Redo',
+    },
+    {
+      id: 'documents',
+      title: 'MOT & DVLA documents',
+      icon: 'shield-check-outline',
+      done: hasDocs && rejectedDocs.length === 0,
+      pendingLabel: rejectedDocs.length > 0 ? `${rejectedDocs.length} to re-upload` : 'Upload',
+    },
+  ];
+  const nextRedoTask = redoTasks.find(t => !t.done);
+  const openSetupTab = (tab: string) => navigation.navigate('GarageSetup', { initialTab: tab });
+
   const completedCount = checklistTasks.filter(t => t.completed).length;
   const progressPercent = Math.round((completedCount / checklistTasks.length) * 100);
   const pendingTasks = checklistTasks.filter(t => !t.completed);
@@ -228,8 +260,127 @@ export default function AdminDashboardScreen({ navigation }: any) {
         </View>
       </View>
 
+      {/* Whole application rejected: redo every setup step, then resubmit */}
+      {isGarageUser && isApplicationRejected && (
+        <View style={[styles.rejectCard, { backgroundColor: theme.colors.card, borderColor: theme.colors.error + '60' }]}>
+          <View style={styles.rejectHeader}>
+            <View style={[styles.rejectIconBox, { backgroundColor: theme.colors.error + '18' }]}>
+              <MaterialCommunityIcons name="alert-octagon-outline" size={22} color={theme.colors.error} />
+            </View>
+            <View style={styles.rejectHeaderText}>
+              <Text style={[styles.rejectTitle, { color: theme.colors.text }]}>Application Rejected</Text>
+              <Text style={[styles.rejectSubtitle, { color: theme.colors.placeholder }]}>
+                Your garage is not live. Go through the setup again and resubmit it for approval.
+              </Text>
+            </View>
+            <View style={[styles.rejectPill, { backgroundColor: theme.colors.error + '18' }]}>
+              <Text style={[styles.rejectPillText, { color: theme.colors.error }]}>NOT LIVE</Text>
+            </View>
+          </View>
+
+          <View style={[styles.rejectReasonBox, { backgroundColor: theme.colors.error + '0D', borderLeftColor: theme.colors.error }]}>
+            <Text style={[styles.rejectReasonLabel, { color: theme.colors.error }]}>Reason from the review team</Text>
+            <Text style={[styles.rejectReasonText, { color: theme.colors.text }]}>
+              {currentGarage?.rejectionReason || 'Your application did not meet the verification requirements.'}
+            </Text>
+          </View>
+
+          <Text style={[styles.rejectSectionLabel, { color: theme.colors.placeholder }]}>WHAT TO DO NEXT</Text>
+          {redoTasks.map((task, index) => (
+            <TouchableOpacity
+              key={task.id}
+              style={[styles.rejectStepRow, { borderBottomColor: theme.colors.border + '60' }]}
+              onPress={() => openSetupTab(task.id)}
+              activeOpacity={0.7}
+            >
+              <View
+                style={[
+                  styles.rejectStepNumber,
+                  { backgroundColor: task.done ? theme.colors.success + '18' : theme.colors.background, borderColor: task.done ? theme.colors.success : theme.colors.border }
+                ]}
+              >
+                {task.done ? (
+                  <MaterialCommunityIcons name="check" size={13} color={theme.colors.success} />
+                ) : (
+                  <Text style={[styles.rejectStepNumberText, { color: theme.colors.placeholder }]}>{index + 1}</Text>
+                )}
+              </View>
+              <MaterialCommunityIcons name={task.icon} size={17} color={task.done ? theme.colors.success : theme.colors.text} />
+              <Text style={[styles.rejectStepTitle, { color: theme.colors.text }]}>{task.title}</Text>
+              <Text style={[styles.rejectStepStatus, { color: task.done ? theme.colors.success : theme.colors.error }]}>
+                {task.done ? 'Done' : task.pendingLabel}
+              </Text>
+              <MaterialCommunityIcons name="chevron-right" size={16} color={theme.colors.placeholder} />
+            </TouchableOpacity>
+          ))}
+          <View style={styles.rejectStepRowLast}>
+            <View style={[styles.rejectStepNumber, { backgroundColor: theme.colors.background, borderColor: theme.colors.border }]}>
+              <Text style={[styles.rejectStepNumberText, { color: theme.colors.placeholder }]}>4</Text>
+            </View>
+            <MaterialCommunityIcons name="send-check-outline" size={17} color={theme.colors.text} />
+            <Text style={[styles.rejectStepTitle, { color: theme.colors.text }]}>Resubmit for approval</Text>
+            <Text style={[styles.rejectStepStatus, { color: theme.colors.placeholder }]}>
+              {nextRedoTask ? 'After steps 1-3' : 'Ready'}
+            </Text>
+          </View>
+
+          <TouchableOpacity
+            style={[styles.rejectButton, { backgroundColor: theme.colors.error }]}
+            onPress={() => openSetupTab(nextRedoTask ? nextRedoTask.id : 'documents')}
+            activeOpacity={0.85}
+          >
+            <MaterialCommunityIcons name={nextRedoTask ? 'restart' : 'send-check'} size={18} color="#FFFFFF" />
+            <Text style={styles.rejectButtonText}>
+              {nextRedoTask
+                ? (redoTasks.every(t => !t.done) ? 'Start Again' : 'Continue Setup')
+                : 'Resubmit for Approval'}
+            </Text>
+          </TouchableOpacity>
+        </View>
+      )}
+
+      {/* Only some documents rejected: just those need a new copy */}
+      {isGarageUser && !isApplicationRejected && rejectedDocs.length > 0 && (
+        <View style={[styles.rejectCard, { backgroundColor: theme.colors.card, borderColor: theme.colors.error + '60' }]}>
+          <View style={styles.rejectHeader}>
+            <View style={[styles.rejectIconBox, { backgroundColor: theme.colors.error + '18' }]}>
+              <MaterialCommunityIcons name="file-alert-outline" size={22} color={theme.colors.error} />
+            </View>
+            <View style={styles.rejectHeaderText}>
+              <Text style={[styles.rejectTitle, { color: theme.colors.text }]}>
+                {rejectedDocs.length === 1 ? '1 document was rejected' : `${rejectedDocs.length} documents were rejected`}
+              </Text>
+              <Text style={[styles.rejectSubtitle, { color: theme.colors.placeholder }]}>
+                Upload a new copy of {rejectedDocs.length === 1 ? 'it' : 'these'} only. Everything else stays as it is.
+              </Text>
+            </View>
+          </View>
+
+          {rejectedDocs.map((doc, index) => (
+            <TouchableOpacity
+              key={doc._id || doc.id || index}
+              style={[styles.rejectDocRow, { backgroundColor: theme.colors.background, borderColor: theme.colors.border }]}
+              onPress={() => openSetupTab('documents')}
+              activeOpacity={0.7}
+            >
+              <MaterialCommunityIcons name="file-document-remove-outline" size={20} color={theme.colors.error} />
+              <View style={styles.rejectHeaderText}>
+                <Text style={[styles.rejectDocName, { color: theme.colors.text }]}>{doc.name}</Text>
+                <Text style={[styles.rejectDocReason, { color: theme.colors.placeholder }]}>
+                  {doc.rejectionReason || 'Please upload a clear, valid copy.'}
+                </Text>
+              </View>
+              <View style={[styles.rejectDocAction, { backgroundColor: theme.colors.error + '18' }]}>
+                <MaterialCommunityIcons name="upload" size={13} color={theme.colors.error} />
+                <Text style={[styles.rejectDocActionText, { color: theme.colors.error }]}>Re-upload</Text>
+              </View>
+            </TouchableOpacity>
+          ))}
+        </View>
+      )}
+
       {/* Dynamic Getting Started Onboarding Card (Compact UI) */}
-      {user && (user.role === 'garage_admin' || user.role === 'staff') && !checklistHidden && (
+      {user && (user.role === 'garage_admin' || user.role === 'staff') && !checklistHidden && !isApplicationRejected && (
         <View style={[styles.gettingStartedCard, { backgroundColor: theme.colors.card, borderColor: theme.colors.border }]}>
           {/* Header Row: Tag + Percent Badge + Hide Button */}
           <View style={styles.gettingStartedHeader}>
@@ -854,6 +1005,158 @@ const styles = StyleSheet.create({
     fontFamily: fonts.regular,
     flex: 1,
     fontSize: 12,
+  },
+  rejectCard: {
+    borderRadius: 14,
+    borderWidth: 1,
+    paddingHorizontal: 14,
+    paddingVertical: 14,
+    marginHorizontal: 16,
+    marginBottom: 12,
+    shadowColor: '#000',
+    shadowOffset: { width: 0, height: 1 },
+    shadowOpacity: 0.05,
+    shadowRadius: 3,
+    elevation: 1,
+  },
+  rejectHeader: {
+    flexDirection: 'row',
+    alignItems: 'flex-start',
+    gap: 10,
+  },
+  rejectIconBox: {
+    width: 40,
+    height: 40,
+    borderRadius: 10,
+    alignItems: 'center',
+    justifyContent: 'center',
+  },
+  rejectHeaderText: {
+    flex: 1,
+  },
+  rejectTitle: {
+    fontFamily: fonts.extraBold,
+    fontSize: 15,
+  },
+  rejectSubtitle: {
+    fontFamily: fonts.medium,
+    fontSize: 12,
+    lineHeight: 17,
+    marginTop: 2,
+  },
+  rejectPill: {
+    paddingHorizontal: 8,
+    paddingVertical: 3,
+    borderRadius: 999,
+  },
+  rejectPillText: {
+    fontFamily: fonts.extraBold,
+    fontSize: 9.5,
+    letterSpacing: 0.6,
+  },
+  rejectReasonBox: {
+    borderLeftWidth: 3,
+    borderRadius: 8,
+    paddingHorizontal: 12,
+    paddingVertical: 10,
+    marginTop: 12,
+  },
+  rejectReasonLabel: {
+    fontFamily: fonts.bold,
+    fontSize: 11,
+    marginBottom: 3,
+  },
+  rejectReasonText: {
+    fontFamily: fonts.medium,
+    fontSize: 13,
+    lineHeight: 18,
+  },
+  rejectSectionLabel: {
+    fontFamily: fonts.extraBold,
+    fontSize: 10.5,
+    letterSpacing: 0.8,
+    marginTop: 14,
+    marginBottom: 2,
+  },
+  rejectStepRow: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    gap: 10,
+    paddingVertical: 9,
+    borderBottomWidth: 0.5,
+  },
+  rejectStepRowLast: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    gap: 10,
+    paddingVertical: 9,
+  },
+  rejectStepNumber: {
+    width: 22,
+    height: 22,
+    borderRadius: 11,
+    borderWidth: 1,
+    alignItems: 'center',
+    justifyContent: 'center',
+  },
+  rejectStepNumberText: {
+    fontFamily: fonts.bold,
+    fontSize: 11,
+  },
+  rejectStepTitle: {
+    flex: 1,
+    fontFamily: fonts.semiBold,
+    fontSize: 13,
+  },
+  rejectStepStatus: {
+    fontFamily: fonts.bold,
+    fontSize: 11.5,
+  },
+  rejectButton: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    justifyContent: 'center',
+    gap: 8,
+    borderRadius: 10,
+    paddingVertical: 12,
+    marginTop: 12,
+  },
+  rejectButtonText: {
+    color: '#FFFFFF',
+    fontFamily: fonts.bold,
+    fontSize: 14,
+  },
+  rejectDocRow: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    gap: 10,
+    borderWidth: 1,
+    borderRadius: 10,
+    paddingHorizontal: 12,
+    paddingVertical: 10,
+    marginTop: 10,
+  },
+  rejectDocName: {
+    fontFamily: fonts.bold,
+    fontSize: 13,
+  },
+  rejectDocReason: {
+    fontFamily: fonts.medium,
+    fontSize: 12,
+    lineHeight: 16,
+    marginTop: 2,
+  },
+  rejectDocAction: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    gap: 4,
+    paddingHorizontal: 9,
+    paddingVertical: 5,
+    borderRadius: 8,
+  },
+  rejectDocActionText: {
+    fontFamily: fonts.bold,
+    fontSize: 11.5,
   },
   gettingStartedCard: {
     borderRadius: 14,

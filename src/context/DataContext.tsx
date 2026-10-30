@@ -99,6 +99,8 @@ export interface Garage {
   locationConfigured?: boolean;
   servicesConfigured?: boolean;
   documentsConfigured?: boolean;
+  /** Setup steps to go through again after the whole application was rejected */
+  redoSteps?: ('location' | 'services')[];
   /** Computed by the backend: which setup steps are done (location, services, documents) */
   profileCompletion?: { complete: boolean; steps: { location: boolean; services: boolean; documents: boolean }; missing: string[]; percent?: number };
   /** Approved AND profile complete - only then do customers see this garage */
@@ -123,6 +125,17 @@ export interface UserProfile {
   garageId?: string;
 }
 
+/** A Super Admin category with the services garages can offer in it (garage setup) */
+export interface ServiceCatalogGroup {
+  id: string;
+  name: string;
+  description?: string;
+  icon: string;
+  iconColor: string;
+  iconBg: string;
+  services: { name: string; category: string; price: number; duration: number; description?: string; icon: string }[];
+}
+
 export interface ServiceCategory {
   id?: string;
   _id?: string;
@@ -144,6 +157,7 @@ interface DataContextType {
   garages: Garage[];
   serviceCategories: ServiceCategory[];
   fetchServiceCategories: () => Promise<ServiceCategory[]>;
+  fetchServiceCatalog: () => Promise<ServiceCatalogGroup[]>;
   createServiceCategory: (catData: Partial<ServiceCategory>) => Promise<ServiceCategory>;
   deleteServiceCategory: (categoryId: string) => Promise<void>;
   token: string | null;
@@ -1267,6 +1281,15 @@ export const DataProvider = ({ children }: { children: ReactNode }) => {
     }
   }, [authFetch]);
 
+  const fetchServiceCatalog = useCallback(async (): Promise<ServiceCatalogGroup[]> => {
+    const response = await authFetch(`${BASE_URL}/service-categories/catalog`);
+    const data = await response.json().catch(() => ({}));
+    if (!response.ok) {
+      throw new Error(data.error || 'Could not load service categories.');
+    }
+    return Array.isArray(data.categories) ? data.categories : [];
+  }, [authFetch]);
+
   const createServiceCategory = useCallback(async (catData: Partial<ServiceCategory>): Promise<ServiceCategory> => {
     try {
       const response = await authFetch(`${BASE_URL}/service-categories`, {
@@ -1314,6 +1337,7 @@ export const DataProvider = ({ children }: { children: ReactNode }) => {
         garages,
         serviceCategories,
         fetchServiceCategories,
+        fetchServiceCatalog,
         createServiceCategory,
         deleteServiceCategory,
         token,
