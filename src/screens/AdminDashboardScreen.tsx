@@ -52,6 +52,7 @@ export default function AdminDashboardScreen({ navigation }: any) {
   const [isRefreshing, setIsRefreshing] = useState(false);
   const [checklistCollapsed, setChecklistCollapsed] = useState(false);
   const [checklistHidden, setChecklistHidden] = useState(false);
+  const [isProfileCompletedForever, setIsProfileCompletedForever] = useState(false);
 
   const [localSetup, setLocalSetup] = useState<{ location: boolean; services: boolean; docs: boolean }>({
     location: false,
@@ -64,16 +65,20 @@ export default function AdminDashboardScreen({ navigation }: any) {
       const gid = currentGarage?.id || currentGarage?._id;
       if (!gid) return;
       try {
-        const [loc, srv, doc] = await Promise.all([
+        const [loc, srv, doc, forever] = await Promise.all([
           AsyncStorage.getItem(`garage_loc_${gid}`),
           AsyncStorage.getItem(`garage_srv_${gid}`),
           AsyncStorage.getItem(`garage_doc_${gid}`),
+          AsyncStorage.getItem(`garage_profile_completed_100_${gid}`),
         ]);
         setLocalSetup({
           location: loc === 'true',
           services: srv === 'true',
           docs: doc === 'true',
         });
+        if (forever === 'true') {
+          setIsProfileCompletedForever(true);
+        }
       } catch (e) {}
     };
     loadSetup();
@@ -154,9 +159,30 @@ export default function AdminDashboardScreen({ navigation }: any) {
   const openSetupTab = (tab: string) => navigation.navigate('GarageSetup', { initialTab: tab });
 
   const completedCount = checklistTasks.filter(t => t.completed).length;
-  const progressPercent = Math.round((completedCount / checklistTasks.length) * 100);
+  const computedPercent = Math.round((completedCount / checklistTasks.length) * 100);
+  const progressPercent = typeof currentGarage?.profileCompletion?.percent === 'number'
+    ? Math.max(currentGarage.profileCompletion.percent, computedPercent)
+    : computedPercent;
   const pendingTasks = checklistTasks.filter(t => !t.completed);
   const completedTasks = checklistTasks.filter(t => t.completed);
+
+  const isProfileComplete = Boolean(
+    isProfileCompletedForever ||
+    progressPercent >= 100 ||
+    currentGarage?.profileCompletion?.complete === true ||
+    currentGarage?.isVisibleToCustomers === true ||
+    (checklistTasks.length > 0 && checklistTasks.every(t => t.completed))
+  );
+
+  React.useEffect(() => {
+    const gid = currentGarage?.id || currentGarage?._id;
+    if (isProfileComplete && gid && !isProfileCompletedForever) {
+      setIsProfileCompletedForever(true);
+      AsyncStorage.setItem(`garage_profile_completed_100_${gid}`, 'true').catch(() => {});
+    }
+  }, [isProfileComplete, currentGarage, isProfileCompletedForever]);
+
+  const shouldShowProfileCompletion = !isProfileComplete;
 
   React.useEffect(() => {
     const unsubscribe = navigation.addListener('focus', () => {
@@ -380,7 +406,7 @@ export default function AdminDashboardScreen({ navigation }: any) {
       )}
 
       {/* Dynamic Getting Started Onboarding Card (Compact UI) */}
-      {user && (user.role === 'garage_admin' || user.role === 'staff') && !checklistHidden && !isApplicationRejected && (
+      {user && (user.role === 'garage_admin' || user.role === 'staff') && shouldShowProfileCompletion && !checklistHidden && !isApplicationRejected && (
         <View style={[styles.gettingStartedCard, { backgroundColor: theme.colors.card, borderColor: theme.colors.border }]}>
           {/* Header Row: Tag + Percent Badge + Hide Button */}
           <View style={styles.gettingStartedHeader}>
@@ -488,7 +514,7 @@ export default function AdminDashboardScreen({ navigation }: any) {
       )}
 
       {/* When user hid the card, provide a sleek, full-width "Complete Your Profile" banner */}
-      {user && (user.role === 'garage_admin' || user.role === 'staff') && checklistHidden && (
+      {user && (user.role === 'garage_admin' || user.role === 'staff') && shouldShowProfileCompletion && checklistHidden && !isApplicationRejected && (
         <TouchableOpacity
           style={[
             styles.unhidePill,
@@ -623,11 +649,31 @@ export default function AdminDashboardScreen({ navigation }: any) {
             onPress={() => navigation.navigate('AdminAlerts')}
             activeOpacity={0.7}
           >
-            <View style={[styles.quickActionIcon, { backgroundColor: '#F59E0B15' }]}>
-              <MaterialCommunityIcons name="bell-badge-outline" size={22} color="#F59E0B" />
+            <View style={styles.quickActionHeaderRow}>
+              <View style={[styles.quickActionIcon, { backgroundColor: '#F59E0B15' }]}>
+                <MaterialCommunityIcons name="bell-outline" size={22} color="#F59E0B" />
+                {pendingAlerts.length > 0 && (
+                  <View style={styles.bellBadge}>
+                    <Text style={styles.bellBadgeText}>
+                      {pendingAlerts.length}
+                    </Text>
+                  </View>
+                )}
+              </View>
+              {pendingAlerts.length > 0 && (
+                <View style={[styles.reminderPillBadge, { backgroundColor: '#EF444415' }]}>
+                  <Text style={[styles.reminderPillText, { color: '#EF4444' }]}>
+                    {pendingAlerts.length} new
+                  </Text>
+                </View>
+              )}
             </View>
-            <Text style={[styles.quickActionTitle, { color: theme.colors.text }]}>Customer Alerts</Text>
-            <Text style={[styles.quickActionSubtitle, { color: theme.colors.placeholder }]}>Requests & changes</Text>
+            <Text style={[styles.quickActionTitle, { color: theme.colors.text }]}>Reminder</Text>
+            <Text style={[styles.quickActionSubtitle, { color: theme.colors.placeholder }]}>
+              {pendingAlerts.length > 0
+                ? `${pendingAlerts.length} pending alert${pendingAlerts.length > 1 ? 's' : ''}`
+                : 'Action alerts & requests'}
+            </Text>
           </TouchableOpacity>
 
           <TouchableOpacity
@@ -920,6 +966,23 @@ const styles = StyleSheet.create({
     alignItems: 'center',
     justifyContent: 'center',
     marginBottom: 8,
+    position: 'relative',
+  },
+  quickActionHeaderRow: {
+    flexDirection: 'row',
+    justifyContent: 'space-between',
+    alignItems: 'center',
+    width: '100%',
+  },
+  reminderPillBadge: {
+    paddingHorizontal: 7,
+    paddingVertical: 2,
+    borderRadius: 10,
+    marginBottom: 8,
+  },
+  reminderPillText: {
+    fontFamily: fonts.bold,
+    fontSize: 10,
   },
   quickActionTitle: {
     fontFamily: fonts.semiBold,

@@ -471,11 +471,11 @@ export default function AdminRemindersScreen() {
                 style={[styles.saveBtn, { backgroundColor: theme.colors.primary }]}
               >
                 {savingTemplate ? (
-                  <ActivityIndicator size="small" color={theme.dark ? theme.colors.background : '#FFFFFF'} />
+                  <ActivityIndicator size="small" color="#FFFFFF" />
                 ) : (
                   <View style={styles.saveBtnContent}>
-                    <MaterialCommunityIcons name="content-save-outline" size={16} color={theme.dark ? theme.colors.background : '#FFFFFF'} style={{ marginRight: 6 }} />
-                    <Text style={[styles.saveBtnText, { color: theme.dark ? theme.colors.background : '#FFFFFF' }]}>Save Reminder Template</Text>
+                    <MaterialCommunityIcons name="content-save-outline" size={16} color="#FFFFFF" style={{ marginRight: 6 }} />
+                    <Text style={[styles.saveBtnText, { color: "#FFFFFF" }]}>Save Reminder Template</Text>
                   </View>
                 )}
               </TouchableOpacity>

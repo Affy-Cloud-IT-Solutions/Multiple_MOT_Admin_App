@@ -163,12 +163,12 @@ export default function SuperAdminGaragesScreen({ navigation }: any) {
     try {
       await updateGarageProfile(garageId, { 
         images: garageImages,
-        logoUrl: garageImages[0] || selectedGarage.logoUrl 
+        logoUrl: selectedGarage.logoUrl || garageImages[0] 
       });
       setSelectedGarage({
         ...selectedGarage,
         images: garageImages,
-        logoUrl: garageImages[0] || selectedGarage.logoUrl
+        logoUrl: selectedGarage.logoUrl || garageImages[0]
       });
       Alert.alert('Success', 'Garage images updated successfully!');
     } catch (err: any) {
@@ -350,12 +350,14 @@ export default function SuperAdminGaragesScreen({ navigation }: any) {
                 {/* Top Row: Icon/Thumbnail, Name, Status & Verification Badge */}
                 <View style={styles.cardHeader}>
                   <View style={[styles.garageAvatar, { backgroundColor: statusColor + '15' }]}>
-                    {(garage.images && garage.images.length > 0) ? (
-                      <Image source={{ uri: garage.images[0] }} style={styles.garageAvatarImg} />
-                    ) : garage.logoUrl ? (
+                    {garage.logoUrl ? (
                       <Image source={{ uri: garage.logoUrl }} style={styles.garageAvatarImg} />
+                    ) : (garage.images && garage.images.length > 0) ? (
+                      <Image source={{ uri: garage.images[0] }} style={styles.garageAvatarImg} />
                     ) : (
-                      <MaterialCommunityIcons name="garage" size={26} color={statusColor} />
+                      <Text style={{ fontFamily: fonts.bold, fontSize: 18, color: statusColor }}>
+                        {(garage.name || 'G').charAt(0).toUpperCase()}
+                      </Text>
                     )}
                   </View>
 
@@ -432,13 +434,26 @@ export default function SuperAdminGaragesScreen({ navigation }: any) {
               <>
                 {/* Modal Header */}
                 <View style={[styles.modalHeader, { borderBottomColor: theme.colors.border }]}>
-                  <View style={{ flex: 1 }}>
-                    <Text style={[styles.modalTitle, { color: theme.colors.text }]}>
-                      {selectedGarage.name}
-                    </Text>
-                    <Text style={[styles.modalSubtitle, { color: theme.colors.placeholder }]}>
-                      Garage Profile & Platform Controls
-                    </Text>
+                  <View style={{ flexDirection: 'row', alignItems: 'center', flex: 1, marginRight: 8 }}>
+                    <View style={[styles.garageAvatar, { width: 44, height: 44, borderRadius: 10, marginRight: 12, backgroundColor: getStatusColor(selectedGarage.status) + '15' }]}>
+                      {selectedGarage.logoUrl ? (
+                        <Image source={{ uri: selectedGarage.logoUrl }} style={styles.garageAvatarImg} resizeMode="contain" />
+                      ) : (selectedGarage.images && selectedGarage.images.length > 0) ? (
+                        <Image source={{ uri: selectedGarage.images[0] }} style={styles.garageAvatarImg} resizeMode="cover" />
+                      ) : (
+                        <Text style={{ fontFamily: fonts.bold, fontSize: 18, color: getStatusColor(selectedGarage.status) }}>
+                          {(selectedGarage.name || 'G').charAt(0).toUpperCase()}
+                        </Text>
+                      )}
+                    </View>
+                    <View style={{ flex: 1 }}>
+                      <Text style={[styles.modalTitle, { color: theme.colors.text }]} numberOfLines={1}>
+                        {selectedGarage.name}
+                      </Text>
+                      <Text style={[styles.modalSubtitle, { color: theme.colors.placeholder }]}>
+                        Garage Profile & Platform Controls
+                      </Text>
+                    </View>
                   </View>
                   <TouchableOpacity onPress={() => setModalVisible(false)} style={styles.closeBtn}>
                     <MaterialCommunityIcons name="close" size={22} color={theme.colors.text} />
@@ -474,6 +489,35 @@ export default function SuperAdminGaragesScreen({ navigation }: any) {
                         Verification: {selectedGarage.verificationStatus || 'Pending'}
                       </Text>
                     </View>
+                  </View>
+
+                  {/* Brand Logo Section */}
+                  <View style={[styles.infoSection, { backgroundColor: theme.colors.background, borderColor: theme.colors.border }]}>
+                    <Text style={[styles.infoSectionTitle, { color: theme.colors.text }]}>Official Brand Logo</Text>
+                    {selectedGarage.logoUrl ? (
+                      <View style={{ flexDirection: 'row', alignItems: 'center', marginTop: 4 }}>
+                        <View style={{ width: 56, height: 56, borderRadius: 10, backgroundColor: '#FFF', alignItems: 'center', justifyContent: 'center', overflow: 'hidden', borderWidth: 1, borderColor: theme.colors.border, marginRight: 12 }}>
+                          <Image source={{ uri: selectedGarage.logoUrl }} style={{ width: '100%', height: '100%' }} resizeMode="contain" />
+                        </View>
+                        <View style={{ flex: 1 }}>
+                          <Text style={{ fontFamily: fonts.bold, fontSize: 14, color: theme.colors.text }}>Logo Active</Text>
+                          <Text style={{ fontFamily: fonts.regular, fontSize: 12, color: theme.colors.placeholder }}>
+                            Used across customer app search lists, garage profile, and booking cards.
+                          </Text>
+                        </View>
+                      </View>
+                    ) : (
+                      <View style={{ flexDirection: 'row', alignItems: 'center', marginTop: 4 }}>
+                        <View style={{ width: 44, height: 44, borderRadius: 10, backgroundColor: theme.colors.primaryContainer, alignItems: 'center', justifyContent: 'center', marginRight: 12 }}>
+                          <Text style={{ fontFamily: fonts.bold, fontSize: 16, color: theme.colors.primary }}>
+                            {(selectedGarage.name || 'G').charAt(0).toUpperCase()}
+                          </Text>
+                        </View>
+                        <Text style={{ fontFamily: fonts.regular, fontSize: 12, color: theme.colors.placeholder, flex: 1 }}>
+                          No custom brand logo uploaded. Falling back to garage initial.
+                        </Text>
+                      </View>
+                    )}
                   </View>
 
                   {/* Location & Contact Info Card */}

@@ -364,9 +364,9 @@ export default function CustomerPortalScreen({ route, navigation }: any) {
                     style={[styles.submitFormBtn, { backgroundColor: theme.colors.secondary }]}
                   >
                     {loadingAction === 'add_vehicle' ? (
-                      <ActivityIndicator color={theme.dark ? theme.colors.background : '#FFFFFF'} size="small" />
+                      <ActivityIndicator color="#FFFFFF" size="small" />
                     ) : (
-                      <Text style={[styles.submitButtonText, { color: theme.dark ? theme.colors.background : '#FFFFFF' }]}>Request Approval</Text>
+                      <Text style={[styles.submitButtonText, { color: "#FFFFFF" }]}>Request Approval</Text>
                     )}
                   </TouchableOpacity>
                 </View>
@@ -608,10 +608,10 @@ export default function CustomerPortalScreen({ route, navigation }: any) {
                               <MaterialCommunityIcons 
                                 name="calendar-edit" 
                                 size={16} 
-                                color={theme.dark ? theme.colors.background : '#FFFFFF'} 
+                                color="#FFFFFF" 
                                 style={{ marginRight: 4 }} 
                               />
-                              <Text style={[styles.actionBtnText, { color: theme.dark ? theme.colors.background : '#FFFFFF' }]}>Reschedule</Text>
+                              <Text style={[styles.actionBtnText, { color: "#FFFFFF" }]}>Reschedule</Text>
                             </View>
                           </TouchableOpacity>
                         ) : (
@@ -624,10 +624,10 @@ export default function CustomerPortalScreen({ route, navigation }: any) {
                               <MaterialCommunityIcons 
                                 name="calendar-plus" 
                                 size={16} 
-                                color={theme.dark ? theme.colors.background : '#FFFFFF'} 
+                                color="#FFFFFF" 
                                 style={{ marginRight: 4 }} 
                               />
-                              <Text style={[styles.actionBtnText, { color: theme.dark ? theme.colors.background : '#FFFFFF' }]}>Book MOT</Text>
+                              <Text style={[styles.actionBtnText, { color: "#FFFFFF" }]}>Book MOT</Text>
                             </View>
                           </TouchableOpacity>
                         )}

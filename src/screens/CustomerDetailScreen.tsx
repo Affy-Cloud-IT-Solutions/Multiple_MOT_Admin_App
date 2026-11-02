@@ -253,6 +253,16 @@ export default function CustomerDetailScreen({ route, navigation }: any) {
                 const isPending = v.status === 'Pending';
                 const isRejected = v.status === 'Rejected';
 
+                const today = new Date();
+                today.setHours(0, 0, 0, 0);
+                const vBooking = alerts.find(a => 
+                  a.type === 'BOOKED' && 
+                  a.registrationNumber?.toUpperCase() === v.registrationNumber?.toUpperCase() && 
+                  (a.status === 'Approved' || a.status === 'Pending') &&
+                  (!a.date || new Date(a.date) >= today)
+                );
+                const isBooked = Boolean(vBooking);
+
                 let statusColor = theme.colors.placeholder;
                 let statusBg = theme.colors.border + '30';
                 if (isActive) {
@@ -268,15 +278,27 @@ export default function CustomerDetailScreen({ route, navigation }: any) {
 
                 return (
                   <View
-                    key={v.id}
+                    key={v.id || v.registrationNumber}
                     style={[styles.card, { backgroundColor: theme.colors.card, borderColor: theme.colors.border }]}
                   >
                     <View style={styles.cardHeader}>
                       <View style={styles.plate}>
                         <Text style={styles.plateText}>{v.registrationNumber}</Text>
                       </View>
-                      <View style={[styles.statusBadge, { backgroundColor: statusBg, borderColor: statusColor + '40' }]}>
-                        <Text style={[styles.statusText, { color: statusColor }]}>{v.status}</Text>
+                      <View style={{ flexDirection: 'row', alignItems: 'center', gap: 6 }}>
+                        {isBooked && vBooking ? (
+                          <View style={[styles.statusBadge, { backgroundColor: '#F59E0B18', borderColor: '#F59E0B60', borderWidth: 1, flexDirection: 'row', alignItems: 'center' }]}>
+                            <MaterialCommunityIcons name="calendar-clock" size={11} color="#D97706" style={{ marginRight: 3 }} />
+                            <Text style={[styles.statusText, { color: '#D97706', fontFamily: fonts.bold }]}>
+                              Already Booked • {new Date(vBooking.date).toLocaleDateString('en-GB', { day: 'numeric', month: 'short' })}
+                            </Text>
+                          </View>
+                        ) : (
+                          <View style={[styles.statusBadge, { backgroundColor: '#10B98118', borderColor: '#10B98160', borderWidth: 1, flexDirection: 'row', alignItems: 'center' }]}>
+                            <MaterialCommunityIcons name="check-circle-outline" size={11} color="#10B981" style={{ marginRight: 3 }} />
+                            <Text style={[styles.statusText, { color: '#10B981', fontFamily: fonts.bold }]}>Active • Available</Text>
+                          </View>
+                        )}
                       </View>
                     </View>
 
@@ -299,6 +321,64 @@ export default function CustomerDetailScreen({ route, navigation }: any) {
                           <Text style={{ fontSize: 12, color: theme.colors.text, marginTop: 2 }}>{v.rejectionReason}</Text>
                         </View>
                       )}
+
+                      {/* Action Button: Book Service or Manage Booking */}
+                      <TouchableOpacity
+                        onPress={() => {
+                          if (isBooked && vBooking) {
+                            Alert.alert(
+                              'Vehicle Already Booked',
+                              `${v.registrationNumber} already has an active booking for ${new Date(vBooking.date).toLocaleDateString('en-GB', { day: 'numeric', month: 'short' })}${vBooking.slotTime ? ` at ${vBooking.slotTime}` : ''}.\n\nWould you like to manage or reschedule this appointment?`,
+                              [
+                                { text: 'Cancel', style: 'cancel' },
+                                {
+                                  text: 'Manage / Reschedule',
+                                  onPress: () => {
+                                    navigation.navigate('AdminBookMot', {
+                                      customer,
+                                      vehicle: v,
+                                      allVehicles: customerVehicles,
+                                      booking: vBooking,
+                                    });
+                                  }
+                                }
+                              ]
+                            );
+                            return;
+                          }
+
+                          navigation.navigate('AdminBookMot', {
+                            customer,
+                            vehicle: v,
+                            allVehicles: customerVehicles,
+                          });
+                        }}
+                        style={{
+                          flexDirection: 'row',
+                          alignItems: 'center',
+                          justifyContent: 'center',
+                          marginTop: 12,
+                          paddingVertical: 9,
+                          borderRadius: 8,
+                          borderWidth: 1,
+                          backgroundColor: isBooked ? '#F59E0B12' : theme.colors.primary + '12',
+                          borderColor: isBooked ? '#F59E0B' : theme.colors.primary,
+                        }}
+                      >
+                        <MaterialCommunityIcons
+                          name={isBooked ? "calendar-clock" : "calendar-plus"}
+                          size={15}
+                          color={isBooked ? "#D97706" : theme.colors.primary}
+                          style={{ marginRight: 6 }}
+                        />
+                        <Text style={{
+                          fontFamily: fonts.bold,
+                          fontSize: 12,
+                          color: isBooked ? "#D97706" : theme.colors.primary,
+                        }}>
+                          {isBooked ? 'Manage / Reschedule Booking' : 'Book Service for this Vehicle'}
+                        </Text>
+                      </TouchableOpacity>
                     </View>
                   </View>
                 );

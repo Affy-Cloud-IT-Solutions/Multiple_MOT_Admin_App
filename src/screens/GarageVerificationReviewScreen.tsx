@@ -247,13 +247,26 @@ export default function GarageVerificationReviewScreen({ route, navigation }: an
           <MaterialCommunityIcons name="arrow-left" size={22} color={theme.colors.text} />
         </TouchableOpacity>
 
-        <View style={{ flex: 1, marginHorizontal: 12 }}>
-          <Text style={[styles.headerTitle, { color: theme.colors.text }]} numberOfLines={1}>
-            Verification & Audit Center
-          </Text>
-          <Text style={[styles.headerSubtitle, { color: theme.colors.placeholder }]} numberOfLines={1}>
-            {garage.name}
-          </Text>
+        <View style={{ flexDirection: 'row', alignItems: 'center', flex: 1, marginHorizontal: 12 }}>
+          <View style={{ width: 38, height: 38, borderRadius: 8, backgroundColor: theme.colors.primary + '15', alignItems: 'center', justifyContent: 'center', overflow: 'hidden', borderWidth: 1, borderColor: theme.colors.border, marginRight: 10 }}>
+            {garage.logoUrl ? (
+              <Image source={{ uri: garage.logoUrl }} style={{ width: '100%', height: '100%' }} resizeMode="contain" />
+            ) : (garage.images && garage.images.length > 0) ? (
+              <Image source={{ uri: garage.images[0] }} style={{ width: '100%', height: '100%' }} resizeMode="cover" />
+            ) : (
+              <Text style={{ fontFamily: fonts.bold, fontSize: 16, color: theme.colors.primary }}>
+                {(garage.name || 'G').charAt(0).toUpperCase()}
+              </Text>
+            )}
+          </View>
+          <View style={{ flex: 1 }}>
+            <Text style={[styles.headerTitle, { color: theme.colors.text }]} numberOfLines={1}>
+              Verification & Audit Center
+            </Text>
+            <Text style={[styles.headerSubtitle, { color: theme.colors.placeholder }]} numberOfLines={1}>
+              {garage.name}
+            </Text>
+          </View>
         </View>
 
         <View style={[styles.statusBadge, { backgroundColor: statusColor + '18' }]}>
@@ -355,6 +368,35 @@ export default function GarageVerificationReviewScreen({ route, navigation }: an
           <View style={styles.sectionHeaderRow}>
             <MaterialCommunityIcons name="storefront-outline" size={20} color={theme.colors.primary} style={{ marginRight: 8 }} />
             <Text style={[styles.sectionTitle, { color: theme.colors.text }]}>Garage & Owner Details</Text>
+          </View>
+
+          {/* Garage Brand Identity & Logo */}
+          <View style={{ flexDirection: 'row', alignItems: 'center', marginBottom: 16, paddingBottom: 14, borderBottomWidth: 1, borderBottomColor: theme.colors.border + '60' }}>
+            <View style={{ width: 58, height: 58, borderRadius: 12, backgroundColor: '#FFF', alignItems: 'center', justifyContent: 'center', overflow: 'hidden', borderWidth: 1, borderColor: theme.colors.border, marginRight: 14 }}>
+              {garage.logoUrl ? (
+                <Image source={{ uri: garage.logoUrl }} style={{ width: '100%', height: '100%' }} resizeMode="contain" />
+              ) : (garage.images && garage.images.length > 0) ? (
+                <Image source={{ uri: garage.images[0] }} style={{ width: '100%', height: '100%' }} resizeMode="cover" />
+              ) : (
+                <Text style={{ fontFamily: fonts.bold, fontSize: 22, color: theme.colors.primary }}>
+                  {(garage.name || 'G').charAt(0).toUpperCase()}
+                </Text>
+              )}
+            </View>
+            <View style={{ flex: 1 }}>
+              <Text style={{ fontFamily: fonts.bold, fontSize: 16, color: theme.colors.text }}>{garage.name}</Text>
+              <View style={{ flexDirection: 'row', alignItems: 'center', marginTop: 3 }}>
+                <MaterialCommunityIcons
+                  name={garage.logoUrl ? "check-decagram" : "image-off-outline"}
+                  size={14}
+                  color={garage.logoUrl ? "#10B981" : theme.colors.placeholder}
+                  style={{ marginRight: 4 }}
+                />
+                <Text style={{ fontFamily: fonts.medium, fontSize: 12, color: garage.logoUrl ? "#10B981" : theme.colors.placeholder }}>
+                  {garage.logoUrl ? 'Official Brand Logo Active' : 'No Brand Logo Provided (Using Initials)'}
+                </Text>
+              </View>
+            </View>
           </View>
 
           <View style={styles.detailGrid}>

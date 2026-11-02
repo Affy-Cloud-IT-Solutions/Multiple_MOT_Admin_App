@@ -8,6 +8,7 @@ import {
   Alert,
   Dimensions,
   ActivityIndicator,
+  Image,
 } from 'react-native';
 import MaterialCommunityIcons from 'react-native-vector-icons/MaterialCommunityIcons';
 import { useAppTheme } from '../context/ThemeContext';
@@ -271,8 +272,16 @@ export default function SuperAdminDashboardScreen({ navigation }: any) {
               ]}
             >
               <View style={styles.pendingCardHeader}>
-                <View style={[styles.garageIconBox, { backgroundColor: '#F59E0B15' }]}>
-                  <MaterialCommunityIcons name="garage-open" size={24} color="#F59E0B" />
+                <View style={[styles.garageIconBox, { backgroundColor: '#F59E0B15', overflow: 'hidden' }]}>
+                  {garage.logoUrl ? (
+                    <Image source={{ uri: garage.logoUrl }} style={{ width: '100%', height: '100%' }} resizeMode="contain" />
+                  ) : (garage.images && garage.images.length > 0) ? (
+                    <Image source={{ uri: garage.images[0] }} style={{ width: '100%', height: '100%' }} resizeMode="cover" />
+                  ) : (
+                    <Text style={{ fontFamily: fonts.bold, fontSize: 18, color: '#F59E0B' }}>
+                      {(garage.name || 'G').charAt(0).toUpperCase()}
+                    </Text>
+                  )}
                 </View>
                 <View style={{ flex: 1 }}>
                   <View style={{ flexDirection: 'row', alignItems: 'center', justifyContent: 'space-between' }}>
@@ -300,7 +309,7 @@ export default function SuperAdminDashboardScreen({ navigation }: any) {
                   onPress={() => navigation.navigate('GarageVerificationReview', { garageId: garage.id || garage._id, garage })}
                 >
                   <MaterialCommunityIcons name="clipboard-check-outline" size={16} color="#FFFFFF" style={{ marginRight: 6 }} />
-                  <Text style={styles.actionBtnText}>Review Application & Audit Docs →</Text>
+                  <Text style={styles.actionBtnText}>Review Application</Text>
                 </TouchableOpacity>
               </View>
             </TouchableOpacity>
@@ -334,8 +343,16 @@ export default function SuperAdminDashboardScreen({ navigation }: any) {
               ]}
             >
               <View style={styles.garageSummaryTop}>
-                <View style={[styles.garageAvatar, { backgroundColor: theme.colors.primaryContainer }]}>
-                  <MaterialCommunityIcons name="garage" size={24} color={theme.colors.primary} />
+                <View style={[styles.garageAvatar, { backgroundColor: theme.colors.primaryContainer, overflow: 'hidden' }]}>
+                  {garage.logoUrl ? (
+                    <Image source={{ uri: garage.logoUrl }} style={{ width: '100%', height: '100%' }} resizeMode="contain" />
+                  ) : (garage.images && garage.images.length > 0) ? (
+                    <Image source={{ uri: garage.images[0] }} style={{ width: '100%', height: '100%' }} resizeMode="cover" />
+                  ) : (
+                    <Text style={{ fontFamily: fonts.bold, fontSize: 16, color: theme.colors.primary }}>
+                      {(garage.name || 'G').charAt(0).toUpperCase()}
+                    </Text>
+                  )}
                 </View>
                 <View style={{ flex: 1 }}>
                   <View style={{ flexDirection: 'row', alignItems: 'center', justifyContent: 'space-between' }}>

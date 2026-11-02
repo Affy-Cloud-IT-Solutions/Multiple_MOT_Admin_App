@@ -419,7 +419,7 @@ export default function AdminCustomersScreen({ navigation }: any) {
             <MaterialCommunityIcons 
               name="account-plus" 
               size={22} 
-              color={theme.dark ? theme.colors.background : '#FFFFFF'} 
+              color="#FFFFFF" 
             />
           </TouchableOpacity>
         </View>
@@ -666,7 +666,7 @@ export default function AdminCustomersScreen({ navigation }: any) {
                         <Text style={{ fontFamily: fonts.bold, fontSize: 13, color: theme.colors.text, marginBottom: 10 }}>
                           Select Vehicle to Book Service:
                         </Text>
-                        {customerVehicles.filter(v => v.status === 'Active').map(v => {
+                        {customerVehicles.filter(v => v.status !== 'Sold' && v.status !== 'Scrapped').map(v => {
                           const today = new Date();
                           today.setHours(0, 0, 0, 0);
 
@@ -683,11 +683,36 @@ export default function AdminCustomersScreen({ navigation }: any) {
 
                           const isBooked = existingBooking?.status === 'Approved';
                           const isPending = existingBooking?.status === 'Pending';
+                          const hasActiveBooking = Boolean(isBooked || isPending);
 
                           return (
                             <TouchableOpacity
-                              key={v.id}
+                              key={v.id || v.registrationNumber}
                               onPress={() => {
+                                if (hasActiveBooking && existingBooking) {
+                                  Alert.alert(
+                                    'Vehicle Already Booked',
+                                    `${v.registrationNumber} already has an active booking for ${new Date(existingBooking.date).toLocaleDateString('en-GB', { day: 'numeric', month: 'short' })}${existingBooking.slotTime ? ` at ${existingBooking.slotTime}` : ''}.\n\nWould you like to manage or reschedule this appointment?`,
+                                    [
+                                      { text: 'Cancel', style: 'cancel' },
+                                      {
+                                        text: 'Manage / Reschedule',
+                                        onPress: () => {
+                                          LayoutAnimation.configureNext(LayoutAnimation.Presets.easeInEaseOut);
+                                          setIsBookingMotForCustId(null);
+                                          navigation.navigate('AdminBookMot', {
+                                            customer: c,
+                                            vehicle: v,
+                                            allVehicles: customerVehicles,
+                                            booking: existingBooking,
+                                          });
+                                        }
+                                      }
+                                    ]
+                                  );
+                                  return;
+                                }
+
                                 LayoutAnimation.configureNext(LayoutAnimation.Presets.easeInEaseOut);
                                 setIsBookingMotForCustId(null);
                                 navigation.navigate('AdminBookMot', {
@@ -712,26 +737,26 @@ export default function AdminCustomersScreen({ navigation }: any) {
                                 <Text style={{ color: theme.colors.text, fontFamily: fonts.semiBold, fontSize: 12 }}>
                                   {v.make} {v.model} {v.year ? `(${v.year})` : ''}
                                 </Text>
-                                <View style={{ flexDirection: 'row', alignItems: 'center', marginTop: 3 }}>
+                                <View style={{ flexDirection: 'row', alignItems: 'center', marginTop: 4 }}>
                                   {isBooked ? (
-                                    <View style={{ flexDirection: 'row', alignItems: 'center', backgroundColor: theme.colors.secondary + '18', paddingHorizontal: 6, paddingVertical: 2, borderRadius: 4 }}>
-                                      <MaterialCommunityIcons name="calendar-check" size={11} color={theme.colors.secondary} style={{ marginRight: 4 }} />
-                                      <Text style={{ fontSize: 10, fontFamily: fonts.bold, color: theme.colors.secondary }}>
-                                        Booked: {new Date(existingBooking.date).toLocaleDateString('en-GB', { day: 'numeric', month: 'short' })} ({existingBooking.slotTime || 'Slot'})
+                                    <View style={{ flexDirection: 'row', alignItems: 'center', backgroundColor: '#F59E0B18', borderColor: '#F59E0B60', borderWidth: 1, paddingHorizontal: 6, paddingVertical: 2, borderRadius: 4 }}>
+                                      <MaterialCommunityIcons name="calendar-check" size={11} color="#D97706" style={{ marginRight: 4 }} />
+                                      <Text style={{ fontSize: 10, fontFamily: fonts.bold, color: '#D97706' }}>
+                                        Already Booked: {new Date(existingBooking.date).toLocaleDateString('en-GB', { day: 'numeric', month: 'short' })} ({existingBooking.slotTime || 'Slot'})
                                       </Text>
                                     </View>
                                   ) : isPending ? (
-                                    <View style={{ flexDirection: 'row', alignItems: 'center', backgroundColor: theme.colors.warning + '18', paddingHorizontal: 6, paddingVertical: 2, borderRadius: 4 }}>
-                                      <MaterialCommunityIcons name="clock-outline" size={11} color={theme.colors.warning} style={{ marginRight: 4 }} />
-                                      <Text style={{ fontSize: 10, fontFamily: fonts.bold, color: theme.colors.warning }}>
+                                    <View style={{ flexDirection: 'row', alignItems: 'center', backgroundColor: '#F59E0B18', borderColor: '#F59E0B60', borderWidth: 1, paddingHorizontal: 6, paddingVertical: 2, borderRadius: 4 }}>
+                                      <MaterialCommunityIcons name="clock-outline" size={11} color="#D97706" style={{ marginRight: 4 }} />
+                                      <Text style={{ fontSize: 10, fontFamily: fonts.bold, color: '#D97706' }}>
                                         Booking Pending Approval
                                       </Text>
                                     </View>
                                   ) : (
-                                    <View style={{ flexDirection: 'row', alignItems: 'center', backgroundColor: '#10B98118', paddingHorizontal: 6, paddingVertical: 2, borderRadius: 4 }}>
+                                    <View style={{ flexDirection: 'row', alignItems: 'center', backgroundColor: '#10B98118', borderColor: '#10B98160', borderWidth: 1, paddingHorizontal: 6, paddingVertical: 2, borderRadius: 4 }}>
                                       <MaterialCommunityIcons name="check-circle-outline" size={11} color="#10B981" style={{ marginRight: 4 }} />
                                       <Text style={{ fontSize: 10, fontFamily: fonts.bold, color: '#10B981' }}>
-                                        Available to Book
+                                        Active • Available to Book
                                       </Text>
                                     </View>
                                   )}
@@ -863,7 +888,7 @@ export default function AdminCustomersScreen({ navigation }: any) {
                           onPress={() => handleCreateVehicle(c.id)}
                           style={[styles.vehicleSubmitBtn, { backgroundColor: theme.colors.secondary }]}
                         >
-                          <Text style={{ color: theme.dark ? theme.colors.background : '#FFFFFF', fontFamily: fonts.bold, fontSize: 13 }}>Save Vehicle</Text>
+                          <Text style={{ color: "#FFFFFF", fontFamily: fonts.bold, fontSize: 13 }}>Save Vehicle</Text>
                         </TouchableOpacity>
                       </View>
                     )}
@@ -1103,11 +1128,11 @@ export default function AdminCustomersScreen({ navigation }: any) {
                       style={{ marginLeft: 8, height: 40, paddingHorizontal: 12, backgroundColor: theme.colors.secondary, borderRadius: 6, justifyContent: 'center', alignItems: 'center', flexDirection: 'row' }}
                     >
                       {isSearchingPlate ? (
-                        <ActivityIndicator size="small" color={theme.dark ? theme.colors.background : '#FFFFFF'} />
+                        <ActivityIndicator size="small" color="#FFFFFF" />
                       ) : (
                         <>
-                          <MaterialCommunityIcons name="magnify" size={16} color={theme.dark ? theme.colors.background : '#FFFFFF'} style={{ marginRight: 4 }} />
-                          <Text style={{ color: theme.dark ? theme.colors.background : '#FFFFFF', fontFamily: fonts.bold, fontSize: 12 }}>LOOKUP</Text>
+                          <MaterialCommunityIcons name="magnify" size={16} color="#FFFFFF" style={{ marginRight: 4 }} />
+                          <Text style={{ color: "#FFFFFF", fontFamily: fonts.bold, fontSize: 12 }}>LOOKUP</Text>
                         </>
                       )}
                     </TouchableOpacity>
@@ -1186,7 +1211,7 @@ export default function AdminCustomersScreen({ navigation }: any) {
               )}
 
               <TouchableOpacity onPress={handleCreateCustomer} style={[styles.submitButton, { backgroundColor: theme.colors.primary, marginTop: 14 }]}>
-                <Text style={[styles.submitButtonText, { color: theme.dark ? theme.colors.background : '#FFFFFF' }]}>Create Customer</Text>
+                <Text style={[styles.submitButtonText, { color: "#FFFFFF" }]}>Create Customer</Text>
               </TouchableOpacity>
             </ScrollView>
           </View>

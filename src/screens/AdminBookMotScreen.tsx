@@ -453,24 +453,7 @@ export default function AdminBookMotScreen({ route, navigation }: any) {
     }
   }, [freeSlots]);
 
-  const handleConfirmBooking = async () => {
-    if (!selectedVehicle) {
-      Alert.alert('Vehicle Missing', 'Please select a vehicle to book service.');
-      return;
-    }
-    if (selectedServices.length === 0) {
-      Alert.alert('Service Missing', 'Please select at least one service to book.');
-      return;
-    }
-    if (!selectedDate) {
-      Alert.alert('Selection Missing', 'Please select an appointment date.');
-      return;
-    }
-    if (hasMot && !selectedTime) {
-      Alert.alert('Selection Missing', 'Please select an MOT bay time slot.');
-      return;
-    }
-
+  const executeBookingCommit = async () => {
     setLoading(true);
 
     try {
@@ -544,8 +527,59 @@ export default function AdminBookMotScreen({ route, navigation }: any) {
       navigation.navigate('Main', { screen: 'Slots', params: { date: selectedDate, highlightReg: selectedVehicle.registrationNumber } });
     } catch (err: any) {
       setLoading(false);
-      Alert.alert('Error', err.message || 'Failed to confirm booking slot.');
+      Alert.alert('Booking Failed', err?.message || 'Could not complete booking.');
     }
+  };
+
+  const handleConfirmBooking = async () => {
+    if (!selectedVehicle) {
+      Alert.alert('Vehicle Missing', 'Please select a vehicle to book service.');
+      return;
+    }
+    if (selectedServices.length === 0) {
+      Alert.alert('Service Missing', 'Please select at least one service to book.');
+      return;
+    }
+    if (!selectedDate) {
+      Alert.alert('Selection Missing', 'Please select an appointment date.');
+      return;
+    }
+    if (hasMot && !selectedTime) {
+      Alert.alert('Selection Missing', 'Please select an MOT bay time slot.');
+      return;
+    }
+
+    // Vehicle Already Booked Validation
+    if (existingBooking) {
+      const existingDateStr = existingBooking.date ? new Date(existingBooking.date).toISOString().split('T')[0] : '';
+      const existingSlotStr = (existingBooking.slotTime || '').split(' - ')[0].trim().toLowerCase();
+      const newSlotStr = (selectedTime || '').split(' - ')[0].trim().toLowerCase();
+
+      // Check if trying to book the exact same slot again
+      if (existingDateStr === selectedDate && (!hasMot || existingSlotStr === newSlotStr)) {
+        Alert.alert(
+          'Vehicle Already Booked',
+          `Vehicle ${selectedVehicle.registrationNumber} is already booked for this exact slot (${selectedDate} at ${selectedTime || 'Full Day Drop-off'}).\n\nIf you want to reschedule, please select a different date or time slot.`
+        );
+        return;
+      }
+
+      // Prompt staff confirmation to reschedule
+      Alert.alert(
+        'Reschedule Existing Booking?',
+        `Vehicle ${selectedVehicle.registrationNumber} already has an active booking for ${formatBookingDate(existingBooking.date)} at ${existingBooking.slotTime || 'Slot'}.\n\nWould you like to reschedule this vehicle's appointment to ${selectedDate} at ${hasMot ? selectedTime : 'Full Day Drop-off'}?`,
+        [
+          { text: 'Keep Current Booking', style: 'cancel' },
+          {
+            text: 'Confirm & Reschedule',
+            onPress: () => executeBookingCommit()
+          }
+        ]
+      );
+      return;
+    }
+
+    await executeBookingCommit();
   };
 
   return (
@@ -581,10 +615,13 @@ export default function AdminBookMotScreen({ route, navigation }: any) {
               <ScrollView horizontal showsHorizontalScrollIndicator={false} contentContainerStyle={{ gap: 8, paddingBottom: 2 }}>
                 {customerVehicles.map((v: any) => {
                   const isSel = selectedVehicle?.registrationNumber === v.registrationNumber;
+                  const today = new Date();
+                  today.setHours(0, 0, 0, 0);
                   const vBooking = alerts.find(a => 
                     a.type === 'BOOKED' && 
                     a.registrationNumber?.toUpperCase() === v.registrationNumber?.toUpperCase() && 
-                    (a.status === 'Approved' || a.status === 'Pending')
+                    (a.status === 'Approved' || a.status === 'Pending') &&
+                    (!a.date || new Date(a.date) >= today)
                   );
                   const isBk = vBooking?.status === 'Approved';
                   const isPend = vBooking?.status === 'Pending';
@@ -614,24 +651,24 @@ export default function AdminBookMotScreen({ route, navigation }: any) {
                         {v.make} {v.model}
                       </Text>
                       {isBk ? (
-                        <View style={{ backgroundColor: theme.colors.secondary + '20', paddingHorizontal: 5, paddingVertical: 1.5, borderRadius: 3, marginTop: 4, flexDirection: 'row', alignItems: 'center' }}>
-                          <MaterialCommunityIcons name="calendar-check" size={10} color={theme.colors.secondary} style={{ marginRight: 3 }} />
-                          <Text style={{ fontSize: 9, fontFamily: fonts.bold, color: theme.colors.secondary }}>
-                            Booked: {formatBookingDate(vBooking.date)}
+                        <View style={{ backgroundColor: '#F59E0B20', borderColor: '#F59E0B60', borderWidth: 1, paddingHorizontal: 5, paddingVertical: 2, borderRadius: 4, marginTop: 4, flexDirection: 'row', alignItems: 'center' }}>
+                          <MaterialCommunityIcons name="calendar-check" size={10} color="#D97706" style={{ marginRight: 3 }} />
+                          <Text style={{ fontSize: 9, fontFamily: fonts.bold, color: '#D97706' }}>
+                            Already Booked: {formatBookingDate(vBooking.date)}
                           </Text>
                         </View>
                       ) : isPend ? (
-                        <View style={{ backgroundColor: theme.colors.warning + '20', paddingHorizontal: 5, paddingVertical: 1.5, borderRadius: 3, marginTop: 4, flexDirection: 'row', alignItems: 'center' }}>
-                          <MaterialCommunityIcons name="clock-outline" size={10} color={theme.colors.warning} style={{ marginRight: 3 }} />
-                          <Text style={{ fontSize: 9, fontFamily: fonts.bold, color: theme.colors.warning }}>
+                        <View style={{ backgroundColor: '#F59E0B20', borderColor: '#F59E0B60', borderWidth: 1, paddingHorizontal: 5, paddingVertical: 2, borderRadius: 4, marginTop: 4, flexDirection: 'row', alignItems: 'center' }}>
+                          <MaterialCommunityIcons name="clock-outline" size={10} color="#D97706" style={{ marginRight: 3 }} />
+                          <Text style={{ fontSize: 9, fontFamily: fonts.bold, color: '#D97706' }}>
                             Pending Approval
                           </Text>
                         </View>
                       ) : (
-                        <View style={{ backgroundColor: '#10B98120', paddingHorizontal: 5, paddingVertical: 1.5, borderRadius: 3, marginTop: 4, flexDirection: 'row', alignItems: 'center' }}>
+                        <View style={{ backgroundColor: '#10B98120', borderColor: '#10B98160', borderWidth: 1, paddingHorizontal: 5, paddingVertical: 2, borderRadius: 4, marginTop: 4, flexDirection: 'row', alignItems: 'center' }}>
                           <MaterialCommunityIcons name="check-circle-outline" size={10} color="#10B981" style={{ marginRight: 3 }} />
                           <Text style={{ fontSize: 9, fontFamily: fonts.bold, color: '#10B981' }}>
-                            Available
+                            Active • Available
                           </Text>
                         </View>
                       )}
@@ -685,12 +722,21 @@ export default function AdminBookMotScreen({ route, navigation }: any) {
                     <Text style={[styles.specChipText, { color: theme.colors.placeholder }]}>{selectedVehicle.year}</Text>
                   </View>
                 ) : null}
-                <View style={[styles.specChip, { backgroundColor: '#10B98115', borderColor: '#10B98140' }]}>
-                  <View style={[styles.statusDot, { backgroundColor: '#10B981' }]} />
-                  <Text style={[styles.specChipText, { color: '#10B981', fontFamily: fonts.bold }]}>
-                    {selectedVehicle?.status || 'Active'}
-                  </Text>
-                </View>
+                {existingBooking ? (
+                  <View style={[styles.specChip, { backgroundColor: '#F59E0B18', borderColor: '#F59E0B60', borderWidth: 1 }]}>
+                    <MaterialCommunityIcons name="calendar-clock" size={12} color="#D97706" style={{ marginRight: 4 }} />
+                    <Text style={[styles.specChipText, { color: '#D97706', fontFamily: fonts.bold }]}>
+                      Already Booked • {formatBookingDate(existingBooking.date)}{existingBooking.slotTime ? ` (${existingBooking.slotTime})` : ''}
+                    </Text>
+                  </View>
+                ) : (
+                  <View style={[styles.specChip, { backgroundColor: '#10B98115', borderColor: '#10B98140' }]}>
+                    <View style={[styles.statusDot, { backgroundColor: '#10B981' }]} />
+                    <Text style={[styles.specChipText, { color: '#10B981', fontFamily: fonts.bold }]}>
+                      Active • Available to Book
+                    </Text>
+                  </View>
+                )}
               </View>
             </View>
           </View>
@@ -1219,11 +1265,11 @@ export default function AdminBookMotScreen({ route, navigation }: any) {
             style={[styles.submitBtn, { backgroundColor: existingBooking ? theme.colors.warning : theme.colors.secondary }]}
           >
             {loading ? (
-              <ActivityIndicator color={theme.dark ? theme.colors.background : '#FFFFFF'} />
+              <ActivityIndicator color="#FFFFFF" />
             ) : (
               <View style={styles.btnContent}>
-                <MaterialCommunityIcons name="calendar-check" size={20} color={theme.dark ? theme.colors.background : '#FFFFFF'} style={{ marginRight: 6 }} />
-                <Text style={[styles.submitBtnText, { color: theme.dark ? theme.colors.background : '#FFFFFF' }]}>
+                <MaterialCommunityIcons name="calendar-check" size={20} color="#FFFFFF" style={{ marginRight: 6 }} />
+                <Text style={[styles.submitBtnText, { color: "#FFFFFF" }]}>
                   {existingBooking
                     ? 'Confirm & Reschedule Booking'
                     : `Confirm Booking • £${totalServicePrice.toFixed(2)}`}

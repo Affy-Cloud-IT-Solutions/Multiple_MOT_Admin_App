@@ -274,6 +274,8 @@ export default function GarageSetupScreen({ route, navigation }: any) {
   const [locationLink, setLocationLink] = useState('');
   const [resolvingLink, setResolvingLink] = useState(false);
   const [images, setImages] = useState<string[]>([]);
+  const [logoUrl, setLogoUrl] = useState('');
+  const [uploadingLogo, setUploadingLogo] = useState(false);
 
   // Tab 2: Services
   const [servicesList, setServicesList] = useState<ServiceItemState[]>([]);
@@ -319,6 +321,7 @@ export default function GarageSetupScreen({ route, navigation }: any) {
     if (currentGarage.latitude) setLatitude(String(currentGarage.latitude));
     if (currentGarage.longitude) setLongitude(String(currentGarage.longitude));
     setImages(currentGarage.images || []);
+    setLogoUrl(currentGarage.logoUrl || '');
     setVtsNumber(currentGarage.vtsNumber || '');
     setMotAuthorisedExaminerNumber(currentGarage.motAuthorisedExaminerNumber || '');
     setBusinessRegistrationNumber(currentGarage.businessRegistrationNumber || '');
@@ -484,6 +487,46 @@ export default function GarageSetupScreen({ route, navigation }: any) {
     setImages(prev => prev.filter(img => img !== url));
   };
 
+  const handlePickLogo = async () => {
+    const result = await launchImageLibrary({
+      mediaType: 'photo',
+      quality: 0.8,
+      maxWidth: 800,
+      maxHeight: 800,
+      selectionLimit: 1,
+    });
+    if (result.didCancel) return;
+    if (result.errorCode) {
+      Alert.alert(
+        'Photo Unavailable',
+        result.errorCode === 'permission'
+          ? 'Photo access was denied. Allow photo access for Ondoorcarservice Hub in Settings.'
+          : result.errorMessage || 'Could not open your photo gallery.'
+      );
+      return;
+    }
+    const asset = result.assets?.[0];
+    if (!asset || !asset.uri) return;
+    setUploadingLogo(true);
+    try {
+      const uploaded = await uploadToBackend(
+        asset.uri,
+        asset.fileName || `logo_${Date.now()}.jpg`,
+        asset.type || 'image/jpeg',
+        'image'
+      );
+      setLogoUrl(uploaded);
+    } catch (err: any) {
+      Alert.alert('Upload Failed', err?.message || 'Could not upload garage logo.');
+    } finally {
+      setUploadingLogo(false);
+    }
+  };
+
+  const handleRemoveLogo = () => {
+    setLogoUrl('');
+  };
+
   // Google Maps link parser
   const handleResolveLocationLink = async () => {
     if (!locationLink.trim()) {
@@ -542,6 +585,7 @@ export default function GarageSetupScreen({ route, navigation }: any) {
         latitude: parseFloat(latitude) || 51.5074,
         longitude: parseFloat(longitude) || -0.1278,
         images,
+        logoUrl: logoUrl.trim(),
         locationConfigured: true
       });
       await AsyncStorage.setItem(`garage_loc_${garageId}`, 'true');
@@ -1009,6 +1053,80 @@ export default function GarageSetupScreen({ route, navigation }: any) {
               </View>
             </View>
 
+            {/* Garage Logo */}
+            <View style={styles.photoHeaderRow}>
+              <Text style={[styles.fieldLabel, styles.photoHeaderLabel, { color: theme.colors.text }]}>Garage Logo</Text>
+              <Text style={[styles.photoCount, { color: logoUrl ? theme.colors.success : theme.colors.placeholder }]}>
+                {logoUrl ? 'Logo Added ✓' : 'Recommended'}
+              </Text>
+            </View>
+            <Text style={[styles.photoHint, { color: theme.colors.placeholder }]}>
+              Upload your official garage brand logo. If provided, this logo will be shown on customer searches, bookings, and lists instead of your initials.
+            </Text>
+
+            {logoUrl ? (
+              <View style={[styles.logoCardWrapper, { borderColor: theme.colors.border, backgroundColor: theme.colors.background }]}>
+                <View style={[styles.logoPreviewBox, { borderColor: theme.colors.border }]}>
+                  <Image source={{ uri: logoUrl }} style={styles.logoPreviewImg} resizeMode="contain" />
+                </View>
+                <View style={styles.logoInfoColumn}>
+                  <Text style={[styles.logoStatusTitle, { color: theme.colors.text }]}>Official Brand Logo</Text>
+                  <Text style={[styles.logoStatusDesc, { color: theme.colors.placeholder }]}>Active & visible across customer portal and lists.</Text>
+                  <View style={styles.logoActionButtonsRow}>
+                    <TouchableOpacity
+                      style={[styles.logoChangeBtn, { borderColor: theme.colors.primary, backgroundColor: theme.colors.primary + '10' }]}
+                      onPress={handlePickLogo}
+                      disabled={uploadingLogo}
+                      activeOpacity={0.7}
+                    >
+                      <MaterialCommunityIcons name="camera-retake-outline" size={14} color={theme.colors.primary} style={{ marginRight: 4 }} />
+                      <Text style={[styles.logoChangeBtnText, { color: theme.colors.primary }]}>Change Logo</Text>
+                    </TouchableOpacity>
+                    <TouchableOpacity
+                      style={[styles.logoRemoveBtn, { borderColor: theme.colors.error + '40' }]}
+                      onPress={handleRemoveLogo}
+                      disabled={uploadingLogo}
+                      activeOpacity={0.7}
+                    >
+                      <MaterialCommunityIcons name="trash-can-outline" size={14} color={theme.colors.error} style={{ marginRight: 4 }} />
+                      <Text style={[styles.logoRemoveBtnText, { color: theme.colors.error }]}>Remove</Text>
+                    </TouchableOpacity>
+                  </View>
+                </View>
+              </View>
+            ) : (
+              <TouchableOpacity
+                style={[styles.logoDropZone, { borderColor: theme.colors.primary, backgroundColor: theme.colors.background }]}
+                onPress={handlePickLogo}
+                disabled={uploadingLogo}
+                activeOpacity={0.7}
+              >
+                {uploadingLogo ? (
+                  <View style={{ alignItems: 'center', paddingVertical: 12 }}>
+                    <ActivityIndicator color={theme.colors.primary} size="small" />
+                    <Text style={[styles.logoDropSubtitle, { color: theme.colors.placeholder, marginTop: 6 }]}>
+                      Uploading your logo...
+                    </Text>
+                  </View>
+                ) : (
+                  <View style={styles.logoDropContent}>
+                    <View style={[styles.logoDropIconBox, { backgroundColor: theme.colors.primary + '12' }]}>
+                      <MaterialCommunityIcons name="image-filter-vintage" size={24} color={theme.colors.primary} />
+                    </View>
+                    <View style={{ flex: 1, marginLeft: 12 }}>
+                      <Text style={[styles.logoDropTitle, { color: theme.colors.text }]}>Upload Garage Logo</Text>
+                      <Text style={[styles.logoDropSubtitle, { color: theme.colors.placeholder }]}>
+                        Tap to choose your logo image (PNG, JPG, or WebP)
+                      </Text>
+                    </View>
+                    <MaterialCommunityIcons name="plus-circle-outline" size={22} color={theme.colors.primary} />
+                  </View>
+                )}
+              </TouchableOpacity>
+            )}
+
+            <View style={{ height: 18 }} />
+
             {/* Garage photos - at least 3 */}
             <View style={styles.photoHeaderRow}>
               <Text style={[styles.fieldLabel, styles.photoHeaderLabel, { color: theme.colors.text }]}>Garage Photos *</Text>
@@ -1070,7 +1188,7 @@ export default function GarageSetupScreen({ route, navigation }: any) {
             <TouchableOpacity
               style={[styles.saveBtn, { backgroundColor: theme.colors.primary }]}
               onPress={handleSaveLocation}
-              disabled={savingLocation || uploadingPhotos > 0}
+              disabled={savingLocation || uploadingPhotos > 0 || uploadingLogo}
             >
               {savingLocation ? (
                 <ActivityIndicator color={onPrimary} />
@@ -1660,6 +1778,98 @@ const styles = StyleSheet.create({
     color: '#FFFFFF',
     fontFamily: fonts.bold,
     fontSize: 12,
+  },
+  logoCardWrapper: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    padding: 12,
+    borderRadius: 12,
+    borderWidth: 1,
+    marginTop: 6,
+  },
+  logoPreviewBox: {
+    width: 68,
+    height: 68,
+    borderRadius: 12,
+    borderWidth: 1,
+    overflow: 'hidden',
+    backgroundColor: '#FFFFFF',
+    alignItems: 'center',
+    justifyContent: 'center',
+  },
+  logoPreviewImg: {
+    width: '100%',
+    height: '100%',
+  },
+  logoInfoColumn: {
+    flex: 1,
+    marginLeft: 12,
+  },
+  logoStatusTitle: {
+    fontFamily: fonts.bold,
+    fontSize: 13,
+  },
+  logoStatusDesc: {
+    fontFamily: fonts.regular,
+    fontSize: 11,
+    marginTop: 2,
+    marginBottom: 6,
+  },
+  logoActionButtonsRow: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    gap: 8,
+  },
+  logoChangeBtn: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    paddingHorizontal: 10,
+    paddingVertical: 5,
+    borderRadius: 6,
+    borderWidth: 1,
+  },
+  logoChangeBtnText: {
+    fontFamily: fonts.bold,
+    fontSize: 11,
+  },
+  logoRemoveBtn: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    paddingHorizontal: 8,
+    paddingVertical: 5,
+    borderRadius: 6,
+    borderWidth: 1,
+  },
+  logoRemoveBtnText: {
+    fontFamily: fonts.semiBold,
+    fontSize: 11,
+  },
+  logoDropZone: {
+    borderWidth: 1.5,
+    borderStyle: 'dashed',
+    borderRadius: 12,
+    padding: 14,
+    marginTop: 6,
+  },
+  logoDropContent: {
+    flexDirection: 'row',
+    alignItems: 'center',
+  },
+  logoDropIconBox: {
+    width: 44,
+    height: 44,
+    borderRadius: 10,
+    alignItems: 'center',
+    justifyContent: 'center',
+  },
+  logoDropTitle: {
+    fontFamily: fonts.bold,
+    fontSize: 13.5,
+  },
+  logoDropSubtitle: {
+    fontFamily: fonts.regular,
+    fontSize: 11,
+    marginTop: 2,
   },
   saveBtn: {
     flexDirection: 'row',

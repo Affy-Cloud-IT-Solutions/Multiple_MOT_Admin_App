@@ -235,6 +235,10 @@ export default function AdminSlotsScreen({ navigation, route }: any) {
   const [newStationType, setNewStationType] = useState('Class 4 MOT Bay');
   const [submittingStation, setSubmittingStation] = useState(false);
 
+  // Manage slot modal state (for single & multi-bay slot blocking controls)
+  const [manageSlotModalVisible, setManageSlotModalVisible] = useState(false);
+  const [slotToManage, setSlotToManage] = useState<SlotItem | null>(null);
+
   // Action loading for slot block/unblock
   const [processingSlot, setProcessingSlot] = useState<string | null>(null);
 
@@ -621,78 +625,9 @@ export default function AdminSlotsScreen({ navigation, route }: any) {
       return;
     }
 
-    // Multi-bay setup (totalCapacity >= 2, e.g. 2 bays: block 1/2 then 2/2)
-    if (blockedCount === 0) {
-      // 0 bays blocked: Option to block 1 bay (1/N) or all bays (N/N)
-      Alert.alert(
-        `Manage Slot ${slot.time}`,
-        `This slot has ${totalCapacity} MOT bays. Choose how many bays to block:`,
-        [
-          { text: 'Cancel', style: 'cancel' },
-          {
-            text: `Block 1 Bay (1/${totalCapacity})`,
-            onPress: () => executeSlotBlock(slot, 'block', 1),
-          },
-          {
-            text: `Block All Bays (${totalCapacity}/${totalCapacity})`,
-            style: 'destructive',
-            onPress: () => executeSlotBlock(slot, 'block', totalCapacity),
-          },
-        ]
-      );
-    } else if (blockedCount < totalCapacity) {
-      // Partially blocked (e.g. 1/2 blocked)
-      const nextBlockCount = blockedCount + 1;
-      const buttons: any[] = [
-        { text: 'Cancel', style: 'cancel' },
-        {
-          text: `Block Bay (${nextBlockCount}/${totalCapacity})`,
-          onPress: () => executeSlotBlock(slot, 'block', nextBlockCount),
-        },
-      ];
-
-      // If more than 2 bays, allow jumping straight to blocking all
-      if (nextBlockCount < totalCapacity) {
-        buttons.push({
-          text: `Block All (${totalCapacity}/${totalCapacity})`,
-          style: 'destructive',
-          onPress: () => executeSlotBlock(slot, 'block', totalCapacity),
-        });
-      }
-
-      buttons.push({
-        text: 'Unblock 1 Bay',
-        onPress: () => executeSlotBlock(slot, 'unblock', 1),
-      });
-
-      buttons.push({
-        text: 'Unblock All Bays',
-        onPress: () => executeSlotBlock(slot, 'unblock', undefined, true),
-      });
-
-      Alert.alert(
-        `Manage Slot ${slot.time}`,
-        `Currently ${blockedCount} of ${totalCapacity} bays are blocked. Remaining ${slot.availableCount} bay(s) are available for bookings.`,
-        buttons
-      );
-    } else {
-      // All bays blocked (e.g. 2/2 blocked)
-      Alert.alert(
-        `Manage Slot ${slot.time}`,
-        `All ${totalCapacity} bays are currently blocked (${totalCapacity}/${totalCapacity}).`,
-        [
-          { text: 'Cancel', style: 'cancel' },
-          {
-            text: `Unblock 1 Bay (1/${totalCapacity} Open)`,
-            onPress: () => executeSlotBlock(slot, 'unblock', 1),
-          },
-          {
-            text: 'Unblock All Bays (All Open)',
-            onPress: () => executeSlotBlock(slot, 'unblock', undefined, true),
-          },
-        ]
-      );
-    }
+    // For multi-bay setup (totalCapacity >= 2), open the dedicated Manage Slot Modal
+    setSlotToManage(slot);
+    setManageSlotModalVisible(true);
   };
 
   return (
@@ -1966,6 +1901,269 @@ export default function AdminSlotsScreen({ navigation, route }: any) {
           </View>
         </View>
       </Modal>
+
+      {/* Dedicated Multi-Bay Manage Slot Modal */}
+      <Modal
+        visible={manageSlotModalVisible && Boolean(slotToManage)}
+        transparent
+        animationType="fade"
+        onRequestClose={() => setManageSlotModalVisible(false)}
+      >
+        <TouchableOpacity
+          style={styles.modalOverlay}
+          activeOpacity={1}
+          onPress={() => setManageSlotModalVisible(false)}
+        >
+          <TouchableOpacity
+            activeOpacity={1}
+            style={[
+              styles.manageSlotModalCard,
+              { backgroundColor: theme.colors.card, borderColor: theme.colors.border }
+            ]}
+          >
+            {slotToManage && (() => {
+              const totalCapacity = slotToManage.totalCapacity || 1;
+              const blockedCount = slotToManage.blockedCount !== undefined
+                ? slotToManage.blockedCount
+                : (slotToManage.isBlocked ? totalCapacity : 0);
+              const availableCount = slotToManage.availableCount !== undefined
+                ? slotToManage.availableCount
+                : Math.max(0, totalCapacity - blockedCount);
+              const isAllBlocked = blockedCount >= totalCapacity;
+              const isPartial = blockedCount > 0 && blockedCount < totalCapacity;
+
+              return (
+                <View>
+                  {/* Header */}
+                  <View style={styles.manageSlotHeader}>
+                    <View style={{ flexDirection: 'row', alignItems: 'center', flex: 1 }}>
+                      <View style={[styles.manageSlotIconBox, { backgroundColor: isAllBlocked ? '#EF444415' : isPartial ? '#F59E0B15' : theme.colors.primary + '15' }]}>
+                        <MaterialCommunityIcons
+                          name={isAllBlocked ? 'lock-alert' : isPartial ? 'lock-clock' : 'clock-outline'}
+                          size={24}
+                          color={isAllBlocked ? '#EF4444' : isPartial ? '#F59E0B' : theme.colors.primary}
+                        />
+                      </View>
+                      <View style={{ marginLeft: 12, flex: 1 }}>
+                        <Text style={[styles.manageSlotTitle, { color: theme.colors.text }]}>
+                          Manage Slot {slotToManage.time}
+                        </Text>
+                        <Text style={[styles.manageSlotSubtitle, { color: theme.colors.placeholder }]}>
+                          Date: {selectedDate} • MOT Bay Controls
+                        </Text>
+                      </View>
+                    </View>
+                    <TouchableOpacity
+                      onPress={() => setManageSlotModalVisible(false)}
+                      style={[styles.manageSlotCloseBtn, { backgroundColor: theme.colors.background }]}
+                      hitSlop={{ top: 8, bottom: 8, left: 8, right: 8 }}
+                    >
+                      <MaterialCommunityIcons name="close" size={20} color={theme.colors.placeholder} />
+                    </TouchableOpacity>
+                  </View>
+
+                  {/* MOT Bays Status Card */}
+                  <View style={[styles.manageSlotStatusCard, { backgroundColor: theme.colors.background, borderColor: theme.colors.border }]}>
+                    <View style={{ flexDirection: 'row', justifyContent: 'space-between', alignItems: 'center', marginBottom: 10 }}>
+                      <Text style={{ fontFamily: fonts.bold, fontSize: 13, color: theme.colors.text }}>
+                        Capacity: {totalCapacity} MOT Bays
+                      </Text>
+                      <View style={{
+                        backgroundColor: isAllBlocked ? '#EF444420' : isPartial ? '#F59E0B20' : '#10B98120',
+                        paddingHorizontal: 8,
+                        paddingVertical: 3,
+                        borderRadius: 6
+                      }}>
+                        <Text style={{
+                          fontFamily: fonts.bold,
+                          fontSize: 11,
+                          color: isAllBlocked ? '#EF4444' : isPartial ? '#F59E0B' : '#10B981'
+                        }}>
+                          {isAllBlocked ? 'Fully Blocked' : isPartial ? 'Partially Blocked' : 'All Bays Open'}
+                        </Text>
+                      </View>
+                    </View>
+
+                    {/* Bay Pills Visualization */}
+                    <View style={styles.manageSlotBayRow}>
+                      {Array.from({ length: totalCapacity }).map((_, idx) => {
+                        const isThisBayBlocked = idx < blockedCount;
+                        return (
+                          <View
+                            key={idx}
+                            style={[
+                              styles.manageSlotBayChip,
+                              {
+                                backgroundColor: isThisBayBlocked ? '#EF444415' : '#10B98115',
+                                borderColor: isThisBayBlocked ? '#EF4444' : '#10B981',
+                              }
+                            ]}
+                          >
+                            <MaterialCommunityIcons
+                              name={isThisBayBlocked ? 'lock' : 'check-circle'}
+                              size={14}
+                              color={isThisBayBlocked ? '#EF4444' : '#10B981'}
+                              style={{ marginRight: 4 }}
+                            />
+                            <Text style={{
+                              fontFamily: fonts.bold,
+                              fontSize: 12,
+                              color: isThisBayBlocked ? '#EF4444' : '#10B981'
+                            }}>
+                              Bay {idx + 1}: {isThisBayBlocked ? 'Blocked' : 'Available'}
+                            </Text>
+                          </View>
+                        );
+                      })}
+                    </View>
+
+                    {/* Explanatory instruction */}
+                    <Text style={{ fontFamily: fonts.regular, fontSize: 12.5, color: theme.colors.placeholder, marginTop: 10, lineHeight: 17 }}>
+                      {blockedCount === 0
+                        ? `This slot has ${totalCapacity} MOT bays. Choose how many bays to block:`
+                        : isPartial
+                        ? `Currently ${blockedCount} of ${totalCapacity} bays are blocked. Remaining ${availableCount} bay(s) are available for bookings.`
+                        : `All ${totalCapacity} bays are currently blocked (${totalCapacity}/${totalCapacity}). No bookings can be taken.`
+                      }
+                    </Text>
+                  </View>
+
+                  {/* Action Buttons Section */}
+                  <View style={{ marginTop: 14 }}>
+                    {blockedCount === 0 && (
+                      <>
+                        <TouchableOpacity
+                          style={[styles.manageSlotActionBtn, { backgroundColor: '#F59E0B' }]}
+                          onPress={() => {
+                            executeSlotBlock(slotToManage, 'block', 1);
+                            setManageSlotModalVisible(false);
+                          }}
+                        >
+                          <MaterialCommunityIcons name="lock-outline" size={18} color="#FFFFFF" />
+                          <Text style={styles.manageSlotActionBtnText}>
+                            Block 1 Bay (1/{totalCapacity})
+                          </Text>
+                        </TouchableOpacity>
+
+                        <TouchableOpacity
+                          style={[styles.manageSlotActionBtn, { backgroundColor: '#EF4444' }]}
+                          onPress={() => {
+                            executeSlotBlock(slotToManage, 'block', totalCapacity);
+                            setManageSlotModalVisible(false);
+                          }}
+                        >
+                          <MaterialCommunityIcons name="lock-alert" size={18} color="#FFFFFF" />
+                          <Text style={styles.manageSlotActionBtnText}>
+                            Block All Bays ({totalCapacity}/{totalCapacity})
+                          </Text>
+                        </TouchableOpacity>
+                      </>
+                    )}
+
+                    {isPartial && (
+                      <>
+                        <TouchableOpacity
+                          style={[styles.manageSlotActionBtn, { backgroundColor: '#F59E0B' }]}
+                          onPress={() => {
+                            executeSlotBlock(slotToManage, 'block', blockedCount + 1);
+                            setManageSlotModalVisible(false);
+                          }}
+                        >
+                          <MaterialCommunityIcons name="lock-outline" size={18} color="#FFFFFF" />
+                          <Text style={styles.manageSlotActionBtnText}>
+                            Block Bay ({blockedCount + 1}/{totalCapacity})
+                          </Text>
+                        </TouchableOpacity>
+
+                        {blockedCount + 1 < totalCapacity && (
+                          <TouchableOpacity
+                            style={[styles.manageSlotActionBtn, { backgroundColor: '#EF4444' }]}
+                            onPress={() => {
+                              executeSlotBlock(slotToManage, 'block', totalCapacity);
+                              setManageSlotModalVisible(false);
+                            }}
+                          >
+                            <MaterialCommunityIcons name="lock-alert" size={18} color="#FFFFFF" />
+                            <Text style={styles.manageSlotActionBtnText}>
+                              Block All ({totalCapacity}/{totalCapacity})
+                            </Text>
+                          </TouchableOpacity>
+                        )}
+
+                        <TouchableOpacity
+                          style={[styles.manageSlotActionBtn, { backgroundColor: '#10B981' }]}
+                          onPress={() => {
+                            executeSlotBlock(slotToManage, 'unblock', 1);
+                            setManageSlotModalVisible(false);
+                          }}
+                        >
+                          <MaterialCommunityIcons name="lock-open-outline" size={18} color="#FFFFFF" />
+                          <Text style={styles.manageSlotActionBtnText}>
+                            Unblock 1 Bay
+                          </Text>
+                        </TouchableOpacity>
+
+                        <TouchableOpacity
+                          style={[styles.manageSlotActionBtn, { backgroundColor: '#059669' }]}
+                          onPress={() => {
+                            executeSlotBlock(slotToManage, 'unblock', undefined, true);
+                            setManageSlotModalVisible(false);
+                          }}
+                        >
+                          <MaterialCommunityIcons name="lock-open" size={18} color="#FFFFFF" />
+                          <Text style={styles.manageSlotActionBtnText}>
+                            Unblock All Bays (All Open)
+                          </Text>
+                        </TouchableOpacity>
+                      </>
+                    )}
+
+                    {isAllBlocked && (
+                      <>
+                        <TouchableOpacity
+                          style={[styles.manageSlotActionBtn, { backgroundColor: '#10B981' }]}
+                          onPress={() => {
+                            executeSlotBlock(slotToManage, 'unblock', 1);
+                            setManageSlotModalVisible(false);
+                          }}
+                        >
+                          <MaterialCommunityIcons name="lock-open-outline" size={18} color="#FFFFFF" />
+                          <Text style={styles.manageSlotActionBtnText}>
+                            Unblock 1 Bay (1/{totalCapacity} Open)
+                          </Text>
+                        </TouchableOpacity>
+
+                        <TouchableOpacity
+                          style={[styles.manageSlotActionBtn, { backgroundColor: '#059669' }]}
+                          onPress={() => {
+                            executeSlotBlock(slotToManage, 'unblock', undefined, true);
+                            setManageSlotModalVisible(false);
+                          }}
+                        >
+                          <MaterialCommunityIcons name="check-circle-outline" size={18} color="#FFFFFF" />
+                          <Text style={styles.manageSlotActionBtnText}>
+                            Unblock All Bays (All Open)
+                          </Text>
+                        </TouchableOpacity>
+                      </>
+                    )}
+
+                    {/* Dismiss / Cancel Button */}
+                    <TouchableOpacity
+                      style={[styles.manageSlotCancelBtn, { borderColor: theme.colors.border }]}
+                      onPress={() => setManageSlotModalVisible(false)}
+                    >
+                      <Text style={{ fontFamily: fonts.semiBold, fontSize: 13.5, color: theme.colors.text }}>
+                        Cancel
+                      </Text>
+                    </TouchableOpacity>
+                  </View>
+                </View>
+              );
+            })()}
+          </TouchableOpacity>
+        </TouchableOpacity>
+      </Modal>
     </ScrollView>
   );
 }
@@ -3208,5 +3406,85 @@ const styles = StyleSheet.create({
   manageServicesBtnText: {
     fontSize: 12.5,
     fontFamily: fonts.bold,
+  },
+  manageSlotModalCard: {
+    width: '92%',
+    maxWidth: 420,
+    borderRadius: 20,
+    borderWidth: 1,
+    padding: 20,
+    alignSelf: 'center',
+  },
+  manageSlotHeader: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    justifyContent: 'space-between',
+    marginBottom: 14,
+  },
+  manageSlotIconBox: {
+    width: 44,
+    height: 44,
+    borderRadius: 12,
+    alignItems: 'center',
+    justifyContent: 'center',
+  },
+  manageSlotTitle: {
+    fontSize: 17,
+    fontFamily: fonts.bold,
+  },
+  manageSlotSubtitle: {
+    fontSize: 12,
+    fontFamily: fonts.regular,
+    marginTop: 2,
+  },
+  manageSlotCloseBtn: {
+    width: 32,
+    height: 32,
+    borderRadius: 8,
+    alignItems: 'center',
+    justifyContent: 'center',
+  },
+  manageSlotStatusCard: {
+    borderRadius: 14,
+    borderWidth: 1,
+    padding: 14,
+    marginBottom: 6,
+  },
+  manageSlotBayRow: {
+    flexDirection: 'row',
+    flexWrap: 'wrap',
+    gap: 8,
+    marginVertical: 4,
+  },
+  manageSlotBayChip: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    paddingHorizontal: 10,
+    paddingVertical: 6,
+    borderRadius: 8,
+    borderWidth: 1,
+  },
+  manageSlotActionBtn: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    justifyContent: 'center',
+    paddingVertical: 12,
+    paddingHorizontal: 16,
+    borderRadius: 12,
+    marginBottom: 8,
+  },
+  manageSlotActionBtnText: {
+    fontFamily: fonts.bold,
+    fontSize: 13.5,
+    color: '#FFFFFF',
+    marginLeft: 8,
+  },
+  manageSlotCancelBtn: {
+    alignItems: 'center',
+    justifyContent: 'center',
+    paddingVertical: 11,
+    borderRadius: 12,
+    borderWidth: 1,
+    marginTop: 4,
   },
 });

@@ -10,6 +10,7 @@ import {
   TextInput,
   ScrollView,
   Dimensions,
+  Image,
 } from 'react-native';
 import MaterialCommunityIcons from 'react-native-vector-icons/MaterialCommunityIcons';
 import { useAppTheme } from '../context/ThemeContext';
@@ -28,6 +29,7 @@ export default function ProfileScreen({ navigation }: any) {
   const { isDarkMode, theme, toggleTheme } = useAppTheme();
   const {
     user,
+    currentGarage,
     createStaffAccount,
     setToken,
     setUser,
@@ -209,14 +211,23 @@ export default function ProfileScreen({ navigation }: any) {
               backgroundColor: isDarkMode
                 ? theme.colors.secondary + '30'
                 : theme.colors.secondary + '15',
+              overflow: 'hidden',
             },
           ]}
         >
-          <Text
-            style={[styles.avatarText, { color: theme.colors.secondary }]}
-          >
-            {getInitials(user?.name || '')}
-          </Text>
+          {((user?.role === 'garage_admin' || user?.role === 'staff') && currentGarage?.logoUrl) ? (
+            <Image
+              source={{ uri: currentGarage.logoUrl }}
+              style={styles.avatarImg}
+              resizeMode="cover"
+            />
+          ) : (
+            <Text
+              style={[styles.avatarText, { color: theme.colors.secondary }]}
+            >
+              {getInitials(user?.name || '')}
+            </Text>
+          )}
         </View>
         <View style={styles.headerMeta}>
           <Text style={[styles.userName, { color: theme.colors.text }]}>
@@ -871,6 +882,10 @@ const styles = StyleSheet.create({
     borderRadius: 32,
     justifyContent: 'center',
     alignItems: 'center',
+  },
+  avatarImg: {
+    width: '100%',
+    height: '100%',
   },
   avatarText: {
     fontSize: 22,

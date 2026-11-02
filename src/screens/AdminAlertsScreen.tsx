@@ -304,9 +304,9 @@ export default function AdminAlertsScreen() {
                     ]}
                   >
                     {loadingAction === item.id ? (
-                      <ActivityIndicator color={theme.dark ? theme.colors.background : '#FFFFFF'} size="small" />
+                      <ActivityIndicator color="#FFFFFF" size="small" />
                     ) : (
-                      <Text style={[styles.actionBtnText, { color: theme.dark ? theme.colors.background : '#FFFFFF' }]}>
+                      <Text style={[styles.actionBtnText, { color: "#FFFFFF" }]}>
                         {item.type === 'BOOKED' ? 'Confirm Booking' : 'Approve'}
                       </Text>
                     )}
@@ -355,7 +355,7 @@ export default function AdminAlertsScreen() {
                 onPress={submitRejection}
                 style={[styles.modalBtn, styles.modalConfirmBtn, { backgroundColor: theme.colors.error }]}
               >
-                <Text style={[styles.modalBtnText, { color: theme.dark ? theme.colors.background : '#FFFFFF' }]}>Reject</Text>
+                <Text style={[styles.modalBtnText, { color: "#FFFFFF" }]}>Reject</Text>
               </TouchableOpacity>
             </View>
           </View>

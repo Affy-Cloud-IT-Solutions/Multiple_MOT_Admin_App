@@ -502,16 +502,16 @@ export default function BookingScreen({ route, navigation }: any) {
             style={[styles.submitBtn, { backgroundColor: isReschedule ? theme.colors.warning : theme.colors.secondary }]}
           >
             {loading ? (
-              <ActivityIndicator color={theme.dark ? theme.colors.background : '#FFFFFF'} size="small" />
+              <ActivityIndicator color="#FFFFFF" size="small" />
             ) : (
               <View style={styles.btnContent}>
                 <MaterialCommunityIcons 
                   name="calendar-check" 
                   size={20} 
-                  color={theme.dark ? theme.colors.background : '#FFFFFF'} 
+                  color="#FFFFFF" 
                   style={{ marginRight: 8 }} 
                 />
-                <Text style={[styles.submitBtnText, { color: theme.dark ? theme.colors.background : '#FFFFFF' }]}>
+                <Text style={[styles.submitBtnText, { color: "#FFFFFF" }]}>
                   {isReschedule ? 'Confirm Rescheduling' : 'Confirm Appointment Booking'}
                 </Text>
               </View>
