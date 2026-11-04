@@ -52,7 +52,7 @@ interface ServiceItemState {
   defaultPrice: number;
   price: string;
   selected: boolean;
-  duration: number;
+  duration: number | string;
   icon: string;
   isCustom: boolean;
 }
@@ -608,6 +608,10 @@ export default function GarageSetupScreen({ route, navigation }: any) {
     setServicesList(prev => prev.map(item => item.id === id ? { ...item, price: newPrice } : item));
   };
 
+  const handleDurationChange = (id: string, newDuration: string) => {
+    setServicesList(prev => prev.map(item => item.id === id ? { ...item, duration: newDuration } : item));
+  };
+
   const openCustomServiceModal = (categoryName: string) => {
     setCustomCategory(categoryName);
     setCustomName('');
@@ -674,8 +678,8 @@ export default function GarageSetupScreen({ route, navigation }: any) {
       const payload = selected.map(s => ({
         name: s.name,
         category: s.category,
-        price: parseFloat(s.price),
-        duration: s.duration || 45,
+        price: parseFloat(s.price) || s.defaultPrice || 45,
+        duration: parseInt(String(s.duration), 10) || 45,
         description: `${s.name} at ${currentGarage?.name || 'our garage'}`,
         availability: ['Monday', 'Tuesday', 'Wednesday', 'Thursday', 'Friday'],
         isActive: true
@@ -1260,7 +1264,7 @@ export default function GarageSetupScreen({ route, navigation }: any) {
                       </View>
                       <View style={styles.categoryHeaderText}>
                         <Text style={[styles.categoryTitle, { color: theme.colors.text }]}>{group.name}</Text>
-                        {group.description ? (
+                        {group.description && group.description.trim() ? (
                           <Text style={[styles.categoryDesc, { color: theme.colors.placeholder }]} numberOfLines={2}>{group.description}</Text>
                         ) : null}
                       </View>
@@ -1308,19 +1312,39 @@ export default function GarageSetupScreen({ route, navigation }: any) {
 
                           {item.selected && (
                             <View style={styles.priceRow}>
-                              <Text style={[styles.priceLabel, { color: theme.colors.placeholder }]}>
-                                Your Price:
-                              </Text>
-                              <View style={[styles.priceInputWrapper, { borderColor: theme.colors.border, backgroundColor: theme.colors.card }]}>
-                                <Text style={[styles.currencyPrefix, { color: theme.colors.text }]}>£</Text>
-                                <TextInput
-                                  style={[styles.priceInput, { color: theme.colors.text }]}
-                                  keyboardType="decimal-pad"
-                                  value={item.price}
-                                  placeholder={String(item.defaultPrice)}
-                                  placeholderTextColor={theme.colors.placeholder}
-                                  onChangeText={(text) => handlePriceChange(item.id, text)}
-                                />
+                              <View style={styles.fieldCol}>
+                                <Text style={[styles.priceLabel, { color: theme.colors.placeholder }]}>
+                                  Rate:
+                                </Text>
+                                <View style={[styles.priceInputWrapper, { borderColor: theme.colors.border, backgroundColor: theme.colors.card }]}>
+                                  <Text style={[styles.currencyPrefix, { color: theme.colors.primary }]}>£</Text>
+                                  <TextInput
+                                    style={[styles.priceInput, { color: theme.colors.text }]}
+                                    keyboardType="decimal-pad"
+                                    value={item.price}
+                                    placeholder={String(item.defaultPrice)}
+                                    placeholderTextColor={theme.colors.placeholder}
+                                    onChangeText={(text) => handlePriceChange(item.id, text)}
+                                  />
+                                </View>
+                              </View>
+
+                              <View style={styles.fieldCol}>
+                                <Text style={[styles.priceLabel, { color: theme.colors.placeholder }]}>
+                                  Timing:
+                                </Text>
+                                <View style={[styles.priceInputWrapper, { borderColor: theme.colors.border, backgroundColor: theme.colors.card }]}>
+                                  <MaterialCommunityIcons name="clock-outline" size={13} color={theme.colors.placeholder} style={{ marginRight: 3 }} />
+                                  <TextInput
+                                    style={[styles.priceInput, { color: theme.colors.text, minWidth: 36 }]}
+                                    keyboardType="number-pad"
+                                    value={String(item.duration)}
+                                    placeholder="45"
+                                    placeholderTextColor={theme.colors.placeholder}
+                                    onChangeText={(text) => handleDurationChange(item.id, text)}
+                                  />
+                                  <Text style={{ fontFamily: fonts.medium, fontSize: 11, color: theme.colors.placeholder, marginLeft: 2 }}>m</Text>
+                                </View>
                               </View>
                             </View>
                           )}
@@ -2194,11 +2218,16 @@ const styles = StyleSheet.create({
     flexDirection: 'row',
     alignItems: 'center',
     justifyContent: 'flex-end',
-    gap: 8,
+    gap: 12,
     marginTop: 8,
     paddingTop: 8,
     borderTopWidth: 1,
     borderTopColor: 'rgba(150,150,150,0.15)',
+  },
+  fieldCol: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    gap: 6,
   },
   priceLabel: {
     fontSize: 12,

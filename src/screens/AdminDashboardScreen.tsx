@@ -65,20 +65,16 @@ export default function AdminDashboardScreen({ navigation }: any) {
       const gid = currentGarage?.id || currentGarage?._id;
       if (!gid) return;
       try {
-        const [loc, srv, doc, forever] = await Promise.all([
+        const [loc, srv, doc] = await Promise.all([
           AsyncStorage.getItem(`garage_loc_${gid}`),
           AsyncStorage.getItem(`garage_srv_${gid}`),
           AsyncStorage.getItem(`garage_doc_${gid}`),
-          AsyncStorage.getItem(`garage_profile_completed_100_${gid}`),
         ]);
         setLocalSetup({
           location: loc === 'true',
           services: srv === 'true',
           docs: doc === 'true',
         });
-        if (forever === 'true') {
-          setIsProfileCompletedForever(true);
-        }
       } catch (e) {}
     };
     loadSetup();
@@ -161,26 +157,26 @@ export default function AdminDashboardScreen({ navigation }: any) {
   const completedCount = checklistTasks.filter(t => t.completed).length;
   const computedPercent = Math.round((completedCount / checklistTasks.length) * 100);
   const progressPercent = typeof currentGarage?.profileCompletion?.percent === 'number'
-    ? Math.max(currentGarage.profileCompletion.percent, computedPercent)
+    ? (completedCount === checklistTasks.length ? 100 : Math.min(currentGarage.profileCompletion.percent, 100))
     : computedPercent;
   const pendingTasks = checklistTasks.filter(t => !t.completed);
   const completedTasks = checklistTasks.filter(t => t.completed);
 
-  const isProfileComplete = Boolean(
-    isProfileCompletedForever ||
-    progressPercent >= 100 ||
-    currentGarage?.profileCompletion?.complete === true ||
-    currentGarage?.isVisibleToCustomers === true ||
-    (checklistTasks.length > 0 && checklistTasks.every(t => t.completed))
-  );
+  // Profile is complete ONLY when progressPercent is strictly 100% and all checklist tasks are done
+  // Will NEVER hide when profile is 75%, 50%, or 25% completed!
+  const isProfileComplete = progressPercent >= 100 && checklistTasks.every(t => t.completed);
 
   React.useEffect(() => {
     const gid = currentGarage?.id || currentGarage?._id;
-    if (isProfileComplete && gid && !isProfileCompletedForever) {
-      setIsProfileCompletedForever(true);
+    if (!gid) return;
+    if (isProfileComplete) {
       AsyncStorage.setItem(`garage_profile_completed_100_${gid}`, 'true').catch(() => {});
+    } else {
+      // If profile is not 100% complete, ensure any old cached "completed" flag is purged!
+      AsyncStorage.removeItem(`garage_profile_completed_100_${gid}`).catch(() => {});
+      setIsProfileCompletedForever(false);
     }
-  }, [isProfileComplete, currentGarage, isProfileCompletedForever]);
+  }, [isProfileComplete, currentGarage]);
 
   const shouldShowProfileCompletion = !isProfileComplete;
 
@@ -406,9 +402,9 @@ export default function AdminDashboardScreen({ navigation }: any) {
       )}
 
       {/* Dynamic Getting Started Onboarding Card (Compact UI) */}
-      {user && (user.role === 'garage_admin' || user.role === 'staff') && shouldShowProfileCompletion && !checklistHidden && !isApplicationRejected && (
+      {user && (user.role === 'garage_admin' || user.role === 'staff') && shouldShowProfileCompletion && !isApplicationRejected && (
         <View style={[styles.gettingStartedCard, { backgroundColor: theme.colors.card, borderColor: theme.colors.border }]}>
-          {/* Header Row: Tag + Percent Badge + Hide Button */}
+          {/* Header Row: Tag + Percent Badge */}
           <View style={styles.gettingStartedHeader}>
             <View style={styles.gettingStartedTagBox}>
               <MaterialCommunityIcons name="rocket-launch-outline" size={13} color="#EA580C" />
@@ -420,13 +416,6 @@ export default function AdminDashboardScreen({ navigation }: any) {
                   {progressPercent}% Complete
                 </Text>
               </View>
-              <TouchableOpacity
-                onPress={() => setChecklistHidden(true)}
-                style={styles.hideIconBtn}
-                hitSlop={{ top: 8, bottom: 8, left: 8, right: 8 }}
-              >
-                <MaterialCommunityIcons name="close" size={16} color={theme.colors.placeholder} />
-              </TouchableOpacity>
             </View>
           </View>
 
@@ -511,53 +500,6 @@ export default function AdminDashboardScreen({ navigation }: any) {
             />
           </TouchableOpacity>
         </View>
-      )}
-
-      {/* When user hid the card, provide a sleek, full-width "Complete Your Profile" banner */}
-      {user && (user.role === 'garage_admin' || user.role === 'staff') && shouldShowProfileCompletion && checklistHidden && !isApplicationRejected && (
-        <TouchableOpacity
-          style={[
-            styles.unhidePill,
-            {
-              backgroundColor: theme.colors.card,
-              borderColor: progressPercent === 100 ? '#10B98150' : '#EA580C40',
-            }
-          ]}
-          onPress={() => setChecklistHidden(false)}
-          activeOpacity={0.8}
-        >
-          <View style={[styles.unhideIconBox, { backgroundColor: progressPercent === 100 ? '#10B98115' : '#EA580C15' }]}>
-            <MaterialCommunityIcons
-              name={progressPercent === 100 ? "check-decagram" : "account-check-outline"}
-              size={20}
-              color={progressPercent === 100 ? "#10B981" : "#EA580C"}
-            />
-          </View>
-          <View style={styles.unhideTextBox}>
-            <View style={styles.unhideTitleRow}>
-              <Text style={[styles.unhideTitle, { color: theme.colors.text }]}>Complete Your Profile</Text>
-              <View style={[styles.unhidePercentBadge, { backgroundColor: progressPercent === 100 ? '#10B98118' : '#EA580C15' }]}>
-                <Text style={[styles.unhidePercentText, { color: progressPercent === 100 ? '#10B981' : '#EA580C' }]}>
-                  {progressPercent}% Complete
-                </Text>
-              </View>
-            </View>
-            <View style={[styles.unhideMiniProgressTrack, { backgroundColor: theme.colors.border + '60' }]}>
-              <View
-                style={[
-                  styles.unhideMiniProgressFill,
-                  {
-                    width: `${progressPercent}%`,
-                    backgroundColor: progressPercent === 100 ? '#10B981' : '#EA580C',
-                  }
-                ]}
-              />
-            </View>
-          </View>
-          <View style={styles.unhideArrowBtn}>
-            <MaterialCommunityIcons name="chevron-down" size={20} color={theme.colors.placeholder} />
-          </View>
-        </TouchableOpacity>
       )}
 
       {/* Stats Grid */}

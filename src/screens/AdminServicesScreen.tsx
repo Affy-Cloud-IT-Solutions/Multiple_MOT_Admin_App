@@ -11,16 +11,13 @@ import {
   TextInput,
   RefreshControl,
   Switch,
-  TouchableWithoutFeedback,
   Dimensions,
-  Platform,
-  KeyboardAvoidingView,
 } from 'react-native';
 import MaterialCommunityIcons from 'react-native-vector-icons/MaterialCommunityIcons';
 import { useFocusEffect } from '@react-navigation/native';
 import { SafeAreaView } from 'react-native-safe-area-context';
 import { useAppTheme } from '../context/ThemeContext';
-import { useAppValues } from '../context/DataContext';
+import { useAppValues, ServiceCatalogGroup } from '../context/DataContext';
 import { fonts } from '../theme/theme';
 
 const { width, height } = Dimensions.get('window');
@@ -35,6 +32,10 @@ interface ServiceItem {
   description?: string;
   availability?: string[];
   isActive?: boolean;
+  isCustom?: boolean;
+  status?: 'Pending' | 'Approved' | 'Rejected';
+  rejectionReason?: string;
+  serviceId?: string;
 }
 
 const CATEGORY_COLORS: Record<string, { bg: string; text: string; icon: string }> = {
@@ -48,19 +49,9 @@ const CATEGORY_COLORS: Record<string, { bg: string; text: string; icon: string }
   'Exhaust': { bg: '#F1F5F9', text: '#475569', icon: 'smoke' },
   'Air Conditioning': { bg: '#E0F7FA', text: '#00838F', icon: 'snowflake' },
   'Custom': { bg: '#F3F4F6', text: '#374151', icon: 'cog-outline' },
+  'Others': { bg: '#F3E8FF', text: '#7C3AED', icon: 'dots-horizontal-circle-outline' },
+  'Other': { bg: '#F3E8FF', text: '#7C3AED', icon: 'dots-horizontal-circle-outline' },
 };
-
-const STANDARD_CATEGORIES = [
-  'All',
-  'MOT',
-  'Servicing',
-  'Repairs',
-  'Tyre replacement',
-  'Diagnostics',
-  'Brakes',
-  'Exhaust',
-  'Air Conditioning',
-];
 
 export default function AdminServicesScreen({ navigation }: any) {
   const { theme, isDarkMode } = useAppTheme();
@@ -73,6 +64,8 @@ export default function AdminServicesScreen({ navigation }: any) {
     addGarageService,
     updateGarageService,
     deleteGarageService,
+    fetchServiceCatalog,
+    selectCatalogServices,
   } = useAppValues();
 
   const isSuperAdmin = user?.role === 'admin';
@@ -82,7 +75,7 @@ export default function AdminServicesScreen({ navigation }: any) {
     if (serviceCategories && serviceCategories.length > 0) {
       return serviceCategories.map(c => c.name);
     }
-    return ['MOT', 'Servicing', 'Tyres', 'Repairs'];
+    return [];
   }, [serviceCategories]);
 
   const allCategoryTabs = useMemo(() => {
@@ -112,15 +105,28 @@ export default function AdminServicesScreen({ navigation }: any) {
   const [activeCategory, setActiveCategory] = useState('All');
   const [searchQuery, setSearchQuery] = useState('');
 
-  // Dropdown menu state (ID of service whose 3-dot dropdown is open)
-  const [openMenuId, setOpenMenuId] = useState<string | null>(null);
-
   // Filter BottomSheet / Modal State
   const [filterModalVisible, setFilterModalVisible] = useState(false);
 
-  // Add / Edit Modal State
+  // ─── CATALOG SELECTION MODAL STATE ───
+  const [catalogModalVisible, setCatalogModalVisible] = useState(false);
+  const [catalogLoading, setCatalogLoading] = useState(false);
+  const [catalogGroups, setCatalogGroups] = useState<ServiceCatalogGroup[]>([]);
+  const [catalogActiveCategory, setCatalogActiveCategory] = useState('All');
+  const [catalogSearch, setCatalogSearch] = useState('');
+  const [savingCatalog, setSavingCatalog] = useState(false);
+  const [catalogSelections, setCatalogSelections] = useState<Record<string, {
+    selected: boolean;
+    name: string;
+    category: string;
+    price: string;
+    duration: string;
+    description: string;
+    serviceId?: string;
+  }>>({});
+
+  // ─── ADD CUSTOM SERVICE MODAL STATE ───
   const [modalVisible, setModalVisible] = useState(false);
-  const [editingService, setEditingService] = useState<ServiceItem | null>(null);
   const [formName, setFormName] = useState('');
   const [formCategory, setFormCategory] = useState('Servicing');
   const [formPrice, setFormPrice] = useState('45.00');
@@ -181,16 +187,96 @@ export default function AdminServicesScreen({ navigation }: any) {
 
   const onRefresh = () => {
     setRefreshing(true);
-    setOpenMenuId(null);
     loadServices(undefined, true);
   };
 
-  // Open Modal for Add
-  const handleOpenAdd = () => {
-    setOpenMenuId(null);
-    setEditingService(null);
+  // Open Modal for Catalog Selection
+  const handleOpenCatalogModal = async () => {
+    setCatalogModalVisible(true);
+    setCatalogLoading(true);
+    try {
+      const groups = await fetchServiceCatalog();
+      setCatalogGroups(groups);
+
+      // Pre-populate selections from garage's current services
+      const initialMap: Record<string, any> = {};
+      groups.forEach((group) => {
+        (group.services || []).forEach((svc: any) => {
+          const key = (svc.name || '').trim().toLowerCase();
+          const existing = services.find(
+            (s) => (s.name || '').trim().toLowerCase() === key && !s.isCustom
+          );
+          initialMap[key] = {
+            selected: !!existing,
+            name: svc.name,
+            category: svc.category || group.name,
+            price: existing ? String(existing.price) : String(svc.price !== undefined ? svc.price : 45),
+            duration: existing ? String(existing.duration) : String(svc.duration || 45),
+            description: existing?.description || svc.description || '',
+            serviceId: svc.id || svc._id,
+          };
+        });
+      });
+      setCatalogSelections(initialMap);
+    } catch (e: any) {
+      Alert.alert('Error', e.message || 'Could not load service catalog.');
+    } finally {
+      setCatalogLoading(false);
+    }
+  };
+
+  // Toggle selection in catalog modal
+  const handleToggleCatalogItem = (key: string) => {
+    setCatalogSelections((prev) => {
+      const cur = prev[key];
+      if (!cur) return prev;
+      return {
+        ...prev,
+        [key]: { ...cur, selected: !cur.selected },
+      };
+    });
+  };
+
+  // Save selected catalog services to garage
+  const handleSaveCatalog = async () => {
+    const targetGId = selectedGarageId || user?.garageId || (garages[0]?._id || garages[0]?.id);
+    if (!targetGId) {
+      Alert.alert('Error', 'Garage ID missing. Please select or verify your garage.');
+      return;
+    }
+
+    const selectedList = Object.values(catalogSelections)
+      .filter((item) => item.selected)
+      .map((item) => ({
+        name: item.name,
+        category: item.category,
+        price: parseFloat(item.price) || 45,
+        duration: parseInt(item.duration, 10) || 45,
+        description: item.description || '',
+        isActive: true,
+        serviceId: item.serviceId,
+      }));
+
+    setSavingCatalog(true);
+    try {
+      await selectCatalogServices(targetGId, selectedList);
+      Alert.alert(
+        'Catalog Services Saved',
+        `Successfully updated services for your garage (${selectedList.length} services active).`
+      );
+      setCatalogModalVisible(false);
+      await loadServices();
+    } catch (e: any) {
+      Alert.alert('Error', e.message || 'Failed to save catalog services.');
+    } finally {
+      setSavingCatalog(false);
+    }
+  };
+
+  // Open Modal for Custom Service Add
+  const handleOpenAddCustom = () => {
     setFormName('');
-    setFormCategory(availableCategories[0] || 'Servicing');
+    setFormCategory('Others');
     setFormPrice('45.00');
     setFormDuration('45');
     setFormDescription('');
@@ -198,20 +284,7 @@ export default function AdminServicesScreen({ navigation }: any) {
     setModalVisible(true);
   };
 
-  // Open Modal for Edit
-  const handleOpenEdit = (service: ServiceItem) => {
-    setOpenMenuId(null);
-    setEditingService(service);
-    setFormName(service.name || '');
-    setFormCategory(service.category || 'Servicing');
-    setFormPrice(String(service.price !== undefined ? service.price : '45.00'));
-    setFormDuration(String(service.duration || '45'));
-    setFormDescription(service.description || '');
-    setFormIsActive(service.isActive !== false);
-    setModalVisible(true);
-  };
-
-  // Save Service (Create or Update)
+  // Save Custom Service
   const handleSaveService = async () => {
     const targetGId = selectedGarageId || user?.garageId || (garages[0]?._id || garages[0]?.id);
     if (!targetGId) {
@@ -239,30 +312,20 @@ export default function AdminServicesScreen({ navigation }: any) {
 
     setSavingService(true);
     try {
-      if (editingService) {
-        // Update
-        const serviceId = editingService._id || editingService.id || '';
-        await updateGarageService(targetGId, serviceId, {
-          name: cleanName,
-          category: formCategory,
-          price: numPrice,
-          duration: numDuration,
-          description: formDescription.trim(),
-          isActive: formIsActive
-        });
-        Alert.alert('Success', `"${cleanName}" updated successfully!`);
-      } else {
-        // Create
-        await addGarageService(targetGId, {
-          name: cleanName,
-          category: formCategory,
-          price: numPrice,
-          duration: numDuration,
-          description: formDescription.trim(),
-          isActive: formIsActive
-        });
-        Alert.alert('Success', `"${cleanName}" added successfully!`);
-      }
+      // Create custom service (automatically placed under 'Others' category)
+      await addGarageService(targetGId, {
+        name: cleanName,
+        category: 'Others',
+        price: numPrice,
+        duration: numDuration,
+        description: formDescription.trim(),
+        isActive: formIsActive,
+        isCustom: true,
+      });
+      Alert.alert(
+        'Submitted for Super Admin Approval',
+        `"${cleanName}" has been submitted under "Others" category for Super Admin review. It will become live for customers once approved.`
+      );
       setModalVisible(false);
       await loadServices();
     } catch (err: any) {
@@ -274,26 +337,33 @@ export default function AdminServicesScreen({ navigation }: any) {
 
   // Toggle Active Switch directly from list
   const handleToggleActive = async (service: ServiceItem, newVal: boolean) => {
-    setOpenMenuId(null);
     const targetGId = selectedGarageId || user?.garageId;
     const serviceId = service._id || service.id;
     if (!targetGId || !serviceId) return;
 
+    if (service.isCustom && service.status === 'Pending') {
+      Alert.alert('Pending Approval', 'This custom service is awaiting Super Admin approval before it can go live.');
+      return;
+    }
+
     // Optimistic update
-    setServices(prev => prev.map(s => (s._id === serviceId || s.id === serviceId) ? { ...s, isActive: newVal } : s));
+    setServices((prev) =>
+      prev.map((s) => ((s._id === serviceId || s.id === serviceId) ? { ...s, isActive: newVal } : s))
+    );
 
     try {
       await updateGarageService(targetGId, serviceId, { isActive: newVal });
     } catch (err: any) {
       // Revert if error
-      setServices(prev => prev.map(s => (s._id === serviceId || s.id === serviceId) ? { ...s, isActive: !newVal } : s));
+      setServices((prev) =>
+        prev.map((s) => ((s._id === serviceId || s.id === serviceId) ? { ...s, isActive: !newVal } : s))
+      );
       Alert.alert('Error', 'Could not update active status.');
     }
   };
 
   // Delete Service
   const handleDeleteService = (service: ServiceItem) => {
-    setOpenMenuId(null);
     const targetGId = selectedGarageId || user?.garageId;
     const serviceId = service._id || service.id;
     if (!targetGId || !serviceId) return;
@@ -317,15 +387,15 @@ export default function AdminServicesScreen({ navigation }: any) {
             } finally {
               setLoading(false);
             }
-          }
-        }
+          },
+        },
       ]
     );
   };
 
   // Filtered Services List
   const filteredServices = useMemo(() => {
-    return services.filter(s => {
+    return services.filter((s) => {
       // Category match
       if (activeCategory !== 'All') {
         const cat = (s.category || '').toLowerCase();
@@ -348,31 +418,57 @@ export default function AdminServicesScreen({ navigation }: any) {
     });
   }, [services, activeCategory, searchQuery]);
 
+  // Catalog items filtered by tab & search
+  const filteredCatalogItems = useMemo(() => {
+    const allItems: any[] = [];
+    catalogGroups.forEach((group) => {
+      (group.services || []).forEach((s) => {
+        allItems.push({
+          ...s,
+          groupName: group.name,
+          groupIcon: group.icon,
+          groupIconColor: group.iconColor,
+          groupIconBg: group.iconBg,
+        });
+      });
+    });
+
+    return allItems.filter((item) => {
+      if (catalogActiveCategory !== 'All') {
+        const cat = (item.category || item.groupName || '').toLowerCase();
+        if (!cat.includes(catalogActiveCategory.toLowerCase())) return false;
+      }
+      if (catalogSearch.trim()) {
+        const q = catalogSearch.toLowerCase().trim();
+        const matchName = (item.name || '').toLowerCase().includes(q);
+        const matchCat = (item.category || '').toLowerCase().includes(q);
+        const matchDesc = (item.description || '').toLowerCase().includes(q);
+        if (!matchName && !matchCat && !matchDesc) return false;
+      }
+      return true;
+    });
+  }, [catalogGroups, catalogActiveCategory, catalogSearch]);
+
+  const selectedCatalogCount = useMemo(() => {
+    return Object.values(catalogSelections).filter((item) => item.selected).length;
+  }, [catalogSelections]);
+
   return (
     <SafeAreaView style={[styles.container, { backgroundColor: theme.colors.background }]} edges={['top']}>
       <View style={{ flex: 1 }}>
-        {/* Transparent backdrop to dismiss 3-dot menu only when open */}
-        {openMenuId !== null && (
-          <TouchableOpacity
-            style={StyleSheet.absoluteFill}
-            activeOpacity={1}
-            onPress={() => setOpenMenuId(null)}
-          />
-        )}
-        {/* Top Navbar: Back + Title + Count Badge + Smaller "Add Service" Button */}
+        {/* Top Navbar: Back + Title + Action Buttons */}
         <View style={[styles.navbar, { backgroundColor: theme.colors.card, borderColor: theme.colors.border }]}>
           {navigation.canGoBack && navigation.canGoBack() ? (
-            <TouchableOpacity
-              onPress={() => navigation.goBack()}
-              style={styles.backBtn}
-              activeOpacity={0.7}
-            >
+            <TouchableOpacity onPress={() => navigation.goBack()} style={styles.backBtn} activeOpacity={0.7}>
               <MaterialCommunityIcons name="arrow-left" size={22} color={theme.colors.text} />
             </TouchableOpacity>
           ) : null}
 
           <View style={styles.navTitleGroup}>
             <Text style={[styles.navTitle, { color: theme.colors.text }]}>Services</Text>
+            <View style={[styles.countBadge, { backgroundColor: theme.colors.primary + '18' }]}>
+              <Text style={[styles.countBadgeText, { color: theme.colors.primary }]}>{services.length}</Text>
+            </View>
           </View>
 
           <View style={{ flexDirection: 'row', alignItems: 'center', gap: 6 }}>
@@ -387,228 +483,484 @@ export default function AdminServicesScreen({ navigation }: any) {
               </TouchableOpacity>
             )}
 
+            {/* Select from Platform Catalog */}
             <TouchableOpacity
               style={[styles.smallAddBtn, { backgroundColor: theme.colors.primary }]}
-              onPress={handleOpenAdd}
+              onPress={handleOpenCatalogModal}
               activeOpacity={0.8}
             >
-              <MaterialCommunityIcons name="plus" size={15} color="#FFFFFF" />
-              <Text style={styles.smallAddBtnText}>Add Service</Text>
+              <MaterialCommunityIcons name="playlist-plus" size={15} color="#FFFFFF" />
+              <Text style={styles.smallAddBtnText}>From Catalog</Text>
+            </TouchableOpacity>
+
+            {/* Add Custom Service */}
+            <TouchableOpacity
+              style={[styles.smallAddBtn, { backgroundColor: isDarkMode ? '#1E293B' : '#F1F5F9', borderWidth: 1, borderColor: theme.colors.border }]}
+              onPress={handleOpenAddCustom}
+              activeOpacity={0.8}
+            >
+              <MaterialCommunityIcons name="plus" size={15} color={theme.colors.text} />
+              <Text style={[styles.smallAddBtnText, { color: theme.colors.text }]}>Custom</Text>
             </TouchableOpacity>
           </View>
         </View>
 
-          {/* Search & Filter Bar */}
-          <View style={[styles.searchFilterContainer, { backgroundColor: theme.colors.card, borderColor: theme.colors.border }]}>
-            <View style={[styles.searchInputWrapper, { backgroundColor: isDarkMode ? '#1E293B' : '#F1F5F9', borderColor: theme.colors.border }]}>
-              <MaterialCommunityIcons name="magnify" size={18} color={theme.colors.placeholder} style={{ marginRight: 6 }} />
-              <TextInput
-                style={[styles.searchInput, { color: theme.colors.text }]}
-                placeholder="Search services by name, keyword..."
-                placeholderTextColor={theme.colors.placeholder}
-                value={searchQuery}
-                onChangeText={setSearchQuery}
-              />
-              {searchQuery.length > 0 && (
-                <TouchableOpacity onPress={() => setSearchQuery('')}>
-                  <MaterialCommunityIcons name="close-circle" size={16} color={theme.colors.placeholder} />
-                </TouchableOpacity>
-              )}
-            </View>
-
-            {/* Filter Button */}
-            <TouchableOpacity
-              style={[
-                styles.filterBtn,
-                {
-                  backgroundColor: activeCategory !== 'All' ? theme.colors.primary + '18' : (isDarkMode ? '#1E293B' : '#F1F5F9'),
-                  borderColor: activeCategory !== 'All' ? theme.colors.primary : theme.colors.border,
-                }
-              ]}
-              onPress={() => {
-                setOpenMenuId(null);
-                setFilterModalVisible(true);
-              }}
-              activeOpacity={0.7}
-            >
-              <MaterialCommunityIcons 
-                name="tune-variant" 
-                size={18} 
-                color={activeCategory !== 'All' ? theme.colors.primary : theme.colors.text} 
-              />
-              {activeCategory !== 'All' && <View style={[styles.filterActiveDot, { backgroundColor: theme.colors.primary }]} />}
-            </TouchableOpacity>
+        {/* Search & Filter Bar */}
+        <View style={[styles.searchFilterContainer, { backgroundColor: theme.colors.card, borderColor: theme.colors.border }]}>
+          <View style={[styles.searchInputWrapper, { backgroundColor: isDarkMode ? '#1E293B' : '#F1F5F9', borderColor: theme.colors.border }]}>
+            <MaterialCommunityIcons name="magnify" size={18} color={theme.colors.placeholder} style={{ marginRight: 6 }} />
+            <TextInput
+              style={[styles.searchInput, { color: theme.colors.text }]}
+              placeholder="Search services by name, keyword..."
+              placeholderTextColor={theme.colors.placeholder}
+              value={searchQuery}
+              onChangeText={setSearchQuery}
+            />
+            {searchQuery.length > 0 && (
+              <TouchableOpacity onPress={() => setSearchQuery('')}>
+                <MaterialCommunityIcons name="close-circle" size={16} color={theme.colors.placeholder} />
+              </TouchableOpacity>
+            )}
           </View>
 
-          {/* Active Filter Indicator */}
-          {activeCategory !== 'All' && (
-            <View style={[styles.activeFilterBar, { backgroundColor: theme.colors.card }]}>
-              <View style={[styles.activeFilterChip, { backgroundColor: theme.colors.primary + '15', borderColor: theme.colors.primary + '35' }]}>
-                <MaterialCommunityIcons name="filter-outline" size={13} color={theme.colors.primary} style={{ marginRight: 4 }} />
-                <Text style={[styles.activeFilterChipText, { color: theme.colors.primary }]}>
-                  Filtered: {activeCategory}
-                </Text>
-                <TouchableOpacity onPress={() => setActiveCategory('All')} style={{ marginLeft: 6 }}>
-                  <MaterialCommunityIcons name="close-circle" size={15} color={theme.colors.primary} />
+          {/* Filter Button */}
+          <TouchableOpacity
+            style={[
+              styles.filterBtn,
+              {
+                backgroundColor: activeCategory !== 'All' ? theme.colors.primary + '18' : (isDarkMode ? '#1E293B' : '#F1F5F9'),
+                borderColor: activeCategory !== 'All' ? theme.colors.primary : theme.colors.border,
+              },
+            ]}
+            onPress={() => {
+              setFilterModalVisible(true);
+            }}
+            activeOpacity={0.7}
+          >
+            <MaterialCommunityIcons
+              name="tune-variant"
+              size={18}
+              color={activeCategory !== 'All' ? theme.colors.primary : theme.colors.text}
+            />
+            {activeCategory !== 'All' && <View style={[styles.filterActiveDot, { backgroundColor: theme.colors.primary }]} />}
+          </TouchableOpacity>
+        </View>
+
+        {/* Active Filter Indicator */}
+        {activeCategory !== 'All' && (
+          <View style={[styles.activeFilterBar, { backgroundColor: theme.colors.card }]}>
+            <View style={[styles.activeFilterChip, { backgroundColor: theme.colors.primary + '15', borderColor: theme.colors.primary + '35' }]}>
+              <MaterialCommunityIcons name="filter-outline" size={13} color={theme.colors.primary} style={{ marginRight: 4 }} />
+              <Text style={[styles.activeFilterChipText, { color: theme.colors.primary }]}>
+                Filtered: {activeCategory}
+              </Text>
+              <TouchableOpacity onPress={() => setActiveCategory('All')} style={{ marginLeft: 6 }}>
+                <MaterialCommunityIcons name="close-circle" size={15} color={theme.colors.primary} />
+              </TouchableOpacity>
+            </View>
+          </View>
+        )}
+
+        {/* Main Services List */}
+        <ScrollView
+          contentContainerStyle={styles.listContent}
+          showsVerticalScrollIndicator={false}
+          refreshControl={<RefreshControl refreshing={refreshing} onRefresh={onRefresh} colors={[theme.colors.primary]} />}
+        >
+          {loading && !refreshing ? (
+            <View style={styles.loadingContainer}>
+              <ActivityIndicator size="large" color={theme.colors.primary} />
+              <Text style={[styles.loadingText, { color: theme.colors.placeholder }]}>Loading services...</Text>
+            </View>
+          ) : filteredServices.length === 0 ? (
+            <View style={[styles.emptyCard, { backgroundColor: theme.colors.card, borderColor: theme.colors.border }]}>
+              <MaterialCommunityIcons name="car-wrench" size={44} color={theme.colors.placeholder} style={{ marginBottom: 10 }} />
+              <Text style={[styles.emptyTitle, { color: theme.colors.text }]}>No Services Found</Text>
+              <Text style={[styles.emptySubtitle, { color: theme.colors.placeholder }]}>
+                {searchQuery || activeCategory !== 'All'
+                  ? 'No services match your filter.'
+                  : 'No services yet. Add from catalog or create a custom one.'}
+              </Text>
+
+              <View style={{ flexDirection: 'row', gap: 10, marginTop: 8 }}>
+                <TouchableOpacity
+                  style={[styles.smallAddBtn, { backgroundColor: theme.colors.primary, paddingHorizontal: 16, paddingVertical: 9 }]}
+                  onPress={handleOpenCatalogModal}
+                >
+                  <MaterialCommunityIcons name="playlist-plus" size={16} color="#FFFFFF" style={{ marginRight: 4 }} />
+                  <Text style={styles.smallAddBtnText}>Select from Catalog</Text>
+                </TouchableOpacity>
+
+                <TouchableOpacity
+                  style={[styles.smallAddBtn, { backgroundColor: isDarkMode ? '#1E293B' : '#F1F5F9', borderWidth: 1, borderColor: theme.colors.border, paddingHorizontal: 14, paddingVertical: 9 }]}
+                  onPress={handleOpenAddCustom}
+                >
+                  <MaterialCommunityIcons name="plus" size={16} color={theme.colors.text} style={{ marginRight: 4 }} />
+                  <Text style={[styles.smallAddBtnText, { color: theme.colors.text }]}>Add Custom</Text>
                 </TouchableOpacity>
               </View>
             </View>
-          )}
+          ) : (
+            filteredServices.map((service) => {
+              const catInfo = CATEGORY_COLORS[service.category || 'Servicing'] || CATEGORY_COLORS['Custom'];
+              const isActive = service.isActive !== false;
+              const serviceId = String(service._id || service.id || service.name);
+              const isCustom = service.isCustom === true;
+              const status = service.status || 'Approved';
 
-          {/* Main Services List */}
-          <ScrollView
-            contentContainerStyle={styles.listContent}
-            showsVerticalScrollIndicator={false}
-            onScrollBeginDrag={() => setOpenMenuId(null)}
-            refreshControl={<RefreshControl refreshing={refreshing} onRefresh={onRefresh} colors={[theme.colors.primary]} />}
-          >
-            {loading && !refreshing ? (
-              <View style={styles.loadingContainer}>
-                <ActivityIndicator size="large" color={theme.colors.primary} />
-                <Text style={[styles.loadingText, { color: theme.colors.placeholder }]}>Loading services...</Text>
-              </View>
-            ) : filteredServices.length === 0 ? (
-              <View style={[styles.emptyCard, { backgroundColor: theme.colors.card, borderColor: theme.colors.border }]}>
-                <MaterialCommunityIcons name="car-wrench" size={44} color={theme.colors.placeholder} style={{ marginBottom: 10 }} />
-                <Text style={[styles.emptyTitle, { color: theme.colors.text }]}>No Services Found</Text>
-                <Text style={[styles.emptySubtitle, { color: theme.colors.placeholder }]}>
-                  {searchQuery || activeCategory !== 'All'
-                    ? 'No services match your active search or filter.'
-                    : 'No services created yet. Tap "+ Add Service" to add your first garage service.'}
-                </Text>
-
-                <TouchableOpacity
-                  style={[styles.smallAddBtn, { backgroundColor: theme.colors.primary, paddingHorizontal: 16, paddingVertical: 8 }]}
-                  onPress={handleOpenAdd}
+              return (
+                <View
+                  key={serviceId}
+                  style={[
+                    styles.serviceCard,
+                    {
+                      backgroundColor: theme.colors.card,
+                      borderColor: status === 'Pending' ? '#F59E0B60' : (status === 'Rejected' ? '#EF444460' : theme.colors.border),
+                    },
+                    !isActive && { opacity: 0.72 },
+                  ]}
                 >
-                  <MaterialCommunityIcons name="plus" size={15} color="#FFFFFF" />
-                  <Text style={styles.smallAddBtnText}>Add Custom Service</Text>
-                </TouchableOpacity>
-              </View>
-            ) : (
-              filteredServices.map((service) => {
-                const catInfo = CATEGORY_COLORS[service.category || 'Servicing'] || CATEGORY_COLORS['Custom'];
-                const isActive = service.isActive !== false;
-                const serviceId = String(service._id || service.id || service.name);
-                const isMenuOpen = openMenuId === serviceId;
+                  {/* Top Row: Left (Icon + Name + Category) & Right (Switch + Delete Button) */}
+                  <View style={styles.cardHeaderRow}>
+                    <View style={[styles.catIconCircle, { backgroundColor: catInfo.bg }]}>
+                      <MaterialCommunityIcons name={catInfo.icon as any} size={22} color={catInfo.text} />
+                    </View>
 
-                return (
-                  <View
-                    key={serviceId}
-                    style={[
-                      styles.serviceCard,
-                      {
-                        backgroundColor: theme.colors.card,
-                        borderColor: theme.colors.border,
-                        zIndex: isMenuOpen ? 100 : 1,
-                      },
-                      !isActive && { opacity: 0.72 }
-                    ]}
-                  >
-                    {/* Top Row: Left (Icon + Name + Category) & Right (Switch + Three-Dot Button) */}
-                    <View style={styles.cardHeaderRow}>
-                      {/* Category Icon */}
-                      <View style={[styles.catIconCircle, { backgroundColor: catInfo.bg }]}>
-                        <MaterialCommunityIcons name={catInfo.icon as any} size={22} color={catInfo.text} />
-                      </View>
-
-                      {/* Name and Enhanced Category Badge */}
-                      <View style={styles.serviceTitleGroup}>
-                        <Text style={[styles.serviceNameText, { color: theme.colors.text }]} numberOfLines={1}>
-                          {service.name}
-                        </Text>
+                    <View style={styles.serviceTitleGroup}>
+                      <Text style={[styles.serviceNameText, { color: theme.colors.text }]} numberOfLines={1}>
+                        {service.name}
+                      </Text>
+                      <View style={{ flexDirection: 'row', alignItems: 'center', gap: 6, flexWrap: 'wrap' }}>
                         <View style={[styles.categoryBadge, { backgroundColor: catInfo.bg, borderColor: catInfo.text + '35' }]}>
                           <MaterialCommunityIcons name={catInfo.icon as any} size={11} color={catInfo.text} style={{ marginRight: 3.5 }} />
                           <Text style={[styles.categoryBadgeText, { color: catInfo.text }]}>
                             {service.category || 'Servicing'}
                           </Text>
                         </View>
-                      </View>
 
-                      {/* Right Side: Checkbox/Switch + Three-dot Menu Button */}
-                      <View style={styles.cardRightControls}>
-                        <Switch
-                          value={isActive}
-                          onValueChange={(val) => handleToggleActive(service, val)}
-                          trackColor={{ false: '#CBD5E1', true: '#10B981' }}
-                          thumbColor="#FFFFFF"
-                          style={{ transform: [{ scaleX: 0.8 }, { scaleY: 0.8 }] }}
-                        />
-
-                        <TouchableOpacity
-                          style={[styles.threeDotBtn, isMenuOpen && { backgroundColor: theme.colors.primary + '15', borderRadius: 6 }]}
-                          onPress={() => setOpenMenuId(isMenuOpen ? null : serviceId)}
-                          activeOpacity={0.7}
-                        >
-                          <MaterialCommunityIcons name="dots-vertical" size={20} color={isMenuOpen ? theme.colors.primary : theme.colors.text} />
-                        </TouchableOpacity>
-
-                        {/* Absolute Dropdown positioned just below the three dots */}
-                        {isMenuOpen && (
-                          <View style={[styles.inlineDropdown, { backgroundColor: theme.colors.card, borderColor: theme.colors.border }]}>
-                            <TouchableOpacity
-                              style={styles.dropdownItem}
-                              onPress={() => handleOpenEdit(service)}
-                              activeOpacity={0.7}
-                            >
-                              <MaterialCommunityIcons name="pencil-outline" size={15} color={theme.colors.primary} />
-                              <Text style={[styles.dropdownItemText, { color: theme.colors.text }]}>Edit</Text>
-                            </TouchableOpacity>
-
-                            <View style={[styles.dropdownDivider, { backgroundColor: theme.colors.border }]} />
-
-                            <TouchableOpacity
-                              style={styles.dropdownItem}
-                              onPress={() => handleDeleteService(service)}
-                              activeOpacity={0.7}
-                            >
-                              <MaterialCommunityIcons name="trash-can-outline" size={15} color="#EF4444" />
-                              <Text style={[styles.dropdownItemText, { color: '#EF4444' }]}>Delete</Text>
-                            </TouchableOpacity>
+                        {/* Custom Service Tag */}
+                        {isCustom && (
+                          <View style={[styles.customBadge, { backgroundColor: isDarkMode ? '#334155' : '#F1F5F9' }]}>
+                            <Text style={[styles.customBadgeText, { color: theme.colors.placeholder }]}>Custom</Text>
                           </View>
                         )}
                       </View>
                     </View>
 
-                    {/* Info Row: LARGER PRICING FIRST, THEN DURATION & STATUS */}
-                    <View style={styles.infoMetaRow}>
-                      {/* 1. Larger Prominent Price First */}
-                      <View style={[styles.priceTagContainer, { backgroundColor: theme.colors.primary + '12', borderColor: theme.colors.primary + '30' }]}>
-                        <Text style={[styles.priceTagCurrency, { color: theme.colors.primary }]}>£</Text>
-                        <Text style={[styles.priceTagAmount, { color: theme.colors.primary }]}>
-                          {Number(service.price).toFixed(2)}
-                        </Text>
-                      </View>
+                    {/* Right Side: Checkbox/Switch + Delete Button */}
+                    <View style={styles.cardRightControls}>
+                      <Switch
+                        value={isActive}
+                        disabled={isCustom && status === 'Pending'}
+                        onValueChange={(val) => handleToggleActive(service, val)}
+                        trackColor={{ false: '#CBD5E1', true: '#10B981' }}
+                        thumbColor="#FFFFFF"
+                        style={{ transform: [{ scaleX: 0.8 }, { scaleY: 0.8 }] }}
+                      />
 
-                      {/* 2. Duration Second */}
-                      <View style={[styles.durationChip, { backgroundColor: isDarkMode ? '#1E293B' : '#F1F5F9', borderColor: theme.colors.border }]}>
-                        <MaterialCommunityIcons name="clock-outline" size={13} color={theme.colors.placeholder} style={{ marginRight: 4 }} />
-                        <Text style={[styles.durationChipText, { color: theme.colors.text }]}>
-                          {service.duration || 45} mins
-                        </Text>
-                      </View>
+                      <TouchableOpacity
+                        style={styles.deleteBtn}
+                        onPress={() => handleDeleteService(service)}
+                        activeOpacity={0.7}
+                        hitSlop={{ top: 8, bottom: 8, left: 8, right: 8 }}
+                      >
+                        <MaterialCommunityIcons name="trash-can-outline" size={19} color="#EF4444" />
+                      </TouchableOpacity>
+                    </View>
+                  </View>
 
-                      {/* Status Indicator Pill */}
+                  {/* Info Row: Price, Duration, Status Pill */}
+                  <View style={styles.infoMetaRow}>
+                    <View style={[styles.priceTagContainer, { backgroundColor: theme.colors.primary + '12', borderColor: theme.colors.primary + '30' }]}>
+                      <Text style={[styles.priceTagCurrency, { color: theme.colors.primary }]}>£</Text>
+                      <Text style={[styles.priceTagAmount, { color: theme.colors.primary }]}>
+                        {Number(service.price).toFixed(2)}
+                      </Text>
+                    </View>
+
+                    <View style={[styles.durationChip, { backgroundColor: isDarkMode ? '#1E293B' : '#F1F5F9', borderColor: theme.colors.border }]}>
+                      <MaterialCommunityIcons name="clock-outline" size={13} color={theme.colors.placeholder} style={{ marginRight: 4 }} />
+                      <Text style={[styles.durationChipText, { color: theme.colors.text }]}>
+                        {service.duration || 45} mins
+                      </Text>
+                    </View>
+
+                    {/* Status Pill: Pending, Rejected, Live, Paused */}
+                    {isCustom && status === 'Pending' ? (
+                      <View style={[styles.statusPill, { backgroundColor: '#F59E0B20' }]}>
+                        <MaterialCommunityIcons name="clock-alert-outline" size={12} color="#D97706" />
+                        <Text style={[styles.statusPillText, { color: '#D97706' }]}>Pending Approval</Text>
+                      </View>
+                    ) : isCustom && status === 'Rejected' ? (
+                      <View style={[styles.statusPill, { backgroundColor: '#EF444420' }]}>
+                        <MaterialCommunityIcons name="close-circle-outline" size={12} color="#DC2626" />
+                        <Text style={[styles.statusPillText, { color: '#DC2626' }]}>Rejected</Text>
+                      </View>
+                    ) : (
                       <View style={[styles.statusPill, { backgroundColor: isActive ? '#10B98115' : '#6B728015' }]}>
                         <View style={[styles.statusDot, { backgroundColor: isActive ? '#10B981' : '#6B7280' }]} />
                         <Text style={[styles.statusPillText, { color: isActive ? '#10B981' : '#6B7280' }]}>
                           {isActive ? 'Live' : 'Paused'}
                         </Text>
                       </View>
-                    </View>
-
-                    {/* Description (if provided) */}
-                    {service.description ? (
-                      <Text style={[styles.descriptionText, { color: theme.colors.placeholder }]} numberOfLines={2}>
-                        {service.description}
-                      </Text>
-                    ) : null}
+                    )}
                   </View>
-                );
-              })
+
+                  {/* Pending Notice Banner */}
+                  {isCustom && status === 'Pending' && (
+                    <View style={[styles.noticeBanner, { backgroundColor: '#F59E0B12', borderColor: '#F59E0B35' }]}>
+                      <MaterialCommunityIcons name="clock-alert-outline" size={14} color="#D97706" style={{ marginRight: 6 }} />
+                      <Text style={[styles.noticeBannerText, { color: '#B45309' }]}>
+                        Under review. Hidden from customers until approved.
+                      </Text>
+                    </View>
+                  )}
+
+                  {/* Rejected Notice Banner */}
+                  {isCustom && status === 'Rejected' && (
+                    <View style={[styles.noticeBanner, { backgroundColor: '#EF444412', borderColor: '#EF444435' }]}>
+                      <MaterialCommunityIcons name="alert-circle-outline" size={14} color="#DC2626" style={{ marginRight: 6 }} />
+                      <Text style={[styles.noticeBannerText, { color: '#DC2626' }]}>
+                        Rejected: {service.rejectionReason || 'Does not meet platform criteria.'}
+                      </Text>
+                    </View>
+                  )}
+
+                  {/* Description (if provided) */}
+                  {service.description && service.description.trim() ? (
+                    <Text style={[styles.descriptionText, { color: theme.colors.placeholder }]} numberOfLines={2}>
+                      {service.description}
+                    </Text>
+                  ) : null}
+                </View>
+              );
+            })
+          )}
+        </ScrollView>
+      </View>
+
+      {/* ─── PLATFORM SERVICE CATALOG MODAL ─── */}
+      <Modal
+        visible={catalogModalVisible}
+        animationType="slide"
+        transparent={true}
+        onRequestClose={() => setCatalogModalVisible(false)}
+      >
+        <View style={styles.modalOverlay}>
+          <View style={[styles.catalogModalCard, { backgroundColor: theme.colors.card, borderColor: theme.colors.border }]}>
+            {/* Header */}
+            <View style={[styles.modalHeader, { borderBottomColor: theme.colors.border }]}>
+              <View style={{ flexDirection: 'row', alignItems: 'center' }}>
+                <MaterialCommunityIcons name="playlist-check" size={24} color={theme.colors.primary} style={{ marginRight: 8 }} />
+                <View>
+                  <Text style={[styles.modalTitle, { color: theme.colors.text }]}>Platform Service Catalog</Text>
+                  <Text style={[styles.modalSubtitle, { color: theme.colors.placeholder }]}>
+                    Select verified services (live instantly)
+                  </Text>
+                </View>
+              </View>
+              <TouchableOpacity onPress={() => setCatalogModalVisible(false)}>
+                <MaterialCommunityIcons name="close" size={22} color={theme.colors.placeholder} />
+              </TouchableOpacity>
+            </View>
+
+            {/* Catalog Search & Category Tabs */}
+            <View style={{ paddingHorizontal: 14, paddingTop: 10 }}>
+              <View style={[styles.searchInputWrapper, { backgroundColor: isDarkMode ? '#1E293B' : '#F1F5F9', borderColor: theme.colors.border, marginBottom: 8 }]}>
+                <MaterialCommunityIcons name="magnify" size={18} color={theme.colors.placeholder} style={{ marginRight: 6 }} />
+                <TextInput
+                  style={[styles.searchInput, { color: theme.colors.text }]}
+                  placeholder="Search catalog services..."
+                  placeholderTextColor={theme.colors.placeholder}
+                  value={catalogSearch}
+                  onChangeText={setCatalogSearch}
+                />
+                {catalogSearch.length > 0 && (
+                  <TouchableOpacity onPress={() => setCatalogSearch('')}>
+                    <MaterialCommunityIcons name="close-circle" size={16} color={theme.colors.placeholder} />
+                  </TouchableOpacity>
+                )}
+              </View>
+
+              <ScrollView horizontal showsHorizontalScrollIndicator={false} style={{ marginBottom: 4 }}>
+                {allCategoryTabs.map((cat) => {
+                  const isSelected = catalogActiveCategory === cat;
+                  return (
+                    <TouchableOpacity
+                      key={cat}
+                      style={[
+                        styles.catSelectPill,
+                        isSelected
+                          ? { backgroundColor: theme.colors.primary, borderColor: theme.colors.primary }
+                          : { backgroundColor: isDarkMode ? '#1E293B' : '#F1F5F9', borderColor: theme.colors.border },
+                      ]}
+                      onPress={() => setCatalogActiveCategory(cat)}
+                    >
+                      <Text style={{ fontFamily: fonts.bold, color: isSelected ? '#FFFFFF' : theme.colors.text, fontSize: 11.5 }}>
+                        {cat}
+                      </Text>
+                    </TouchableOpacity>
+                  );
+                })}
+              </ScrollView>
+            </View>
+
+            {/* Services List */}
+            {catalogLoading ? (
+              <View style={{ padding: 40, alignItems: 'center' }}>
+                <ActivityIndicator size="large" color={theme.colors.primary} />
+                <Text style={{ marginTop: 10, fontFamily: fonts.medium, color: theme.colors.placeholder, fontSize: 12 }}>
+                  Loading catalog services...
+                </Text>
+              </View>
+            ) : filteredCatalogItems.length === 0 ? (
+              <View style={{ padding: 40, alignItems: 'center' }}>
+                <MaterialCommunityIcons name="magnify-close" size={36} color={theme.colors.placeholder} style={{ marginBottom: 6 }} />
+                <Text style={{ fontFamily: fonts.bold, color: theme.colors.text, fontSize: 14 }}>No catalog services found</Text>
+                <Text style={{ fontFamily: fonts.regular, color: theme.colors.placeholder, fontSize: 12, marginTop: 2 }}>
+                  Try another search or category.
+                </Text>
+              </View>
+            ) : (
+              <ScrollView style={{ flex: 1, paddingHorizontal: 14, paddingVertical: 6 }} showsVerticalScrollIndicator={false}>
+                {filteredCatalogItems.map((item) => {
+                  const key = (item.name || '').trim().toLowerCase();
+                  const selection = catalogSelections[key] || {
+                    selected: false,
+                    name: item.name,
+                    category: item.category || item.groupName,
+                    price: String(item.price || 45),
+                    duration: String(item.duration || 45),
+                    description: item.description || '',
+                  };
+                  const isSelected = selection.selected;
+                  const catInfo = getCategoryMeta(item.category || item.groupName || 'Servicing');
+
+                  return (
+                    <View
+                      key={key}
+                      style={[
+                        styles.catalogItemCard,
+                        {
+                          backgroundColor: isSelected ? theme.colors.primary + '0C' : (isDarkMode ? '#1E293B' : '#F8FAFC'),
+                          borderColor: isSelected ? theme.colors.primary : theme.colors.border,
+                        },
+                      ]}
+                    >
+                      <TouchableOpacity
+                        style={{ flexDirection: 'row', alignItems: 'center', width: '100%' }}
+                        onPress={() => handleToggleCatalogItem(key)}
+                        activeOpacity={0.7}
+                      >
+                        <View style={[styles.checkboxSquare, { borderColor: isSelected ? theme.colors.primary : theme.colors.border, backgroundColor: isSelected ? theme.colors.primary : 'transparent' }]}>
+                          {isSelected && <MaterialCommunityIcons name="check" size={14} color="#FFFFFF" />}
+                        </View>
+
+                        <View style={[styles.catIconCircle, { width: 34, height: 34, marginLeft: 10, marginRight: 10, backgroundColor: catInfo.bg }]}>
+                          <MaterialCommunityIcons name={(item.icon || catInfo.icon) as any} size={18} color={catInfo.text} />
+                        </View>
+
+                        <View style={{ flex: 1 }}>
+                          <Text style={[styles.catalogItemName, { color: theme.colors.text }]} numberOfLines={1}>
+                            {item.name}
+                          </Text>
+                          <Text style={[styles.catalogItemCat, { color: theme.colors.placeholder }]}>
+                            {item.category || item.groupName}
+                          </Text>
+                        </View>
+
+                        {isSelected && (
+                          <View style={[styles.catalogActiveTag, { backgroundColor: theme.colors.primary + '18' }]}>
+                            <Text style={[styles.catalogActiveTagText, { color: theme.colors.primary }]}>Active</Text>
+                          </View>
+                        )}
+                      </TouchableOpacity>
+
+                      {/* Custom Rate & Timing Fields */}
+                      {isSelected && (
+                        <View style={[styles.catalogConfigBox, { backgroundColor: isDarkMode ? '#0F172A' : '#FFFFFF', borderColor: theme.colors.border }]}>
+                          <View style={styles.catalogConfigField}>
+                            <Text style={[styles.catalogConfigLabel, { color: theme.colors.placeholder }]}>
+                              Rate (£)
+                            </Text>
+                            <View style={[styles.catalogInputWrap, { backgroundColor: isDarkMode ? '#1E293B' : '#F8FAFC', borderColor: theme.colors.border }]}>
+                              <Text style={[styles.catalogCurrencyText, { color: theme.colors.primary }]}>£</Text>
+                              <TextInput
+                                style={[styles.catalogInputText, { color: theme.colors.text }]}
+                                keyboardType="decimal-pad"
+                                value={selection.price}
+                                placeholder="0.00"
+                                placeholderTextColor={theme.colors.placeholder}
+                                onChangeText={(val) => {
+                                  setCatalogSelections((prev) => ({
+                                    ...prev,
+                                    [key]: { ...prev[key], price: val },
+                                  }));
+                                }}
+                              />
+                            </View>
+                          </View>
+
+                          <View style={styles.catalogConfigField}>
+                            <Text style={[styles.catalogConfigLabel, { color: theme.colors.placeholder }]}>
+                              Timing (mins)
+                            </Text>
+                            <View style={[styles.catalogInputWrap, { backgroundColor: isDarkMode ? '#1E293B' : '#F8FAFC', borderColor: theme.colors.border }]}>
+                              <MaterialCommunityIcons name="clock-outline" size={13} color={theme.colors.placeholder} style={{ marginRight: 4 }} />
+                              <TextInput
+                                style={[styles.catalogInputText, { color: theme.colors.text }]}
+                                keyboardType="number-pad"
+                                value={selection.duration}
+                                placeholder="45"
+                                placeholderTextColor={theme.colors.placeholder}
+                                onChangeText={(val) => {
+                                  setCatalogSelections((prev) => ({
+                                    ...prev,
+                                    [key]: { ...prev[key], duration: val },
+                                  }));
+                                }}
+                              />
+                              <Text style={[styles.catalogUnitText, { color: theme.colors.placeholder }]}>min</Text>
+                            </View>
+                          </View>
+                        </View>
+                      )}
+                    </View>
+                  );
+                })}
+              </ScrollView>
             )}
-          </ScrollView>
+
+            {/* Catalog Modal Actions */}
+            <View style={[styles.modalActionsRow, { borderTopColor: theme.colors.border }]}>
+              <TouchableOpacity
+                style={[styles.cancelBtn, { borderColor: theme.colors.border }]}
+                onPress={() => setCatalogModalVisible(false)}
+                disabled={savingCatalog}
+              >
+                <Text style={[styles.cancelBtnText, { color: theme.colors.text }]}>Cancel</Text>
+              </TouchableOpacity>
+
+              <TouchableOpacity
+                style={[styles.saveBtn, { backgroundColor: theme.colors.primary }]}
+                onPress={handleSaveCatalog}
+                disabled={savingCatalog}
+              >
+                {savingCatalog ? (
+                  <ActivityIndicator size="small" color="#FFFFFF" />
+                ) : (
+                  <>
+                    <MaterialCommunityIcons name="content-save" size={16} color="#FFFFFF" style={{ marginRight: 6 }} />
+                    <Text style={styles.saveBtnText}>
+                      Save Selected ({selectedCatalogCount})
+                    </Text>
+                  </>
+                )}
+              </TouchableOpacity>
+            </View>
+          </View>
         </View>
+      </Modal>
 
       {/* ─── CATEGORY FILTER BOTTOM SHEET ─── */}
       <Modal
@@ -617,19 +969,10 @@ export default function AdminServicesScreen({ navigation }: any) {
         transparent={true}
         onRequestClose={() => setFilterModalVisible(false)}
       >
-        <TouchableOpacity
-          style={styles.bottomSheetOverlay}
-          activeOpacity={1}
-          onPress={() => setFilterModalVisible(false)}
-        >
-          <View
-            style={[styles.bottomSheetCard, { backgroundColor: theme.colors.card, borderColor: theme.colors.border }]}
-            onStartShouldSetResponder={() => true}
-          >
-            {/* Sheet Handle */}
+        <TouchableOpacity style={styles.bottomSheetOverlay} activeOpacity={1} onPress={() => setFilterModalVisible(false)}>
+          <View style={[styles.bottomSheetCard, { backgroundColor: theme.colors.card, borderColor: theme.colors.border }]} onStartShouldSetResponder={() => true}>
             <View style={styles.sheetHandle} />
 
-            {/* Sheet Header */}
             <View style={[styles.sheetHeader, { borderBottomColor: theme.colors.border }]}>
               <View style={{ flexDirection: 'row', alignItems: 'center', gap: 8 }}>
                 <MaterialCommunityIcons name="tune-variant" size={20} color={theme.colors.primary} />
@@ -640,7 +983,6 @@ export default function AdminServicesScreen({ navigation }: any) {
               </TouchableOpacity>
             </View>
 
-            {/* Category Options List */}
             <ScrollView style={{ maxHeight: 380 }} showsVerticalScrollIndicator={false}>
               <View style={styles.categoryOptionsGrid}>
                 {allCategoryTabs.map((cat) => {
@@ -655,7 +997,7 @@ export default function AdminServicesScreen({ navigation }: any) {
                         {
                           backgroundColor: isSelected ? theme.colors.primary + '15' : (isDarkMode ? '#1E293B' : '#F8FAFC'),
                           borderColor: isSelected ? theme.colors.primary : theme.colors.border,
-                        }
+                        },
                       ]}
                       onPress={() => {
                         setActiveCategory(cat);
@@ -671,16 +1013,13 @@ export default function AdminServicesScreen({ navigation }: any) {
                         </Text>
                       </View>
 
-                      {isSelected && (
-                        <MaterialCommunityIcons name="check-circle" size={18} color={theme.colors.primary} />
-                      )}
+                      {isSelected && <MaterialCommunityIcons name="check-circle" size={18} color={theme.colors.primary} />}
                     </TouchableOpacity>
                   );
                 })}
               </View>
             </ScrollView>
 
-            {/* Reset / All Action */}
             <View style={[styles.sheetFooter, { borderTopColor: theme.colors.border }]}>
               <TouchableOpacity
                 style={[styles.resetFilterBtn, { borderColor: theme.colors.border }]}
@@ -696,7 +1035,7 @@ export default function AdminServicesScreen({ navigation }: any) {
         </TouchableOpacity>
       </Modal>
 
-      {/* ─── ADD / EDIT SERVICE MODAL ─── */}
+      {/* ─── ADD / EDIT CUSTOM SERVICE MODAL ─── */}
       <Modal
         visible={modalVisible}
         animationType="slide"
@@ -709,14 +1048,19 @@ export default function AdminServicesScreen({ navigation }: any) {
             <View style={[styles.modalHeader, { borderBottomColor: theme.colors.border }]}>
               <View style={{ flexDirection: 'row', alignItems: 'center' }}>
                 <MaterialCommunityIcons
-                  name={editingService ? 'pencil-circle' : 'plus-circle'}
+                  name="plus-circle"
                   size={24}
                   color={theme.colors.primary}
                   style={{ marginRight: 8 }}
                 />
-                <Text style={[styles.modalTitle, { color: theme.colors.text }]}>
-                  {editingService ? 'Edit Service' : 'Add New Service'}
-                </Text>
+                <View>
+                  <Text style={[styles.modalTitle, { color: theme.colors.text }]}>
+                    Add Custom Service
+                  </Text>
+                  <Text style={{ fontFamily: fonts.regular, fontSize: 11, color: '#D97706', marginTop: 1 }}>
+                    Requires admin approval before going live
+                  </Text>
+                </View>
               </View>
               <TouchableOpacity onPress={() => setModalVisible(false)}>
                 <MaterialCommunityIcons name="close" size={24} color={theme.colors.placeholder} />
@@ -724,61 +1068,23 @@ export default function AdminServicesScreen({ navigation }: any) {
             </View>
 
             <ScrollView contentContainerStyle={styles.modalFormContent} showsVerticalScrollIndicator={false}>
+              {/* Approval Notice */}
+              <View style={[styles.noticeBanner, { backgroundColor: '#F59E0B12', borderColor: '#F59E0B35', marginBottom: 12 }]}>
+                <MaterialCommunityIcons name="shield-alert-outline" size={16} color="#D97706" style={{ marginRight: 6 }} />
+                <Text style={[styles.noticeBannerText, { color: '#B45309', flex: 1 }]}>
+                  Requires admin approval before appearing to customers.
+                </Text>
+              </View>
+
               {/* Service Name */}
               <Text style={[styles.fieldLabel, { color: theme.colors.text }]}>Service Name *</Text>
               <TextInput
                 style={[styles.formInput, { backgroundColor: isDarkMode ? '#1E293B' : '#F8FAFC', color: theme.colors.text, borderColor: theme.colors.border }]}
-                placeholder="e.g. Front Brake Pads & Discs, Full Service..."
+                placeholder="e.g. Front Brake Pads & Discs, Custom Detailing..."
                 placeholderTextColor={theme.colors.placeholder}
                 value={formName}
                 onChangeText={setFormName}
               />
-
-              {/* Category Selection */}
-              <View style={{ flexDirection: 'row', alignItems: 'center', justifyContent: 'space-between', marginTop: 14, marginBottom: 6 }}>
-                <Text style={[styles.fieldLabel, { color: theme.colors.text, marginBottom: 0 }]}>Category *</Text>
-                {isSuperAdmin && (
-                  <TouchableOpacity
-                    onPress={() => {
-                      setModalVisible(false);
-                      navigation.navigate('SuperAdminCategories');
-                    }}
-                    style={{ flexDirection: 'row', alignItems: 'center' }}
-                  >
-                    <MaterialCommunityIcons name="cog-outline" size={13} color={theme.colors.primary} style={{ marginRight: 2 }} />
-                    <Text style={{ fontFamily: fonts.bold, fontSize: 11, color: theme.colors.primary }}>Manage Categories</Text>
-                  </TouchableOpacity>
-                )}
-              </View>
-              <ScrollView horizontal showsHorizontalScrollIndicator={false} style={{ marginBottom: 4 }}>
-                {availableCategories.map((cat) => {
-                  const meta = getCategoryMeta(cat);
-                  const isSelected = formCategory.toLowerCase() === cat.toLowerCase();
-                  return (
-                    <TouchableOpacity
-                      key={cat}
-                      style={[
-                        styles.catSelectPill,
-                        { flexDirection: 'row', alignItems: 'center' },
-                        isSelected
-                          ? { backgroundColor: theme.colors.primary, borderColor: theme.colors.primary }
-                          : { backgroundColor: isDarkMode ? '#1E293B' : '#F1F5F9', borderColor: theme.colors.border }
-                      ]}
-                      onPress={() => setFormCategory(cat)}
-                    >
-                      <MaterialCommunityIcons
-                        name={meta.icon as any}
-                        size={14}
-                        color={isSelected ? '#FFFFFF' : meta.text}
-                        style={{ marginRight: 5 }}
-                      />
-                      <Text style={{ fontFamily: fonts.bold, color: isSelected ? '#FFFFFF' : theme.colors.text, fontSize: 12 }}>
-                        {cat}
-                      </Text>
-                    </TouchableOpacity>
-                  );
-                })}
-              </ScrollView>
 
               {/* Price (£) & Duration (Mins) Row */}
               <View style={styles.priceDurationRow}>
@@ -825,9 +1131,9 @@ export default function AdminServicesScreen({ navigation }: any) {
               {/* Active Toggle */}
               <View style={[styles.toggleActiveCard, { backgroundColor: isDarkMode ? '#1E293B' : '#F1F5F9' }]}>
                 <View style={{ flex: 1, marginRight: 10 }}>
-                  <Text style={[styles.toggleActiveTitle, { color: theme.colors.text }]}>Live for Customer Booking</Text>
+                  <Text style={[styles.toggleActiveTitle, { color: theme.colors.text }]}>Enable Service</Text>
                   <Text style={[styles.toggleActiveSubtitle, { color: theme.colors.placeholder }]}>
-                    When active, customers can find and book this service.
+                    Make service available once approved.
                   </Text>
                 </View>
                 <Switch
@@ -859,7 +1165,7 @@ export default function AdminServicesScreen({ navigation }: any) {
                 ) : (
                   <>
                     <MaterialCommunityIcons name="content-save" size={16} color="#FFFFFF" style={{ marginRight: 6 }} />
-                    <Text style={styles.saveBtnText}>{editingService ? 'Update Service' : 'Add Service'}</Text>
+                    <Text style={styles.saveBtnText}>Submit for Approval</Text>
                   </>
                 )}
               </TouchableOpacity>
@@ -898,46 +1204,55 @@ const styles = StyleSheet.create({
     fontSize: 17,
     letterSpacing: -0.3,
   },
+  countBadge: {
+    paddingHorizontal: 7,
+    paddingVertical: 1.5,
+    borderRadius: 10,
+  },
+  countBadgeText: {
+    fontFamily: fonts.bold,
+    fontSize: 11,
+  },
   smallAddBtn: {
     flexDirection: 'row',
     alignItems: 'center',
     paddingHorizontal: 10,
     paddingVertical: 6,
-    borderRadius: 8,
-    gap: 3,
+    borderRadius: 7,
   },
   smallAddBtnText: {
     fontFamily: fonts.bold,
-    color: '#FFFFFF',
     fontSize: 11.5,
+    color: '#FFFFFF',
+    marginLeft: 3,
   },
   searchFilterContainer: {
     flexDirection: 'row',
     alignItems: 'center',
-    paddingHorizontal: 16,
+    paddingHorizontal: 14,
     paddingVertical: 10,
-    gap: 10,
     borderBottomWidth: 1,
+    gap: 10,
   },
   searchInputWrapper: {
     flex: 1,
     flexDirection: 'row',
     alignItems: 'center',
-    borderWidth: 1,
-    borderRadius: 10,
     paddingHorizontal: 10,
+    borderRadius: 8,
+    borderWidth: 1,
     height: 38,
   },
   searchInput: {
     fontFamily: fonts.regular,
     flex: 1,
-    fontSize: 13,
+    fontSize: 12.5,
     paddingVertical: 0,
   },
   filterBtn: {
     width: 38,
     height: 38,
-    borderRadius: 10,
+    borderRadius: 8,
     borderWidth: 1,
     alignItems: 'center',
     justifyContent: 'center',
@@ -952,44 +1267,43 @@ const styles = StyleSheet.create({
     borderRadius: 3,
   },
   activeFilterBar: {
-    paddingHorizontal: 16,
+    paddingHorizontal: 14,
     paddingVertical: 6,
     flexDirection: 'row',
   },
   activeFilterChip: {
     flexDirection: 'row',
     alignItems: 'center',
-    paddingHorizontal: 10,
+    paddingHorizontal: 9,
     paddingVertical: 4,
     borderRadius: 12,
     borderWidth: 1,
   },
   activeFilterChipText: {
-    fontFamily: fonts.semiBold,
+    fontFamily: fonts.bold,
     fontSize: 11,
   },
   listContent: {
-    padding: 16,
+    padding: 14,
     paddingBottom: 36,
     gap: 10,
   },
   loadingContainer: {
+    padding: 40,
     alignItems: 'center',
-    justifyContent: 'center',
-    paddingVertical: 60,
   },
   loadingText: {
-    fontFamily: fonts.semiBold,
-    marginTop: 10,
+    fontFamily: fonts.medium,
     fontSize: 12,
+    marginTop: 8,
   },
   emptyCard: {
-    padding: 28,
+    padding: 24,
     borderRadius: 14,
     borderWidth: 1,
     alignItems: 'center',
     justifyContent: 'center',
-    marginTop: 20,
+    marginTop: 10,
   },
   emptyTitle: {
     fontFamily: fonts.bold,
@@ -1052,6 +1366,16 @@ const styles = StyleSheet.create({
     fontSize: 10,
     letterSpacing: 0.1,
   },
+  customBadge: {
+    paddingHorizontal: 6,
+    paddingVertical: 2,
+    borderRadius: 4,
+    marginTop: 2,
+  },
+  customBadgeText: {
+    fontFamily: fonts.bold,
+    fontSize: 9.5,
+  },
   cardRightControls: {
     flexDirection: 'row',
     alignItems: 'center',
@@ -1077,6 +1401,13 @@ const styles = StyleSheet.create({
     shadowOpacity: 0.18,
     shadowRadius: 6,
     zIndex: 999,
+  },
+  deleteBtn: {
+    padding: 6,
+    marginLeft: 6,
+    borderRadius: 8,
+    alignItems: 'center',
+    justifyContent: 'center',
   },
   dropdownItem: {
     flexDirection: 'row',
@@ -1146,6 +1477,20 @@ const styles = StyleSheet.create({
   statusPillText: {
     fontFamily: fonts.bold,
     fontSize: 10.5,
+  },
+  noticeBanner: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    paddingHorizontal: 10,
+    paddingVertical: 6,
+    borderRadius: 7,
+    borderWidth: 1,
+    marginTop: 8,
+  },
+  noticeBannerText: {
+    fontFamily: fonts.medium,
+    fontSize: 11,
+    lineHeight: 15,
   },
   descriptionText: {
     fontFamily: fonts.regular,
@@ -1234,7 +1579,14 @@ const styles = StyleSheet.create({
   },
   modalCard: {
     width: '100%',
-    maxHeight: Math.min(height * 0.88, 620),
+    maxHeight: Math.min(height * 0.88, 640),
+    borderRadius: 16,
+    borderWidth: 1,
+    overflow: 'hidden',
+  },
+  catalogModalCard: {
+    width: '100%',
+    height: Math.min(height * 0.88, 680),
     borderRadius: 16,
     borderWidth: 1,
     overflow: 'hidden',
@@ -1249,6 +1601,11 @@ const styles = StyleSheet.create({
   modalTitle: {
     fontFamily: fonts.bold,
     fontSize: 15,
+  },
+  modalSubtitle: {
+    fontFamily: fonts.regular,
+    fontSize: 11,
+    marginTop: 1,
   },
   modalFormContent: {
     padding: 14,
@@ -1329,7 +1686,7 @@ const styles = StyleSheet.create({
   },
   cancelBtn: {
     flex: 1,
-    paddingVertical: 8,
+    paddingVertical: 9,
     borderRadius: 8,
     borderWidth: 1,
     alignItems: 'center',
@@ -1343,12 +1700,87 @@ const styles = StyleSheet.create({
     flexDirection: 'row',
     alignItems: 'center',
     justifyContent: 'center',
-    paddingVertical: 8,
+    paddingVertical: 9,
     borderRadius: 8,
   },
   saveBtnText: {
     fontFamily: fonts.bold,
     color: '#FFFFFF',
-    fontSize: 12,
+    fontSize: 12.5,
+  },
+  catalogItemCard: {
+    padding: 10,
+    borderRadius: 10,
+    borderWidth: 1,
+    marginBottom: 8,
+  },
+  checkboxSquare: {
+    width: 20,
+    height: 20,
+    borderRadius: 5,
+    borderWidth: 1.5,
+    alignItems: 'center',
+    justifyContent: 'center',
+  },
+  catalogItemName: {
+    fontFamily: fonts.bold,
+    fontSize: 12.5,
+  },
+  catalogItemCat: {
+    fontFamily: fonts.medium,
+    fontSize: 10.5,
+    marginTop: 1,
+  },
+  catalogActiveTag: {
+    paddingHorizontal: 8,
+    paddingVertical: 3,
+    borderRadius: 6,
+  },
+  catalogActiveTagText: {
+    fontFamily: fonts.bold,
+    fontSize: 10.5,
+  },
+  catalogConfigBox: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    gap: 10,
+    marginTop: 8,
+    paddingTop: 8,
+    paddingHorizontal: 8,
+    paddingBottom: 8,
+    borderRadius: 8,
+    borderWidth: 1,
+  },
+  catalogConfigField: {
+    flex: 1,
+  },
+  catalogConfigLabel: {
+    fontFamily: fonts.bold,
+    fontSize: 10.5,
+    marginBottom: 4,
+  },
+  catalogInputWrap: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    borderWidth: 1,
+    borderRadius: 6,
+    paddingHorizontal: 8,
+    height: 34,
+  },
+  catalogCurrencyText: {
+    fontFamily: fonts.bold,
+    fontSize: 12.5,
+    marginRight: 4,
+  },
+  catalogInputText: {
+    fontFamily: fonts.bold,
+    fontSize: 12.5,
+    flex: 1,
+    padding: 0,
+  },
+  catalogUnitText: {
+    fontFamily: fonts.medium,
+    fontSize: 10.5,
+    marginLeft: 2,
   },
 });

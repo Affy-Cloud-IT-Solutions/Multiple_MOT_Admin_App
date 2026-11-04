@@ -160,6 +160,15 @@ interface DataContextType {
   fetchServiceCatalog: () => Promise<ServiceCatalogGroup[]>;
   createServiceCategory: (catData: Partial<ServiceCategory>) => Promise<ServiceCategory>;
   deleteServiceCategory: (categoryId: string) => Promise<void>;
+  fetchPlatformServices: (params?: any) => Promise<any[]>;
+  createPlatformService: (serviceData: any) => Promise<any>;
+  deletePlatformService: (serviceId: string) => Promise<void>;
+  fetchPendingCustomServices: () => Promise<any[]>;
+  pendingCustomServicesCount: number;
+  setPendingCustomServicesCount: React.Dispatch<React.SetStateAction<number>>;
+  approveCustomService: (serviceId: string) => Promise<any>;
+  rejectCustomService: (serviceId: string, reason?: string) => Promise<any>;
+  selectCatalogServices: (garageId: string, selectedServices: any[]) => Promise<any>;
   token: string | null;
   refreshToken: string | null;
   setToken: (token: string | null) => void;
@@ -205,8 +214,8 @@ interface DataContextType {
 
 const DataContext = createContext<DataContextType | undefined>(undefined);
 
-// Local development backend (port 5000 reverse-tunneled to connected Android device via adb reverse)
-// export const BASE_URL = 'https://api.ondoorcarservice.com/api';
+// Live production backend
+// export const BASE_URL = 'http://localhost:5000/api';
 export const BASE_URL = 'https://api.ondoorcarservice.com/api';
 
 const decodeToken = (tokenStr: string | null) => {
@@ -259,6 +268,7 @@ export const DataProvider = ({ children }: { children: ReactNode }) => {
   const [garages, setGarages] = useState<Garage[]>([]);
   const [currentGarage, setCurrentGarage] = useState<Garage | null>(null);
   const [serviceCategories, setServiceCategories] = useState<ServiceCategory[]>([]);
+  const [pendingCustomServicesCount, setPendingCustomServicesCount] = useState<number>(0);
   const [token, setTokenState] = useState<string | null>(null);
   const [refreshToken, setRefreshTokenState] = useState<string | null>(null);
   const [user, setUserState] = useState<UserProfile | null>(null);
@@ -517,12 +527,13 @@ export const DataProvider = ({ children }: { children: ReactNode }) => {
       console.log(`[DATA CONTEXT] Fetching data for role: ${role}`);
 
       if (role === 'admin') {
-        // Super Admin: fetches all garages, all platform customers, all vehicles, and all audit logs (no garage alerts/reminders)
-        const [garagesRes, customersRes, vehiclesRes, auditsRes] = await Promise.all([
+        // Super Admin: fetches all garages, all platform customers, all vehicles, all audit logs, and pending custom services
+        const [garagesRes, customersRes, vehiclesRes, auditsRes, pendingRes] = await Promise.all([
           authFetch(`${BASE_URL}/garages`),
           authFetch(`${BASE_URL}/customers`),
           authFetch(`${BASE_URL}/vehicles`),
           authFetch(`${BASE_URL}/audit`),
+          authFetch(`${BASE_URL}/services/pending-custom`),
         ]);
 
         if (garagesRes.ok) {
@@ -540,6 +551,10 @@ export const DataProvider = ({ children }: { children: ReactNode }) => {
         if (auditsRes.ok) {
           const auditsData = await auditsRes.json();
           setAudits(auditsData);
+        }
+        if (pendingRes && pendingRes.ok) {
+          const pendingData = await pendingRes.json();
+          setPendingCustomServicesCount(Array.isArray(pendingData.services) ? pendingData.services.length : 0);
         }
         setAlerts([]); // Super Admin has no personal garage action alerts
       } else if (role === 'staff' || role === 'garage_admin') {
@@ -1282,12 +1297,61 @@ export const DataProvider = ({ children }: { children: ReactNode }) => {
   }, [authFetch]);
 
   const fetchServiceCatalog = useCallback(async (): Promise<ServiceCatalogGroup[]> => {
-    const response = await authFetch(`${BASE_URL}/service-categories/catalog`);
-    const data = await response.json().catch(() => ({}));
-    if (!response.ok) {
-      throw new Error(data.error || 'Could not load service categories.');
+    try {
+      const response = await authFetch(`${BASE_URL}/services/catalog-grouped`);
+      if (response.ok) {
+        const data = await response.json();
+        if (Array.isArray(data.categories) && data.categories.length > 0) {
+          return data.categories;
+        }
+      }
+      const altRes = await authFetch(`${BASE_URL}/service-categories/catalog`);
+      const altData = await altRes.json().catch(() => ({}));
+      if (Array.isArray(altData.categories) && altData.categories.length > 0) {
+        return altData.categories;
+      }
+      // Direct fallback to /services?all=true to ensure all platform catalog services are shown
+      const sRes = await authFetch(`${BASE_URL}/services?all=true`);
+      if (sRes.ok) {
+        const sData = await sRes.json();
+        const list = Array.isArray(sData.services) ? sData.services : [];
+        if (list.length > 0) {
+          const groupMap = new Map();
+          list.forEach((s: any) => {
+            const cat = (s.category || 'General').trim();
+            if (!groupMap.has(cat)) {
+              groupMap.set(cat, {
+                id: `cat_${cat.toLowerCase().replace(/[^a-z0-9]/g, '_')}`,
+                name: cat,
+                description: `${cat} automotive services`,
+                icon: s.icon || 'wrench',
+                iconColor: s.iconColor || '#1677FF',
+                iconBg: s.iconBg || '#1677FF15',
+                services: [],
+              });
+            }
+            groupMap.get(cat).services.push({
+              id: s._id || s.id,
+              _id: s._id || s.id,
+              name: s.name || s.title,
+              title: s.title || s.name,
+              category: cat,
+              price: s.price !== undefined ? Number(s.price) : 45,
+              duration: s.duration !== undefined ? Number(s.duration) : 45,
+              description: s.description || '',
+              icon: s.icon,
+              iconColor: s.iconColor,
+              iconBg: s.iconBg,
+            });
+          });
+          return Array.from(groupMap.values());
+        }
+      }
+      return [];
+    } catch (e) {
+      console.error('[DATA CONTEXT] fetchServiceCatalog error:', e);
+      return [];
     }
-    return Array.isArray(data.categories) ? data.categories : [];
   }, [authFetch]);
 
   const createServiceCategory = useCallback(async (catData: Partial<ServiceCategory>): Promise<ServiceCategory> => {
@@ -1327,6 +1391,100 @@ export const DataProvider = ({ children }: { children: ReactNode }) => {
     }
   }, [authFetch, fetchServiceCategories]);
 
+  const fetchPlatformServices = useCallback(async (params?: any): Promise<any[]> => {
+    try {
+      const query = new URLSearchParams(params || {}).toString();
+      const url = `${BASE_URL}/services${query ? `?${query}` : ''}`;
+      const response = await authFetch(url);
+      if (response.ok) {
+        const data = await response.json();
+        return Array.isArray(data.services) ? data.services : [];
+      }
+      return [];
+    } catch (e) {
+      console.error('[DATA CONTEXT] fetchPlatformServices error:', e);
+      return [];
+    }
+  }, [authFetch]);
+
+  const createPlatformService = useCallback(async (serviceData: any): Promise<any> => {
+    const response = await authFetch(`${BASE_URL}/services`, {
+      method: 'POST',
+      headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify(serviceData),
+    });
+    const data = await response.json();
+    if (!response.ok) {
+      throw new Error(data.error || 'Failed to create platform service');
+    }
+    return data.service;
+  }, [authFetch]);
+
+  const deletePlatformService = useCallback(async (serviceId: string): Promise<void> => {
+    const response = await authFetch(`${BASE_URL}/services/${serviceId}`, {
+      method: 'DELETE',
+    });
+    const data = await response.json();
+    if (!response.ok) {
+      throw new Error(data.error || 'Failed to delete service');
+    }
+  }, [authFetch]);
+
+  const fetchPendingCustomServices = useCallback(async (): Promise<any[]> => {
+    try {
+      const response = await authFetch(`${BASE_URL}/services/pending-custom`);
+      if (response.ok) {
+        const data = await response.json();
+        const list = Array.isArray(data.services) ? data.services : [];
+        setPendingCustomServicesCount(list.length);
+        return list;
+      }
+      return [];
+    } catch (e) {
+      console.error('[DATA CONTEXT] fetchPendingCustomServices error:', e);
+      return [];
+    }
+  }, [authFetch]);
+
+  const approveCustomService = useCallback(async (serviceId: string): Promise<any> => {
+    const response = await authFetch(`${BASE_URL}/services/${serviceId}/approve`, {
+      method: 'PUT',
+    });
+    const data = await response.json();
+    if (!response.ok) {
+      throw new Error(data.error || 'Failed to approve custom service');
+    }
+    setPendingCustomServicesCount(prev => Math.max(0, prev - 1));
+    return data;
+  }, [authFetch]);
+
+  const rejectCustomService = useCallback(async (serviceId: string, reason?: string): Promise<any> => {
+    const response = await authFetch(`${BASE_URL}/services/${serviceId}/reject`, {
+      method: 'PUT',
+      headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify({ reason: reason || 'Does not meet criteria' }),
+    });
+    const data = await response.json();
+    if (!response.ok) {
+      throw new Error(data.error || 'Failed to reject custom service');
+    }
+    setPendingCustomServicesCount(prev => Math.max(0, prev - 1));
+    return data;
+  }, [authFetch]);
+
+  const selectCatalogServices = useCallback(async (garageId: string, selectedServices: any[]): Promise<any> => {
+    const response = await authFetch(`${BASE_URL}/garages/${garageId}/services/select-catalog`, {
+      method: 'POST',
+      headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify({ selectedServices }),
+    });
+    const data = await response.json();
+    if (!response.ok) {
+      throw new Error(data.error || 'Failed to save selected services');
+    }
+    return data;
+  }, [authFetch]);
+
   return (
     <DataContext.Provider
       value={{
@@ -1340,6 +1498,15 @@ export const DataProvider = ({ children }: { children: ReactNode }) => {
         fetchServiceCatalog,
         createServiceCategory,
         deleteServiceCategory,
+        fetchPlatformServices,
+        createPlatformService,
+        deletePlatformService,
+        fetchPendingCustomServices,
+        pendingCustomServicesCount,
+        setPendingCustomServicesCount,
+        approveCustomService,
+        rejectCustomService,
+        selectCatalogServices,
         token,
         refreshToken,
         setToken,

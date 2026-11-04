@@ -367,6 +367,7 @@ export default function ProfileScreen({ navigation }: any) {
       {/* Garage Operations & Tools Hub (For Garage Admin and Staff only; excluded for Super Admin) */}
       {user && (user.role === 'garage_admin' || user.role === 'staff') && (
         <Section title="Garage Operations & Tools" theme={theme}>
+          {/* Location, Photos & MOT Documents commented out
           <MenuRow
             icon="shield-check-outline"
             iconColor="#10B981"
@@ -375,6 +376,7 @@ export default function ProfileScreen({ navigation }: any) {
             onPress={() => navigation.navigate('GarageSetup')}
             theme={theme}
           />
+          */}
           <MenuRow
             icon="car-wrench"
             iconColor="#0284C7"

@@ -1,10 +1,11 @@
-import React from 'react';
+import React, { useEffect } from 'react';
 import { createBottomTabNavigator } from '@react-navigation/bottom-tabs';
 import MaterialCommunityIcons from 'react-native-vector-icons/MaterialCommunityIcons';
 import AdminDashboardScreen from '../screens/AdminDashboardScreen';
 import SuperAdminDashboardScreen from '../screens/SuperAdminDashboardScreen';
 import SuperAdminGaragesScreen from '../screens/SuperAdminGaragesScreen';
 import SuperAdminAuditsScreen from '../screens/SuperAdminAuditsScreen';
+import SuperAdminCategoriesScreen from '../screens/SuperAdminCategoriesScreen';
 import AdminCustomersScreen from '../screens/AdminCustomersScreen';
 import AdminServicesScreen from '../screens/AdminServicesScreen';
 import AdminSlotsScreen from '../screens/AdminSlotsScreen';
@@ -19,9 +20,16 @@ const Tab = createBottomTabNavigator();
 
 export default function MainTabNavigator() {
   const { theme } = useAppTheme();
-  const { user } = useAppValues();
+  const { user, pendingCustomServicesCount, fetchPendingCustomServices } = useAppValues();
 
   const isSuperAdmin = user?.role === 'admin';
+
+  // Periodically fetch pending custom services count for Super Admin badges
+  useEffect(() => {
+    if (isSuperAdmin && fetchPendingCustomServices) {
+      fetchPendingCustomServices().catch(() => {});
+    }
+  }, [isSuperAdmin, fetchPendingCustomServices]);
 
   return (
     <Tab.Navigator
@@ -35,6 +43,8 @@ export default function MainTabNavigator() {
             iconName = 'garage-variant';
           } else if (route.name === 'Services') {
             iconName = 'car-wrench';
+          } else if (route.name === 'SuperAdminCategories' || route.name === 'Categories') {
+            iconName = 'shape-plus';
           } else if (route.name === 'Audits') {
             iconName = 'clipboard-text-clock-outline';
           } else if (route.name === 'Customers') {
@@ -62,7 +72,7 @@ export default function MainTabNavigator() {
         },
         tabBarLabelStyle: {
           fontFamily: fonts.semiBold,
-          fontSize: 11,
+          fontSize: 10,
         },
         headerShown: false,
         headerStyle: {
@@ -90,6 +100,21 @@ export default function MainTabNavigator() {
             name="Garages" 
             component={SuperAdminGaragesScreen} 
             options={{ title: 'Garages', headerShown: false }} 
+          />
+          <Tab.Screen 
+            name="SuperAdminCategories" 
+            component={SuperAdminCategoriesScreen} 
+            options={{ 
+              title: 'Services', 
+              headerShown: false,
+              tabBarBadge: pendingCustomServicesCount > 0 ? pendingCustomServicesCount : undefined,
+              tabBarBadgeStyle: {
+                backgroundColor: '#EF4444',
+                color: '#FFFFFF',
+                fontSize: 10,
+                fontFamily: fonts.bold,
+              },
+            }} 
           />
           <Tab.Screen 
             name="Audits" 

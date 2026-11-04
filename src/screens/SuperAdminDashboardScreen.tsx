@@ -19,7 +19,7 @@ const { width } = Dimensions.get('window');
 
 export default function SuperAdminDashboardScreen({ navigation }: any) {
   const { theme } = useAppTheme();
-  const { user, garages, customers, vehicles, audits, refreshData, updateGarageStatus, token, authFetch } = useAppValues();
+  const { user, garages, customers, vehicles, audits, refreshData, updateGarageStatus, token, authFetch, pendingCustomServicesCount } = useAppValues();
   const [isRefreshing, setIsRefreshing] = useState(false);
   const [stats, setStats] = useState<any>(null);
   const [loadingAction, setLoadingAction] = useState<string | null>(null);
@@ -234,11 +234,16 @@ export default function SuperAdminDashboardScreen({ navigation }: any) {
         <View style={{ flex: 1, marginLeft: 12 }}>
           <View style={{ flexDirection: 'row', alignItems: 'center', gap: 6 }}>
             <Text style={[styles.catManageTitle, { color: theme.colors.text }]}>
-              Manage Service Categories
+              Manage Services & Categories
             </Text>
             <View style={{ backgroundColor: '#10B98118', paddingHorizontal: 6, paddingVertical: 1.5, borderRadius: 4 }}>
               <Text style={{ fontFamily: fonts.bold, color: '#10B981', fontSize: 10 }}>Master</Text>
             </View>
+            {pendingCustomServicesCount > 0 && (
+              <View style={{ backgroundColor: '#EF4444', minWidth: 18, height: 18, borderRadius: 9, paddingHorizontal: 4, alignItems: 'center', justifyContent: 'center' }}>
+                <Text style={{ fontFamily: fonts.bold, color: '#FFFFFF', fontSize: 10 }}>{pendingCustomServicesCount}</Text>
+              </View>
+            )}
           </View>
           <Text style={[styles.catManageSubtitle, { color: theme.colors.placeholder }]}>
             Create & delete service categories (MOT, Servicing, Tyres, Repairs...)
