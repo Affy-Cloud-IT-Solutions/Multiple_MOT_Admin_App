@@ -78,8 +78,8 @@ export default function ProfileScreen({ navigation }: any) {
       Alert.alert(
         'Platform Setting Updated',
         newValue
-          ? 'Strict Mode Enabled: Garages must have 100% completed profile & documents before they appear to customers.'
-          : 'Marketing Mode Enabled: Approved garages are now visible to customers immediately (7-day grace period for documents).'
+          ? 'Setup Profile is now Mandatory: Garages must have 100% completed profile & documents before they appear to customers.'
+          : 'Setup Profile is now Optional: Approved garages are visible to customers immediately with a 7-day grace period to submit documents.'
       );
     } catch (err: any) {
       Alert.alert('Update Failed', err.message || 'Could not update platform setting.');
@@ -579,8 +579,8 @@ export default function ProfileScreen({ navigation }: any) {
             title="Setup Profile Mandatory"
             subtitle={
               requireFullProfile
-                ? 'Strict Mode: Approved garages must be 100% complete with documents before appearing to customers.'
-                : 'Marketing Mode: Approved garages appear to customers immediately (7-day grace period for documents).'
+                ? 'Mandatory: Approved garages must have 100% completed profile & documents to be visible to customers.'
+                : 'Optional: Approved garages are visible to customers immediately (7-day grace period for documents).'
             }
             control={
               loadingPlatformSettings || savingPlatformSetting ? (

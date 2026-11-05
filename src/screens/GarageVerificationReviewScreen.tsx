@@ -415,19 +415,7 @@ export default function GarageVerificationReviewScreen({ route, navigation }: an
             <Text style={[styles.sectionHelper, { color: '#EF4444', marginTop: 8, marginBottom: 0 }]}>
               Hidden from customers (Status: {garage.status}).
             </Text>
-          ) : garage.status === 'Pending' ? (
-            <Text style={[styles.sectionHelper, { color: '#F59E0B', marginTop: 8, marginBottom: 0 }]}>
-              Awaiting Super Admin Approval (Hidden from customers).
-            </Text>
-          ) : garage.isVisibleToCustomers === false ? (
-            <Text style={[styles.sectionHelper, { color: '#EA580C', marginTop: 8, marginBottom: 0 }]}>
-              Hidden from customers (Platform requires 100% profile & documents in Strict Mode).
-            </Text>
-          ) : (
-            <Text style={[styles.sectionHelper, { color: '#10B981', marginTop: 8, marginBottom: 0 }]}>
-              Visible to customers on the MOT Platform.
-            </Text>
-          )}
+          ) : null}
         </View>
 
         {/* SECTION 1: GARAGE & OWNER PROFILE */}
