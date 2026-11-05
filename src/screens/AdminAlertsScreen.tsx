@@ -62,10 +62,16 @@ const formatBookingDate = (dateVal: any) => {
 
 export default function AdminAlertsScreen() {
   const { theme } = useAppTheme();
-  const { alerts, customers = [], approveAlert, acknowledgeAlert, rejectAlert } = useAppValues();
+  const { alerts, customers = [], approveAlert, acknowledgeAlert, rejectAlert, user, updateGarageStationStatus } = useAppValues();
 
   // Show only pending customer-facing alerts (do not show platform garage registration approval alerts to garage admin)
-  const pendingAlerts = alerts.filter((a) => a.status === 'Pending' && a.type !== 'GARAGE_REGISTRATION');
+  const pendingAlerts = alerts.filter((a) => {
+    if (a.status !== 'Pending') return false;
+    if (user?.role === 'admin') {
+      return true; // Super admin sees all pending alerts including station requests
+    }
+    return a.type !== 'GARAGE_REGISTRATION' && a.type !== 'NEW_STATION';
+  });
 
   const handleApprove = async (alertId: string, alertType: string) => {
     setLoadingAction(alertId);
@@ -307,7 +313,7 @@ export default function AdminAlertsScreen() {
                       <ActivityIndicator color="#FFFFFF" size="small" />
                     ) : (
                       <Text style={[styles.actionBtnText, { color: "#FFFFFF" }]}>
-                        {item.type === 'BOOKED' ? 'Confirm Booking' : 'Approve'}
+                        {item.type === 'BOOKED' ? 'Confirm Booking' : item.type === 'NEW_STATION' ? 'Approve Station' : 'Approve'}
                       </Text>
                     )}
                   </TouchableOpacity>
@@ -328,7 +334,7 @@ export default function AdminAlertsScreen() {
         <View style={styles.modalOverlay}>
           <View style={[styles.modalContent, { backgroundColor: theme.colors.card, borderColor: theme.colors.border }]}>
             <Text style={[styles.modalTitle, { color: theme.colors.text }]}>
-              {selectedAlertType === 'NEW_VEHICLE' ? 'Reject Vehicle Registration' : 'Reject Booking Request'}
+              {selectedAlertType === 'NEW_VEHICLE' ? 'Reject Vehicle Registration' : selectedAlertType === 'NEW_STATION' ? 'Reject Station Request' : 'Reject Booking Request'}
             </Text>
             <Text style={[styles.modalSubtitle, { color: theme.colors.placeholder }]}>
               Please enter the reason for rejecting this {selectedAlertType === 'NEW_VEHICLE' ? 'registration' : 'booking'} request. This reason will be displayed to the customer.

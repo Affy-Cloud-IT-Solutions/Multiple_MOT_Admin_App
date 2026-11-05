@@ -399,6 +399,17 @@ export default function SuperAdminGaragesScreen({ navigation }: any) {
                   ) : null}
                 </View>
 
+                {/* Pending Stations Warning Badge */}
+                {Array.isArray(garage.stations) && garage.stations.some((s: any) => s.status === 'Pending') && (
+                  <View style={{ backgroundColor: '#F59E0B15', borderWidth: 1, borderColor: '#F59E0B', paddingHorizontal: 10, paddingVertical: 5, borderRadius: 6, marginHorizontal: 14, marginBottom: 8, flexDirection: 'row', alignItems: 'center' }}>
+                    <MaterialCommunityIcons name="clock-alert-outline" size={14} color="#F59E0B" style={{ marginRight: 6 }} />
+                    <Text style={{ fontFamily: fonts.bold, fontSize: 11.5, color: '#F59E0B', flex: 1 }}>
+                      {garage.stations.filter((s: any) => s.status === 'Pending').length} Station Request(s) Pending Approval
+                    </Text>
+                    <Text style={{ fontFamily: fonts.bold, fontSize: 11, color: '#F59E0B' }}>Review ➔</Text>
+                  </View>
+                )}
+
                 {/* Bottom Stats & Verification Banner */}
                 <View style={[styles.cardFooter, { borderTopColor: theme.colors.border + '60' }]}>
                   <View style={styles.metricChip}>

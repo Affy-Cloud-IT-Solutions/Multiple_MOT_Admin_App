@@ -31,7 +31,7 @@ const REJECTION_PRESETS = [
 
 export default function GarageVerificationReviewScreen({ route, navigation }: any) {
   const { theme } = useAppTheme();
-  const { token, updateGarageStatus, updateGarageDocumentStatus, refreshData, authFetch } = useAppValues();
+  const { token, updateGarageStatus, updateGarageDocumentStatus, updateGarageStationStatus, refreshData, authFetch } = useAppValues();
 
   const initialGarageId = route.params?.garageId || route.params?.garage?.id || route.params?.garage?._id;
   const initialGarage = route.params?.garage;
@@ -49,6 +49,11 @@ export default function GarageVerificationReviewScreen({ route, navigation }: an
   const [docRejectionReason, setDocRejectionReason] = useState<string>('');
   const [docRejectModalVisible, setDocRejectModalVisible] = useState<boolean>(false);
   const [savingDocAction, setSavingDocAction] = useState<boolean>(false);
+  // Single Station Rejection Modal
+  const [rejectingStation, setRejectingStation] = useState<any | null>(null);
+  const [stationRejectionReason, setStationRejectionReason] = useState<string>('');
+  const [stationRejectModalVisible, setStationRejectModalVisible] = useState<boolean>(false);
+  const [savingStationAction, setSavingStationAction] = useState<string | null>(null);
 
   // Master Final Garage Rejection Modal
   const [masterRejectModalVisible, setMasterRejectModalVisible] = useState<boolean>(false);
@@ -228,6 +233,51 @@ export default function GarageVerificationReviewScreen({ route, navigation }: an
     Linking.openURL(url).catch(() => {
       Alert.alert('Notice', 'Could not open document URL.');
     });
+  };
+
+  // Station Approval & Rejection Handlers
+  const handleApproveStation = async (station: any) => {
+    const stationId = station.id || station._id;
+    if (!stationId || !initialGarageId) return;
+    setSavingStationAction(stationId);
+    try {
+      await updateGarageStationStatus(initialGarageId, stationId, 'Approved');
+      Alert.alert(
+        'Station Approved',
+        `"${station.name}" (${station.slotDuration || 45} mins/slot) has been approved! Daily MOT appointment slots are now active.`
+      );
+      await fetchGarageDetails();
+    } catch (err: any) {
+      Alert.alert('Approval Failed', err?.message || 'Could not approve station.');
+    } finally {
+      setSavingStationAction(null);
+    }
+  };
+
+  const handleOpenRejectStationModal = (station: any) => {
+    setRejectingStation(station);
+    setStationRejectionReason(station.rejectionReason || '');
+    setStationRejectModalVisible(true);
+  };
+
+  const handleConfirmRejectStation = async () => {
+    if (!rejectingStation || !initialGarageId) return;
+    const stationId = rejectingStation.id || rejectingStation._id;
+    if (!stationId) return;
+    setSavingStationAction(stationId);
+    try {
+      const reason = stationRejectionReason.trim() || 'Station configuration does not meet platform criteria.';
+      await updateGarageStationStatus(initialGarageId, stationId, 'Rejected', reason);
+      setStationRejectModalVisible(false);
+      setRejectingStation(null);
+      setStationRejectionReason('');
+      Alert.alert('Station Rejected', `"${rejectingStation.name}" was rejected.`);
+      await fetchGarageDetails();
+    } catch (err: any) {
+      Alert.alert('Rejection Failed', err?.message || 'Could not reject station.');
+    } finally {
+      setSavingStationAction(null);
+    }
   };
 
   const isApproved = garage.status === 'Approved';
@@ -673,6 +723,134 @@ export default function GarageVerificationReviewScreen({ route, navigation }: an
             })
           )}
         </View>
+        {/* SECTION 5: MOT TESTING STATIONS & APPOINTMENT BAYS */}
+        <View style={[styles.sectionCard, { backgroundColor: theme.colors.card, borderColor: theme.colors.border }]}>
+          <View style={styles.sectionHeaderRow}>
+            <MaterialCommunityIcons name="garage" size={20} color="#F59E0B" style={{ marginRight: 8 }} />
+            <View style={{ flex: 1 }}>
+              <Text style={[styles.sectionTitle, { color: theme.colors.text }]}>
+                MOT Testing Stations & Bays ({((garage.stations as any[]) || []).length})
+              </Text>
+            </View>
+            <View style={[styles.verificationPill, { backgroundColor: (((garage.stations as any[]) || []).filter((s: any) => s.status === 'Approved').length > 0) ? '#10B98120' : '#F59E0B20' }]}>
+              <Text style={{ fontSize: 12, fontFamily: fonts.bold, color: (((garage.stations as any[]) || []).filter((s: any) => s.status === 'Approved').length > 0) ? '#10B981' : '#F59E0B' }}>
+                {((garage.stations as any[]) || []).filter((s: any) => s.status === 'Approved').length} Active Bay(s)
+              </Text>
+            </View>
+          </View>
+
+          <Text style={[styles.sectionHelper, { color: theme.colors.placeholder }]}>
+            {((garage.stations as any[]) || []).some((s: any) => s.status === 'Pending')
+              ? '⚠️ Review pending bay station requests below. Approving a station automatically activates daily appointment slots.'
+              : 'Review configured testing stations, slot durations (30/45 mins), and daily operating capacity.'}
+          </Text>
+
+          {!garage.stations || (garage.stations as any[]).length === 0 ? (
+            <View style={[styles.emptyBox, { borderColor: theme.colors.border }]}>
+              <MaterialCommunityIcons name="garage-variant" size={28} color={theme.colors.placeholder} />
+              <Text style={[styles.emptyBoxText, { color: theme.colors.placeholder }]}>No MOT testing bays configured yet.</Text>
+            </View>
+          ) : (
+            (garage.stations as any[]).map((st: any, sIdx: number) => {
+              const isStationApproved = st.status === 'Approved';
+              const isStationPending = st.status === 'Pending';
+              const isStationRejected = st.status === 'Rejected';
+              const stationColor = isStationApproved ? '#10B981' : isStationPending ? '#F59E0B' : '#EF4444';
+              const duration = st.slotDuration === 30 ? 30 : 45;
+              const capacityPerDay = duration === 30 ? 18 : 12;
+              const isProcessing = savingStationAction === (st.id || st._id);
+
+              return (
+                <View
+                  key={st.id || st._id || sIdx}
+                  style={{
+                    borderWidth: 1,
+                    borderColor: isStationPending ? '#F59E0B' : isStationApproved ? '#10B98150' : theme.colors.border,
+                    borderRadius: 10,
+                    padding: 14,
+                    marginBottom: 10,
+                    backgroundColor: theme.colors.background,
+                  }}
+                >
+                  <View style={{ flexDirection: 'row', alignItems: 'center', justifyContent: 'space-between' }}>
+                    <View style={{ flexDirection: 'row', alignItems: 'center', flex: 1, marginRight: 8 }}>
+                      <View style={{ width: 38, height: 38, borderRadius: 8, backgroundColor: stationColor + '18', alignItems: 'center', justifyContent: 'center', marginRight: 10 }}>
+                        <MaterialCommunityIcons name="garage" size={22} color={stationColor} />
+                      </View>
+                      <View style={{ flex: 1 }}>
+                        <Text style={{ fontFamily: fonts.bold, fontSize: 14, color: theme.colors.text }}>{st.name}</Text>
+                        <Text style={{ fontFamily: fonts.medium, fontSize: 12, color: theme.colors.placeholder, marginTop: 2 }}>
+                          {duration} mins duration • {capacityPerDay} appointment slots/day
+                        </Text>
+                      </View>
+                    </View>
+
+                    <View style={{ paddingHorizontal: 8, paddingVertical: 3, borderRadius: 6, backgroundColor: stationColor + '20' }}>
+                      <Text style={{ fontFamily: fonts.bold, fontSize: 11, color: stationColor }}>
+                        {st.status || 'Pending'}
+                      </Text>
+                    </View>
+                  </View>
+
+                  {st.rejectionReason ? (
+                    <View style={{ flexDirection: 'row', alignItems: 'center', backgroundColor: '#EF444415', padding: 8, borderRadius: 6, marginTop: 10 }}>
+                      <MaterialCommunityIcons name="alert-circle-outline" size={14} color="#EF4444" style={{ marginRight: 6 }} />
+                      <Text style={{ fontFamily: fonts.medium, fontSize: 11.5, color: '#EF4444', flex: 1 }}>
+                        Rejection Reason: {st.rejectionReason}
+                      </Text>
+                    </View>
+                  ) : null}
+
+                  {/* Actions: Approve / Reject for Pending Stations */}
+                  {isStationPending && (
+                    <View style={{ flexDirection: 'row', gap: 10, marginTop: 12, justifyContent: 'flex-end' }}>
+                      <TouchableOpacity
+                        style={{
+                          paddingHorizontal: 16,
+                          paddingVertical: 8,
+                          borderRadius: 8,
+                          backgroundColor: '#EF444415',
+                          borderWidth: 1,
+                          borderColor: '#EF4444',
+                          flexDirection: 'row',
+                          alignItems: 'center'
+                        }}
+                        disabled={isProcessing}
+                        onPress={() => handleOpenRejectStationModal(st)}
+                      >
+                        <MaterialCommunityIcons name="close" size={15} color="#EF4444" style={{ marginRight: 4 }} />
+                        <Text style={{ fontFamily: fonts.bold, fontSize: 12, color: '#EF4444' }}>Reject Station</Text>
+                      </TouchableOpacity>
+
+                      <TouchableOpacity
+                        style={{
+                          paddingHorizontal: 16,
+                          paddingVertical: 8,
+                          borderRadius: 8,
+                          backgroundColor: '#10B981',
+                          flexDirection: 'row',
+                          alignItems: 'center'
+                        }}
+                        disabled={isProcessing}
+                        onPress={() => handleApproveStation(st)}
+                      >
+                        {isProcessing ? (
+                          <ActivityIndicator size="small" color="#FFFFFF" />
+                        ) : (
+                          <>
+                            <MaterialCommunityIcons name="check" size={15} color="#FFFFFF" style={{ marginRight: 4 }} />
+                            <Text style={{ fontFamily: fonts.bold, fontSize: 12, color: '#FFFFFF' }}>Approve Station</Text>
+                          </>
+                        )}
+                      </TouchableOpacity>
+                    </View>
+                  )}
+                </View>
+              );
+            })
+          )}
+        </View>
+
       </ScrollView>
 
       {/* MASTER DECISION BAR AT BOTTOM - ONLY WHEN PENDING */}
@@ -999,6 +1177,143 @@ export default function GarageVerificationReviewScreen({ route, navigation }: an
           ) : null}
         </View>
       </Modal>
+
+      {/* MODAL: SINGLE STATION REJECTION MODAL */}
+      <Modal
+        visible={stationRejectModalVisible}
+        transparent
+        animationType="fade"
+        onRequestClose={() => setStationRejectModalVisible(false)}
+      >
+        <View style={styles.modalOverlay}>
+          <View style={[styles.modalCard, { backgroundColor: theme.colors.card, borderColor: theme.colors.border }]}>
+            <View style={styles.modalHeaderRow}>
+              <View style={{ flexDirection: 'row', alignItems: 'center' }}>
+                <MaterialCommunityIcons name="garage-alert" size={22} color="#EF4444" style={{ marginRight: 8 }} />
+                <Text style={[styles.modalHeading, { color: theme.colors.text }]}>Reject Station Request</Text>
+              </View>
+              <TouchableOpacity onPress={() => setStationRejectModalVisible(false)}>
+                <MaterialCommunityIcons name="close" size={22} color={theme.colors.placeholder} />
+              </TouchableOpacity>
+            </View>
+
+            <Text style={[styles.modalDocName, { color: theme.colors.text }]}>
+              Station: <Text style={{ fontFamily: fonts.bold }}>{rejectingStation?.name}</Text>
+              {rejectingStation?.slotDuration ? ` (${rejectingStation.slotDuration} mins/slot)` : ''}
+            </Text>
+
+            <Text style={[styles.modalLabel, { color: theme.colors.placeholder, marginTop: 12 }]}>
+              Reason for Rejection:
+            </Text>
+            <TextInput
+              value={stationRejectionReason}
+              onChangeText={setStationRejectionReason}
+              placeholder="e.g. VTS site authorisation does not support an additional test lane, bay specifications incomplete..."
+              placeholderTextColor={theme.colors.placeholder}
+              multiline
+              numberOfLines={3}
+              style={[
+                styles.rejectionTextInput,
+                { color: theme.colors.text, borderColor: theme.colors.border, backgroundColor: theme.colors.background }
+              ]}
+            />
+
+            <View style={styles.modalBtnRow}>
+              <TouchableOpacity
+                onPress={() => {
+                  setStationRejectModalVisible(false);
+                  setRejectingStation(null);
+                  setStationRejectionReason('');
+                }}
+                style={[styles.modalCancelBtn, { borderColor: theme.colors.border }]}
+              >
+                <Text style={[styles.modalCancelBtnText, { color: theme.colors.text }]}>Cancel</Text>
+              </TouchableOpacity>
+
+              <TouchableOpacity
+                onPress={handleConfirmRejectStation}
+                disabled={Boolean(savingStationAction)}
+                style={[styles.modalConfirmRejectBtn, { opacity: savingStationAction ? 0.6 : 1 }]}
+              >
+                {savingStationAction ? (
+                  <ActivityIndicator size="small" color="#FFFFFF" />
+                ) : (
+                  <Text style={styles.modalConfirmRejectBtnText}>Reject Station</Text>
+                )}
+              </TouchableOpacity>
+            </View>
+          </View>
+        </View>
+      </Modal>
+
+      {/* MODAL: SINGLE STATION REJECTION MODAL */}
+      <Modal
+        visible={stationRejectModalVisible}
+        transparent
+        animationType="fade"
+        onRequestClose={() => setStationRejectModalVisible(false)}
+      >
+        <View style={styles.modalOverlay}>
+          <View style={[styles.modalCard, { backgroundColor: theme.colors.card, borderColor: theme.colors.border }]}>
+            <View style={styles.modalHeaderRow}>
+              <View style={{ flexDirection: 'row', alignItems: 'center' }}>
+                <MaterialCommunityIcons name="garage-alert" size={22} color="#EF4444" style={{ marginRight: 8 }} />
+                <Text style={[styles.modalHeading, { color: theme.colors.text }]}>Reject Station Request</Text>
+              </View>
+              <TouchableOpacity onPress={() => setStationRejectModalVisible(false)}>
+                <MaterialCommunityIcons name="close" size={22} color={theme.colors.placeholder} />
+              </TouchableOpacity>
+            </View>
+
+            <Text style={[styles.modalDocName, { color: theme.colors.text }]}>
+              Station: <Text style={{ fontFamily: fonts.bold }}>{rejectingStation?.name}</Text>
+              {rejectingStation?.slotDuration ? ` (${rejectingStation.slotDuration} mins/slot)` : ''}
+            </Text>
+
+            <Text style={[styles.modalLabel, { color: theme.colors.placeholder, marginTop: 12 }]}>
+              Reason for Rejection:
+            </Text>
+            <TextInput
+              value={stationRejectionReason}
+              onChangeText={setStationRejectionReason}
+              placeholder="e.g. VTS site authorisation does not support an additional test lane, bay specifications incomplete..."
+              placeholderTextColor={theme.colors.placeholder}
+              multiline
+              numberOfLines={3}
+              style={[
+                styles.rejectionTextInput,
+                { color: theme.colors.text, borderColor: theme.colors.border, backgroundColor: theme.colors.background }
+              ]}
+            />
+
+            <View style={styles.modalBtnRow}>
+              <TouchableOpacity
+                onPress={() => {
+                  setStationRejectModalVisible(false);
+                  setRejectingStation(null);
+                  setStationRejectionReason('');
+                }}
+                style={[styles.modalCancelBtn, { borderColor: theme.colors.border }]}
+              >
+                <Text style={[styles.modalCancelBtnText, { color: theme.colors.text }]}>Cancel</Text>
+              </TouchableOpacity>
+
+              <TouchableOpacity
+                onPress={handleConfirmRejectStation}
+                disabled={Boolean(savingStationAction)}
+                style={[styles.modalConfirmRejectBtn, { opacity: savingStationAction ? 0.6 : 1 }]}
+              >
+                {savingStationAction ? (
+                  <ActivityIndicator size="small" color="#FFFFFF" />
+                ) : (
+                  <Text style={styles.modalConfirmRejectBtnText}>Reject Station</Text>
+                )}
+              </TouchableOpacity>
+            </View>
+          </View>
+        </View>
+      </Modal>
+
     </View>
   );
 }

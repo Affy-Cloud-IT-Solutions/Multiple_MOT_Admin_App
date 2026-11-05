@@ -108,6 +108,18 @@ export interface Garage {
   verificationStatus?: 'Pending' | 'Verified' | 'Rejected' | 'Expired';
   rejectionReason?: string;
   verificationDocuments?: { id?: string; _id?: string; name: string; fileUrl: string; documentType?: string; status?: 'Pending' | 'Verified' | 'Rejected'; rejectionReason?: string; verifiedAt?: string; uploadDate?: string }[];
+  stations?: {
+    id?: string;
+    _id?: string;
+    name: string;
+    type?: string;
+    slotDuration?: number;
+    status: 'Pending' | 'Approved' | 'Rejected';
+    requestedAt?: string;
+    approvedAt?: string;
+    rejectionReason?: string;
+    isActive?: boolean;
+  }[];
   rating?: number;
   distance?: number;
   status: 'Approved' | 'Pending' | 'Suspended' | 'Rejected' | 'Blacklisted';
@@ -200,6 +212,7 @@ interface DataContextType {
   fetchGarages: () => Promise<Garage[]>;
   updateGarageStatus: (garageId: string, status: string, verificationStatus?: string, rejectionReason?: string) => Promise<void>;
   updateGarageDocumentStatus: (garageId: string, docId: string, status: 'Verified' | 'Rejected' | 'Pending', rejectionReason?: string) => Promise<any>;
+  updateGarageStationStatus: (garageId: string, stationId: string, status: 'Approved' | 'Rejected', rejectionReason?: string) => Promise<any>;
   updateGarageProfile: (garageId: string, updates: Partial<Garage>) => Promise<any>;
   currentGarage: Garage | null;
   fetchCurrentGarage: () => Promise<Garage | null>;
@@ -1093,6 +1106,32 @@ export const DataProvider = ({ children }: { children: ReactNode }) => {
     }
   };
 
+  const updateGarageStationStatus = async (
+    garageId: string,
+    stationId: string,
+    status: 'Approved' | 'Rejected',
+    rejectionReason?: string
+  ): Promise<any> => {
+    try {
+      const response = await authFetch(`${BASE_URL}/garages/${garageId}/stations/${stationId}/status`, {
+        method: 'PUT',
+        headers: {
+          'Content-Type': 'application/json',
+        },
+        body: JSON.stringify({ status, rejectionReason })
+      });
+      const data = await parseJsonResponse(response);
+      if (!response.ok) {
+        throw new Error(data.error || `Failed to ${status.toLowerCase()} station`);
+      }
+      await refreshData();
+      return data;
+    } catch (error) {
+      console.error('[DATA CONTEXT] updateGarageStationStatus error:', error);
+      throw error;
+    }
+  };
+
   const updateGarageProfile = async (garageId: string, updates: Partial<Garage>): Promise<any> => {
     try {
       const response = await authFetch(`${BASE_URL}/garages/${garageId}`, {
@@ -1571,6 +1610,7 @@ export const DataProvider = ({ children }: { children: ReactNode }) => {
         fetchGarages,
         updateGarageStatus,
         updateGarageDocumentStatus,
+        updateGarageStationStatus,
         updateGarageProfile,
         currentGarage,
         fetchCurrentGarage,
