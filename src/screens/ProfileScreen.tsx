@@ -189,6 +189,12 @@ export default function ProfileScreen({ navigation }: any) {
     }
   };
 
+  const isGarageStaffOrAdmin = user?.role === 'garage_admin' || user?.role === 'staff';
+  const garageDocs = (currentGarage as any)?.verificationDocuments || [];
+  const verifiedCount = garageDocs.filter((d: any) => d && d.status === 'Verified').length;
+  const isFullyVerified = (currentGarage as any)?.verificationStatus === 'Verified' || (garageDocs.length >= 3 && verifiedCount === garageDocs.length);
+  const hasUploadedDocs = garageDocs.length > 0;
+
   return (
     <ScrollView
       contentContainerStyle={styles.scrollContent}
@@ -365,19 +371,119 @@ export default function ProfileScreen({ navigation }: any) {
         </Section>
       )}
 
+      {/* Garage Legal Verification Card */}
+      {isGarageStaffOrAdmin && currentGarage && (
+        <View
+          style={[
+            styles.verificationCard,
+            {
+              backgroundColor: theme.colors.card,
+              borderColor: isFullyVerified ? '#10B98140' : '#0284C740',
+            },
+          ]}
+        >
+          <View style={styles.verificationCardHeader}>
+            <View
+              style={[
+                styles.verificationCardIconWrap,
+                { backgroundColor: isFullyVerified ? '#10B98115' : '#0284C715' },
+              ]}
+            >
+              <MaterialCommunityIcons
+                name={isFullyVerified ? 'shield-check' : 'shield-alert-outline'}
+                size={22}
+                color={isFullyVerified ? '#10B981' : '#0284C7'}
+              />
+            </View>
+            <View style={{ flex: 1, marginLeft: 12 }}>
+              <View style={{ flexDirection: 'row', alignItems: 'center', justifyContent: 'space-between' }}>
+                <Text style={[styles.verificationCardTitle, { color: theme.colors.text }]}>
+                  MOT & Legal Verification
+                </Text>
+                <View
+                  style={[
+                    styles.verificationStatusPill,
+                    {
+                      backgroundColor: isFullyVerified
+                        ? '#10B98120'
+                        : hasUploadedDocs
+                        ? '#F59E0B20'
+                        : '#0284C720',
+                    },
+                  ]}
+                >
+                  <Text
+                    style={[
+                      styles.verificationStatusText,
+                      {
+                        color: isFullyVerified
+                          ? '#10B981'
+                          : hasUploadedDocs
+                          ? '#F59E0B'
+                          : '#0284C7',
+                      },
+                    ]}
+                  >
+                    {isFullyVerified
+                      ? 'Verified ✓'
+                      : hasUploadedDocs
+                      ? 'In Review'
+                      : '7-Day Grace'}
+                  </Text>
+                </View>
+              </View>
+              <Text style={[styles.verificationCardDesc, { color: theme.colors.placeholder }]}>
+                {isFullyVerified
+                  ? 'Your DVLA VTS certification and insurance are approved and verified.'
+                  : hasUploadedDocs
+                  ? `${verifiedCount} document(s) verified. Review in progress with Super Admin.`
+                  : 'Document upload is optional for go-live. You have 7 days to upload your DVLA VTS certificate & insurance.'}
+              </Text>
+            </View>
+          </View>
+
+          <TouchableOpacity
+            style={[
+              styles.verificationActionBtn,
+              { backgroundColor: theme.colors.primary },
+            ]}
+            onPress={() => navigation.navigate('GarageSetup', { initialTab: 'documents' })}
+            activeOpacity={0.8}
+          >
+            <MaterialCommunityIcons
+              name={hasUploadedDocs ? 'file-eye-outline' : 'file-upload-outline'}
+              size={16}
+              color="#FFFFFF"
+              style={{ marginRight: 6 }}
+            />
+            <Text style={styles.verificationActionBtnText}>
+              {isFullyVerified
+                ? 'View Verified Documents'
+                : hasUploadedDocs
+                ? 'Manage Documents'
+                : 'Upload Documents to Get Verified ➔'}
+            </Text>
+          </TouchableOpacity>
+        </View>
+      )}
+
       {/* Garage Operations & Tools Hub (For Garage Admin and Staff only; excluded for Super Admin) */}
       {user && (user.role === 'garage_admin' || user.role === 'staff') && (
         <Section title="Garage Operations & Tools" theme={theme}>
-          {/* Location, Photos & MOT Documents commented out
           <MenuRow
-            icon="shield-check-outline"
+            icon="file-certificate-outline"
             iconColor="#10B981"
-            title="Location, Photos & MOT Documents"
-            subtitle="Configure GPS map pin, facility photos & legal verification"
-            onPress={() => navigation.navigate('GarageSetup')}
+            title="Verification Documents"
+            subtitle={
+              isFullyVerified
+                ? 'MOT certificates & liability insurance verified'
+                : hasUploadedDocs
+                ? 'Manage uploaded legal certificates & review status'
+                : 'Upload DVLA VTS certificate & insurance (7-day grace)'
+            }
+            onPress={() => navigation.navigate('GarageSetup', { initialTab: 'documents' })}
             theme={theme}
           />
-          */}
           <MenuRow
             icon="car-wrench"
             iconColor="#0284C7"
@@ -1146,5 +1252,60 @@ const styles = StyleSheet.create({
     fontFamily: fonts.regular,
     marginBottom: 20,
     letterSpacing: 0.3,
+  },
+  verificationCard: {
+    borderRadius: 14,
+    borderWidth: 1,
+    padding: 14,
+    marginBottom: 16,
+    elevation: 2,
+    shadowColor: '#000',
+    shadowOffset: { width: 0, height: 1 },
+    shadowOpacity: 0.06,
+    shadowRadius: 3,
+  },
+  verificationCardHeader: {
+    flexDirection: 'row',
+    alignItems: 'flex-start',
+  },
+  verificationCardIconWrap: {
+    width: 36,
+    height: 36,
+    borderRadius: 18,
+    alignItems: 'center',
+    justifyContent: 'center',
+    marginTop: 2,
+  },
+  verificationCardTitle: {
+    fontSize: 14,
+    fontFamily: fonts.bold,
+  },
+  verificationStatusPill: {
+    paddingHorizontal: 8,
+    paddingVertical: 2,
+    borderRadius: 6,
+  },
+  verificationStatusText: {
+    fontSize: 10.5,
+    fontFamily: fonts.bold,
+  },
+  verificationCardDesc: {
+    fontSize: 12,
+    fontFamily: fonts.regular,
+    marginTop: 4,
+    lineHeight: 16,
+  },
+  verificationActionBtn: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    justifyContent: 'center',
+    height: 38,
+    borderRadius: 8,
+    marginTop: 12,
+  },
+  verificationActionBtnText: {
+    fontSize: 12.5,
+    fontFamily: fonts.semiBold,
+    color: '#FFFFFF',
   },
 });

@@ -1519,26 +1519,66 @@ export default function GarageSetupScreen({ route, navigation }: any) {
               );
             })}
 
-            {/* Master Submission Button */}
-            <TouchableOpacity
-              style={[
-                styles.submitReviewBtn,
-                { backgroundColor: theme.colors.primary }
-              ]}
-              onPress={handleSubmitForReview}
-              disabled={submittingReview}
-            >
-              {submittingReview ? (
-                <ActivityIndicator color={onPrimary} />
-              ) : (
-                <>
-                  <MaterialCommunityIcons name="send-check" size={22} color={onPrimary} />
-                  <Text style={[styles.submitReviewBtnText, { color: onPrimary }]}>
-                    {isRejected ? 'Resubmit Application for Approval' : isApproved ? 'Update & Re-Submit' : 'Submit for Super Admin Approval'}
+            {/* Master Submission / Skip Buttons */}
+            {(verificationDocuments || []).length > 0 ? (
+              <>
+                <TouchableOpacity
+                  style={[
+                    styles.submitReviewBtn,
+                    { backgroundColor: theme.colors.primary }
+                  ]}
+                  onPress={handleSubmitForReview}
+                  disabled={submittingReview}
+                >
+                  {submittingReview ? (
+                    <ActivityIndicator color={onPrimary} />
+                  ) : (
+                    <>
+                      <MaterialCommunityIcons name="send-check" size={22} color={onPrimary} />
+                      <Text style={[styles.submitReviewBtnText, { color: onPrimary }]}>
+                        {isRejected ? 'Resubmit Application for Approval' : isApproved ? 'Update & Re-Submit' : 'Submit for Super Admin Approval'}
+                      </Text>
+                    </>
+                  )}
+                </TouchableOpacity>
+
+                <TouchableOpacity
+                  style={[
+                    styles.skipReviewBtn,
+                    { borderColor: theme.colors.primary + '55', backgroundColor: theme.colors.primary + '10' }
+                  ]}
+                  onPress={handleSubmitForReview}
+                  disabled={submittingReview}
+                  activeOpacity={0.8}
+                >
+                  <MaterialCommunityIcons name="clock-fast" size={18} color={theme.colors.primary} />
+                  <Text style={[styles.skipReviewBtnText, { color: theme.colors.primary }]}>
+                    Skip this part and submit within 7 days ➔
                   </Text>
-                </>
-              )}
-            </TouchableOpacity>
+                </TouchableOpacity>
+              </>
+            ) : (
+              <TouchableOpacity
+                style={[
+                  styles.submitReviewBtn,
+                  { backgroundColor: theme.colors.primary }
+                ]}
+                onPress={handleSubmitForReview}
+                disabled={submittingReview}
+                activeOpacity={0.8}
+              >
+                {submittingReview ? (
+                  <ActivityIndicator color={onPrimary} />
+                ) : (
+                  <>
+                    <MaterialCommunityIcons name="clock-fast" size={22} color={onPrimary} />
+                    <Text style={[styles.submitReviewBtnText, { color: onPrimary }]}>
+                      Skip this part and submit within 7 days ➔
+                    </Text>
+                  </>
+                )}
+              </TouchableOpacity>
+            )}
           </View>
         )}
       </ScrollView>
@@ -2231,6 +2271,20 @@ const styles = StyleSheet.create({
     color: '#FFFFFF',
     fontFamily: fonts.bold,
     fontSize: 15,
+  },
+  skipReviewBtn: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    justifyContent: 'center',
+    height: 48,
+    borderRadius: 10,
+    borderWidth: 1.5,
+    gap: 8,
+    marginTop: 10,
+  },
+  skipReviewBtnText: {
+    fontFamily: fonts.semiBold,
+    fontSize: 14,
   },
   // Modal Styles
   modalOverlay: {
