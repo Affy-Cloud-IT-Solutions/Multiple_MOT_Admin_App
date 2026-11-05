@@ -535,6 +535,7 @@ export default function AdminSlotsScreen({ navigation, route }: any) {
   }, [isAllSelected, isMotSelected, allBookingsToday, motBookings, serviceBookings]);
 
   const stations = slotData?.allStations || slotData?.stations || [];
+  const pendingStations = stations.filter(s => s.status === 'Pending');
   const approvedStationsCount = slotData?.totalApprovedStations || 0;
   const totalBookedToday = motBookings.length;
   const totalCapacityToday = slotData?.totalCapacityToday ?? (approvedStationsCount * 12);
@@ -653,10 +654,35 @@ export default function AdminSlotsScreen({ navigation, route }: any) {
       {/* Top Header Controls */}
       <View style={styles.header}>
         {/* Station Count Chip */}
-        <View style={[styles.stationCountChip, { backgroundColor: theme.colors.primary + '15', borderColor: theme.colors.primary + '35' }]}>
-          <MaterialCommunityIcons name="garage" size={16} color={theme.colors.primary} />
-          <Text style={[styles.stationCountChipText, { color: theme.colors.primary }]}>
-            {approvedStationsCount} {approvedStationsCount === 1 ? 'MOT Bay' : 'MOT Bays'} Active
+        <View style={[
+          styles.stationCountChip,
+          {
+            backgroundColor: approvedStationsCount > 0
+              ? theme.colors.primary + '15'
+              : pendingStations.length > 0
+              ? '#F59E0B15'
+              : theme.colors.primary + '15',
+            borderColor: approvedStationsCount > 0
+              ? theme.colors.primary + '35'
+              : pendingStations.length > 0
+              ? '#F59E0B40'
+              : theme.colors.primary + '35',
+          }
+        ]}>
+          <MaterialCommunityIcons
+            name={approvedStationsCount > 0 ? 'garage' : pendingStations.length > 0 ? 'clock-alert-outline' : 'garage'}
+            size={16}
+            color={approvedStationsCount > 0 ? theme.colors.primary : pendingStations.length > 0 ? '#F59E0B' : theme.colors.primary}
+          />
+          <Text style={[
+            styles.stationCountChipText,
+            { color: approvedStationsCount > 0 ? theme.colors.primary : pendingStations.length > 0 ? '#F59E0B' : theme.colors.primary }
+          ]}>
+            {approvedStationsCount > 0
+              ? `${approvedStationsCount} ${approvedStationsCount === 1 ? 'MOT Bay' : 'MOT Bays'} Active${pendingStations.length > 0 ? ` • ${pendingStations.length} Pending` : ''}`
+              : pendingStations.length > 0
+              ? `${pendingStations.length} ${pendingStations.length === 1 ? 'Bay' : 'Bays'} Pending Approval`
+              : '0 MOT Bays Active'}
           </Text>
         </View>
 
@@ -1009,19 +1035,41 @@ export default function AdminSlotsScreen({ navigation, route }: any) {
           </View>
         ) : (slotData?.slots || []).length === 0 ? (
           <View style={[styles.emptySlotsCard, { backgroundColor: theme.colors.card, borderColor: theme.colors.border }]}>
-            <MaterialCommunityIcons name="calendar-clock" size={44} color={theme.colors.placeholder} style={{ marginBottom: 12 }} />
-            <Text style={[styles.emptySlotsTitle, { color: theme.colors.text }]}>No Slots Configured</Text>
-            <Text style={[styles.emptySlotsSubtitle, { color: theme.colors.placeholder }]}>
-              This garage does not have any active MOT bays or time slots configured for {selectedDate}.
-            </Text>
-            <TouchableOpacity
-              style={[styles.emptyAddStationBtn, { backgroundColor: theme.colors.primary }]}
-              onPress={() => setModalVisible(true)}
-              activeOpacity={0.8}
-            >
-              <MaterialCommunityIcons name="plus" size={16} color="#FFFFFF" style={{ marginRight: 6 }} />
-              <Text style={styles.emptyAddStationBtnText}>Add MOT Bay Station</Text>
-            </TouchableOpacity>
+            {pendingStations.length > 0 ? (
+              <>
+                <MaterialCommunityIcons name="clock-alert-outline" size={44} color="#F59E0B" style={{ marginBottom: 12 }} />
+                <Text style={[styles.emptySlotsTitle, { color: theme.colors.text }]}>Station Awaiting Approval</Text>
+                <Text style={[styles.emptySlotsSubtitle, { color: theme.colors.placeholder }]}>
+                  "{pendingStations[0].name}" ({pendingStations[0].slotDuration || 45} mins/slot) has been submitted and is awaiting Platform Super Admin approval. Once approved, your daily MOT slots will automatically appear here.
+                </Text>
+                {user?.role === 'garage_admin' && (
+                  <TouchableOpacity
+                    style={[styles.emptyAddStationBtn, { backgroundColor: theme.colors.primary, marginTop: 16 }]}
+                    onPress={() => setModalVisible(true)}
+                    activeOpacity={0.8}
+                  >
+                    <MaterialCommunityIcons name="plus" size={16} color="#FFFFFF" style={{ marginRight: 6 }} />
+                    <Text style={styles.emptyAddStationBtnText}>Add Another Bay</Text>
+                  </TouchableOpacity>
+                )}
+              </>
+            ) : (
+              <>
+                <MaterialCommunityIcons name="calendar-clock" size={44} color={theme.colors.placeholder} style={{ marginBottom: 12 }} />
+                <Text style={[styles.emptySlotsTitle, { color: theme.colors.text }]}>No Slots Configured</Text>
+                <Text style={[styles.emptySlotsSubtitle, { color: theme.colors.placeholder }]}>
+                  This garage does not have any active MOT bays or time slots configured for {selectedDate}.
+                </Text>
+                <TouchableOpacity
+                  style={[styles.emptyAddStationBtn, { backgroundColor: theme.colors.primary }]}
+                  onPress={() => setModalVisible(true)}
+                  activeOpacity={0.8}
+                >
+                  <MaterialCommunityIcons name="plus" size={16} color="#FFFFFF" style={{ marginRight: 6 }} />
+                  <Text style={styles.emptyAddStationBtnText}>Add MOT Bay Station</Text>
+                </TouchableOpacity>
+              </>
+            )}
           </View>
         ) : (
           <View style={styles.slotsGrid2x2}>
