@@ -219,6 +219,18 @@ const DataContext = createContext<DataContextType | undefined>(undefined);
 // export const BASE_URL = 'http://localhost:5000/api';
 export const BASE_URL = 'https://api.ondoorcarservice.com/api';
 
+const parseJsonResponse = async (response: Response): Promise<any> => {
+  const text = await response.text();
+  try {
+    return JSON.parse(text);
+  } catch {
+    if (!response.ok) {
+      throw new Error(`Server returned HTTP ${response.status} (${response.statusText || 'Error'})`);
+    }
+    throw new Error('Unexpected non-JSON response from server');
+  }
+};
+
 const decodeToken = (tokenStr: string | null) => {
   if (!tokenStr) return null;
   try {
@@ -670,7 +682,7 @@ export const DataProvider = ({ children }: { children: ReactNode }) => {
         },
         body: JSON.stringify(customerData)
       });
-      const data = await response.json();
+      const data = await parseJsonResponse(response);
       if (!response.ok) {
         throw new Error(data.error || 'Failed to create customer');
       }
@@ -692,7 +704,7 @@ export const DataProvider = ({ children }: { children: ReactNode }) => {
         body: JSON.stringify(vehicleData)
       });
       if (!response.ok) {
-        const data = await response.json();
+        const data = await parseJsonResponse(response);
         throw new Error(data.error || 'Failed to add vehicle');
       }
       await refreshData();
@@ -712,7 +724,7 @@ export const DataProvider = ({ children }: { children: ReactNode }) => {
         body: JSON.stringify({ status })
       });
       if (!response.ok) {
-        const data = await response.json();
+        const data = await parseJsonResponse(response);
         throw new Error(data.error || 'Failed to update vehicle status');
       }
       await refreshData();
@@ -732,7 +744,7 @@ export const DataProvider = ({ children }: { children: ReactNode }) => {
         body: JSON.stringify(alertData)
       });
       if (!response.ok) {
-        const data = await response.json();
+        const data = await parseJsonResponse(response);
         throw new Error(data.error || 'Failed to submit notification');
       }
       await refreshData();
@@ -751,7 +763,7 @@ export const DataProvider = ({ children }: { children: ReactNode }) => {
         }
       });
       if (!response.ok) {
-        const data = await response.json();
+        const data = await parseJsonResponse(response);
         throw new Error(data.error || 'Failed to approve notification');
       }
       await refreshData();
@@ -770,7 +782,7 @@ export const DataProvider = ({ children }: { children: ReactNode }) => {
         }
       });
       if (!response.ok) {
-        const data = await response.json();
+        const data = await parseJsonResponse(response);
         throw new Error(data.error || 'Failed to acknowledge notification');
       }
       await refreshData();
@@ -790,7 +802,7 @@ export const DataProvider = ({ children }: { children: ReactNode }) => {
         body: JSON.stringify({ activity, details })
       });
       if (!response.ok) {
-        const data = await response.json();
+        const data = await parseJsonResponse(response);
         throw new Error(data.error || 'Failed to log audit activity');
       }
       await refreshData();
@@ -809,7 +821,7 @@ export const DataProvider = ({ children }: { children: ReactNode }) => {
         },
         body: JSON.stringify({ name, email, password })
       });
-      const data = await response.json();
+      const data = await parseJsonResponse(response);
       if (!response.ok) {
         throw new Error(data.error || 'Failed to create staff account');
       }
@@ -834,7 +846,7 @@ export const DataProvider = ({ children }: { children: ReactNode }) => {
         headers: { 
         }
       });
-      const data = await response.json();
+      const data = await parseJsonResponse(response);
       if (!response.ok) {
         throw new Error(data.error || 'Failed to fetch staff list');
       }
@@ -852,7 +864,7 @@ export const DataProvider = ({ children }: { children: ReactNode }) => {
         headers: { 
         }
       });
-      const data = await response.json();
+      const data = await parseJsonResponse(response);
       if (!response.ok) {
         throw new Error(data.error || 'Failed to delete staff account');
       }
@@ -872,7 +884,7 @@ export const DataProvider = ({ children }: { children: ReactNode }) => {
         body: JSON.stringify({ date, slot })
       });
       if (!response.ok) {
-        const data = await response.json();
+        const data = await parseJsonResponse(response);
         throw new Error(data.error || 'Failed to reschedule booking');
       }
       await refreshData();
@@ -892,7 +904,7 @@ export const DataProvider = ({ children }: { children: ReactNode }) => {
         body: JSON.stringify({ reason: reason || '' })
       });
       if (!response.ok) {
-        const data = await response.json();
+        const data = await parseJsonResponse(response);
         throw new Error(data.error || 'Failed to cancel booking');
       }
       await refreshData();
@@ -912,7 +924,7 @@ export const DataProvider = ({ children }: { children: ReactNode }) => {
         body: JSON.stringify({ reason })
       });
       if (!response.ok) {
-        const data = await response.json();
+        const data = await parseJsonResponse(response);
         throw new Error(data.error || 'Failed to reject booking request');
       }
       await refreshData();
@@ -1028,7 +1040,7 @@ export const DataProvider = ({ children }: { children: ReactNode }) => {
         headers: {
         }
       });
-      const data = await response.json();
+      const data = await parseJsonResponse(response);
       if (!response.ok) {
         throw new Error(data.error || 'Failed to fetch garages');
       }
@@ -1049,7 +1061,7 @@ export const DataProvider = ({ children }: { children: ReactNode }) => {
         },
         body: JSON.stringify({ status, verificationStatus, rejectionReason })
       });
-      const data = await response.json();
+      const data = await parseJsonResponse(response);
       if (!response.ok) {
         throw new Error(data.error || 'Failed to update garage status');
       }
@@ -1069,7 +1081,7 @@ export const DataProvider = ({ children }: { children: ReactNode }) => {
         },
         body: JSON.stringify({ status, rejectionReason })
       });
-      const data = await response.json();
+      const data = await parseJsonResponse(response);
       if (!response.ok) {
         throw new Error(data.error || 'Failed to update document status');
       }
@@ -1090,7 +1102,7 @@ export const DataProvider = ({ children }: { children: ReactNode }) => {
         },
         body: JSON.stringify(updates)
       });
-      const data = await response.json();
+      const data = await parseJsonResponse(response);
       if (!response.ok) {
         throw new Error(data.error || 'Failed to update garage profile');
       }
@@ -1127,7 +1139,7 @@ export const DataProvider = ({ children }: { children: ReactNode }) => {
         },
         body: JSON.stringify({ documentName, fileUrl, documentType })
       });
-      const data = await response.json();
+      const data = await parseJsonResponse(response);
       if (!response.ok) {
         throw new Error(data.error || 'Failed to upload document');
       }
@@ -1149,7 +1161,7 @@ export const DataProvider = ({ children }: { children: ReactNode }) => {
           'Content-Type': 'application/json',
         }
       });
-      const data = await response.json();
+      const data = await parseJsonResponse(response);
       if (!response.ok) {
         throw new Error(data.error || 'Failed to submit garage for review');
       }
@@ -1164,7 +1176,7 @@ export const DataProvider = ({ children }: { children: ReactNode }) => {
   const fetchGarageServices = useCallback(async (garageId: string): Promise<any> => {
     try {
       const response = await authFetch(`${BASE_URL}/garages/${garageId}/services`);
-      const data = await response.json();
+      const data = await parseJsonResponse(response);
       if (!response.ok) {
         throw new Error(data.error || 'Failed to fetch services');
       }
@@ -1178,7 +1190,7 @@ export const DataProvider = ({ children }: { children: ReactNode }) => {
   const fetchServiceCatalogTemplates = async (): Promise<{ categories: string[]; templates: any[] }> => {
     try {
       const response = await fetch(`${BASE_URL}/garages/templates/catalog`);
-      const data = await response.json();
+      const data = await parseJsonResponse(response);
       if (!response.ok) {
         throw new Error(data.error || 'Failed to fetch catalog templates');
       }
@@ -1209,7 +1221,7 @@ export const DataProvider = ({ children }: { children: ReactNode }) => {
         },
         body: JSON.stringify(serviceData)
       });
-      const data = await response.json();
+      const data = await parseJsonResponse(response);
       if (!response.ok) {
         throw new Error(data.error || 'Failed to add service');
       }
@@ -1230,7 +1242,7 @@ export const DataProvider = ({ children }: { children: ReactNode }) => {
         },
         body: JSON.stringify(updates)
       });
-      const data = await response.json();
+      const data = await parseJsonResponse(response);
       if (!response.ok) {
         throw new Error(data.error || 'Failed to update service');
       }
@@ -1249,7 +1261,7 @@ export const DataProvider = ({ children }: { children: ReactNode }) => {
         headers: {
         }
       });
-      const data = await response.json();
+      const data = await parseJsonResponse(response);
       if (!response.ok) {
         throw new Error(data.error || 'Failed to delete service');
       }
@@ -1269,7 +1281,7 @@ export const DataProvider = ({ children }: { children: ReactNode }) => {
           'Content-Type': 'application/json',
         }
       });
-      const data = await response.json();
+      const data = await parseJsonResponse(response);
       if (!response.ok) {
         throw new Error(data.error || 'Failed to initialize default services');
       }
@@ -1285,7 +1297,7 @@ export const DataProvider = ({ children }: { children: ReactNode }) => {
     try {
       const response = await authFetch(`${BASE_URL}/service-categories`);
       if (response.ok) {
-        const data = await response.json();
+        const data = await parseJsonResponse(response);
         const list = Array.isArray(data.categories) ? data.categories : [];
         setServiceCategories(list);
         return list;
@@ -1301,7 +1313,7 @@ export const DataProvider = ({ children }: { children: ReactNode }) => {
     try {
       const response = await authFetch(`${BASE_URL}/services/catalog-grouped`);
       if (response.ok) {
-        const data = await response.json();
+        const data = await parseJsonResponse(response);
         if (Array.isArray(data.categories) && data.categories.length > 0) {
           return data.categories;
         }
@@ -1364,7 +1376,7 @@ export const DataProvider = ({ children }: { children: ReactNode }) => {
         },
         body: JSON.stringify(catData),
       });
-      const data = await response.json();
+      const data = await parseJsonResponse(response);
       if (!response.ok) {
         throw new Error(data.error || 'Failed to create service category');
       }
@@ -1385,7 +1397,7 @@ export const DataProvider = ({ children }: { children: ReactNode }) => {
         },
         body: JSON.stringify(updates),
       });
-      const data = await response.json();
+      const data = await parseJsonResponse(response);
       if (!response.ok) {
         throw new Error(data.error || 'Failed to update service category');
       }
@@ -1402,7 +1414,7 @@ export const DataProvider = ({ children }: { children: ReactNode }) => {
       const response = await authFetch(`${BASE_URL}/service-categories/${categoryId}`, {
         method: 'DELETE',
       });
-      const data = await response.json();
+      const data = await parseJsonResponse(response);
       if (!response.ok) {
         throw new Error(data.error || 'Failed to delete service category');
       }
@@ -1419,7 +1431,7 @@ export const DataProvider = ({ children }: { children: ReactNode }) => {
       const url = `${BASE_URL}/services${query ? `?${query}` : ''}`;
       const response = await authFetch(url);
       if (response.ok) {
-        const data = await response.json();
+        const data = await parseJsonResponse(response);
         return Array.isArray(data.services) ? data.services : [];
       }
       return [];
@@ -1456,7 +1468,7 @@ export const DataProvider = ({ children }: { children: ReactNode }) => {
     try {
       const response = await authFetch(`${BASE_URL}/services/pending-custom`);
       if (response.ok) {
-        const data = await response.json();
+        const data = await parseJsonResponse(response);
         const list = Array.isArray(data.services) ? data.services : [];
         setPendingCustomServicesCount(list.length);
         return list;

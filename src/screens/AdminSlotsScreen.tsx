@@ -297,14 +297,25 @@ export default function AdminSlotsScreen({ navigation, route }: any) {
         }
       );
       if (res.ok) {
-        const data = await res.json();
-        setSlotData(data);
-        if (data.services && data.services.length > 0) {
-          setGarageServices(data.services);
+        const text = await res.text();
+        try {
+          const data = JSON.parse(text);
+          setSlotData(data);
+          if (data.services && data.services.length > 0) {
+            setGarageServices(data.services);
+          }
+        } catch {
+          console.warn('[AdminSlotsScreen] Non-JSON response for slots:', text.substring(0, 100));
         }
       } else {
-        const err = await res.json();
-        console.error('Failed to fetch slots:', err);
+        let errMessage = `Server returned HTTP ${res.status}`;
+        try {
+          const err = await res.json();
+          errMessage = err.message || err.error || JSON.stringify(err);
+        } catch {
+          // Response was not JSON (e.g. 502 HTML)
+        }
+        console.error('Failed to fetch slots:', errMessage);
       }
     } catch (e) {
       console.error('Error fetching slots:', e);
