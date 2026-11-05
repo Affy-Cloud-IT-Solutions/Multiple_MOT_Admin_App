@@ -100,26 +100,30 @@ export default function GarageVerificationReviewScreen({ route, navigation }: an
 
   const garageId = garage.id || garage._id || '';
   const docs = garage.verificationDocuments || [];
-  const verifiedDocsCount = docs.filter(d => d.status === 'Verified').length;
-  const rejectedDocsCount = docs.filter(d => d.status === 'Rejected').length;
-  const pendingDocsCount = docs.filter(d => !d.status || d.status === 'Pending').length;
+  const validDocs = docs.filter(d => d && (d.fileUrl || d.name));
+  const verifiedDocsCount = validDocs.filter(d => d.status === 'Verified').length;
+  const rejectedDocsCount = validDocs.filter(d => d.status === 'Rejected').length;
+  const pendingDocsCount = validDocs.filter(d => !d.status || d.status === 'Pending').length;
 
-  // Profile setup progress - same 4-item checklist the garage admin sees (registration + location + services + documents).
-  // Prefer the backend's result; fall back to the setup flags for an older API.
+  // Documents step: only marked done if documents are actually submitted and not rejected
+  const hasSubmittedDocuments = validDocs.length > 0 && !validDocs.some(d => d.status === 'Rejected');
+
+  // Profile setup progress - strictly check that items are really submitted:
   const completionSteps = garage.profileCompletion?.steps || {
-    location: Boolean(garage.locationConfigured),
-    services: Boolean((garage as any).servicesConfigured),
-    documents: Boolean((garage as any).documentsConfigured) || docs.length > 0
+    location: Boolean(garage.locationConfigured) || Boolean(garage.address && garage.postcode),
+    services: Array.isArray(garage.services) && garage.services.some((s: any) => s && s.isActive !== false),
+    documents: hasSubmittedDocuments
   };
   const setupChecklist = [
     { key: 'registration', label: 'Initial registration details', done: true },
     { key: 'location', label: 'Garage location', done: Boolean(completionSteps.location) },
     { key: 'services', label: 'Services & pricing', done: Boolean(completionSteps.services) },
-    { key: 'documents', label: 'MOT & DVLA documents', done: Boolean(completionSteps.documents) }
+    { key: 'documents', label: 'MOT & DVLA documents', done: Boolean(completionSteps.documents && hasSubmittedDocuments) }
   ];
+  const completedStepsCount = setupChecklist.filter(s => s.done).length;
   const profilePercent = typeof garage.profileCompletion?.percent === 'number'
-    ? garage.profileCompletion.percent
-    : Math.round((setupChecklist.filter(s => s.done).length / setupChecklist.length) * 100);
+    ? (hasSubmittedDocuments ? garage.profileCompletion.percent : Math.min(garage.profileCompletion.percent, 75))
+    : Math.round((completedStepsCount / setupChecklist.length) * 100);
   const profileColor = profilePercent === 100 ? '#10B981' : '#EA580C';
   // Until the garage sets its location, the stored address/GPS are only schema defaults (central London)
   const locationSet = Boolean(completionSteps.location);
@@ -407,9 +411,9 @@ export default function GarageVerificationReviewScreen({ route, navigation }: an
             ))}
           </View>
 
-          {garage.isVisibleToCustomers === false && garage.status === 'Approved' ? (
-            <Text style={[styles.sectionHelper, { color: theme.colors.placeholder, marginTop: 8, marginBottom: 0 }]}>
-              Hidden from customers until the profile is 100% complete.
+          {garage.status === 'Rejected' || garage.status === 'Blacklisted' ? (
+            <Text style={[styles.sectionHelper, { color: '#EF4444', marginTop: 8, marginBottom: 0 }]}>
+              Hidden from customers (Status: {garage.status}).
             </Text>
           ) : null}
         </View>

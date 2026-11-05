@@ -722,13 +722,18 @@ export default function GarageSetupScreen({ route, navigation }: any) {
     try {
       const garageId = currentGarage?.id || currentGarage?._id || user?.garageId;
       if (garageId) {
-        await updateGarageProfile(garageId, {
-          vtsNumber: vtsNumber.trim().toUpperCase(),
-          motAuthorisedExaminerNumber: motAuthorisedExaminerNumber.trim().toUpperCase(),
-          businessRegistrationNumber: businessRegistrationNumber.trim().toUpperCase(),
-          documentsConfigured: (verificationDocuments || []).length > 0
-        });
-        await AsyncStorage.setItem(`garage_doc_${garageId}`, 'true');
+          const hasUploadedDocs = (verificationDocuments || []).length > 0;
+          await updateGarageProfile(garageId, {
+            vtsNumber: vtsNumber.trim().toUpperCase(),
+            motAuthorisedExaminerNumber: motAuthorisedExaminerNumber.trim().toUpperCase(),
+            businessRegistrationNumber: businessRegistrationNumber.trim().toUpperCase(),
+            documentsConfigured: hasUploadedDocs
+          });
+          if (hasUploadedDocs) {
+            await AsyncStorage.setItem(`garage_doc_${garageId}`, 'true');
+          } else {
+            await AsyncStorage.removeItem(`garage_doc_${garageId}`);
+          }
       }
       await submitCurrentGarageForReview();
       Alert.alert(

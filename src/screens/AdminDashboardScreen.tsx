@@ -88,7 +88,9 @@ export default function AdminDashboardScreen({ navigation }: any) {
   const serverSteps = currentGarage?.profileCompletion?.steps;
   const hasLocation = serverSteps ? Boolean(serverSteps.location) : Boolean(currentGarage?.locationConfigured || localSetup.location);
   const hasServices = serverSteps ? Boolean(serverSteps.services) : Boolean(currentGarage?.servicesConfigured || localSetup.services);
-  const hasDocs = serverSteps ? Boolean(serverSteps.documents) : Boolean(currentGarage?.documentsConfigured || localSetup.docs);
+  const uploadedDocs = (currentGarage?.verificationDocuments || []).filter((d: any) => d && (d.fileUrl || d.name));
+  const hasValidDocs = uploadedDocs.length > 0 && !uploadedDocs.some((d: any) => d.status === 'Rejected');
+  const hasDocs = serverSteps ? Boolean(serverSteps.documents && hasValidDocs) : hasValidDocs;
   const isHiddenFromCustomers = currentGarage?.isVisibleToCustomers === false;
 
   const checklistTasks = [
