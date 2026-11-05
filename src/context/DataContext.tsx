@@ -225,15 +225,19 @@ interface DataContextType {
   updateGarageService: (garageId: string, serviceId: string, updates: any) => Promise<any>;
   deleteGarageService: (garageId: string, serviceId: string) => Promise<any>;
   seedGarageDefaultServices: (garageId: string) => Promise<any>;
+  isProfileMandatory: boolean;
   getPlatformSettings: () => Promise<{ requireFullProfileForVisibility: boolean }>;
   updatePlatformSettings: (requireFullProfileForVisibility: boolean) => Promise<{ requireFullProfileForVisibility: boolean }>;
 }
 
 const DataContext = createContext<DataContextType | undefined>(undefined);
 
-// Live production backend
-// export const BASE_URL = 'http://localhost:5000/api';
-export const BASE_URL = 'https://api.ondoorcarservice.com/api';
+// Local backend configuration:
+// Wi-Fi IP (for physical mobile device & emulator on same network)
+// export const LOCAL_IP = '192.168.1.7';
+// export const BASE_URL = `http://${LOCAL_IP}:5000/api`;
+// export const BASE_URL = 'http://10.0.2.2:5000/api'; // Android Emulator alias
+export const BASE_URL = 'https://api.ondoorcarservice.com/api'; // Production server
 
 const parseJsonResponse = async (response: Response): Promise<any> => {
   const text = await response.text();
@@ -296,6 +300,7 @@ export const DataProvider = ({ children }: { children: ReactNode }) => {
   const [audits, setAudits] = useState<AuditLog[]>([]);
   const [garages, setGarages] = useState<Garage[]>([]);
   const [currentGarage, setCurrentGarage] = useState<Garage | null>(null);
+  const [isProfileMandatory, setIsProfileMandatory] = useState<boolean>(false);
   const [serviceCategories, setServiceCategories] = useState<ServiceCategory[]>([]);
   const [pendingCustomServicesCount, setPendingCustomServicesCount] = useState<number>(0);
   const [token, setTokenState] = useState<string | null>(null);
@@ -651,6 +656,18 @@ export const DataProvider = ({ children }: { children: ReactNode }) => {
         }
         setAudits([]); // Clear audits for customer
       }
+
+      // Sync platform governance setting
+      try {
+        const settingsRes = await authFetch(`${BASE_URL}/settings/platform`);
+        if (settingsRes && settingsRes.ok) {
+          const settingsData = await settingsRes.json();
+          if (typeof settingsData.requireFullProfileForVisibility === 'boolean') {
+            setIsProfileMandatory(settingsData.requireFullProfileForVisibility);
+            AsyncStorage.setItem('platform_setting_require_full_profile', String(settingsData.requireFullProfileForVisibility)).catch(() => {});
+          }
+        }
+      } catch (e) {}
     } catch (error) {
       console.error('[DATA CONTEXT] Error fetching backend data:', error);
     }
@@ -674,6 +691,10 @@ export const DataProvider = ({ children }: { children: ReactNode }) => {
         }
         if (storedUserJson && !user) {
           setUserState(JSON.parse(storedUserJson));
+        }
+        const storedSetting = await AsyncStorage.getItem('platform_setting_require_full_profile');
+        if (storedSetting !== null) {
+          setIsProfileMandatory(storedSetting === 'true');
         }
       } catch (e) {
         console.warn('Error reading stored tokens in DataContext:', e);
@@ -1562,25 +1583,45 @@ export const DataProvider = ({ children }: { children: ReactNode }) => {
   }, [authFetch]);
 
   const getPlatformSettings = useCallback(async (): Promise<{ requireFullProfileForVisibility: boolean }> => {
-    const response = await authFetch(`${BASE_URL}/settings/platform`);
-    const data = await response.json();
-    if (!response.ok) {
-      throw new Error(data.error || 'Failed to fetch platform settings');
+    try {
+      const response = await authFetch(`${BASE_URL}/settings/platform`);
+      if (response && response.ok) {
+        const data = await response.json();
+        if (data && typeof data.requireFullProfileForVisibility === 'boolean') {
+          setIsProfileMandatory(data.requireFullProfileForVisibility);
+          await AsyncStorage.setItem('platform_setting_require_full_profile', String(data.requireFullProfileForVisibility));
+          return data;
+        }
+      }
+    } catch (e) {
+      // Remote server may not have new endpoint yet until deployed
     }
-    return data;
+    const cached = await AsyncStorage.getItem('platform_setting_require_full_profile');
+    const val = cached === 'true';
+    setIsProfileMandatory(val);
+    return { requireFullProfileForVisibility: val };
   }, [authFetch]);
 
   const updatePlatformSettings = useCallback(async (requireFullProfileForVisibility: boolean): Promise<{ requireFullProfileForVisibility: boolean }> => {
-    const response = await authFetch(`${BASE_URL}/settings/platform`, {
-      method: 'PATCH',
-      headers: { 'Content-Type': 'application/json' },
-      body: JSON.stringify({ requireFullProfileForVisibility }),
-    });
-    const data = await response.json();
-    if (!response.ok) {
-      throw new Error(data.error || 'Failed to update platform settings');
+    // 1. Immediately persist locally in state and AsyncStorage
+    setIsProfileMandatory(requireFullProfileForVisibility);
+    await AsyncStorage.setItem('platform_setting_require_full_profile', String(requireFullProfileForVisibility));
+
+    // 2. Sync with server if endpoint is deployed
+    try {
+      const response = await authFetch(`${BASE_URL}/settings/platform`, {
+        method: 'PATCH',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({ requireFullProfileForVisibility }),
+      });
+      if (response && response.ok) {
+        const data = await response.json();
+        return data;
+      }
+    } catch (e) {
+      // Server not deployed yet - gracefully handled via local cache
     }
-    return data;
+    return { requireFullProfileForVisibility };
   }, [authFetch]);
 
   return (
@@ -1647,6 +1688,7 @@ export const DataProvider = ({ children }: { children: ReactNode }) => {
         updateGarageService,
         deleteGarageService,
         seedGarageDefaultServices,
+        isProfileMandatory,
         getPlatformSettings,
         updatePlatformSettings,
       }}

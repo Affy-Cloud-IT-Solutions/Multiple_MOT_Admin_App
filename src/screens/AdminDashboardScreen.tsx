@@ -48,7 +48,7 @@ const formatBookingDate = (dateVal: any) => {
 
 export default function AdminDashboardScreen({ navigation }: any) {
   const { theme } = useAppTheme();
-  const { user, currentGarage, customers, vehicles, alerts, audits, refreshData } = useAppValues();
+  const { user, currentGarage, customers, vehicles, alerts, audits, refreshData, isProfileMandatory: contextIsProfileMandatory } = useAppValues();
   const [isRefreshing, setIsRefreshing] = useState(false);
   const [checklistCollapsed, setChecklistCollapsed] = useState(false);
   const [checklistHidden, setChecklistHidden] = useState(false);
@@ -92,6 +92,9 @@ export default function AdminDashboardScreen({ navigation }: any) {
   const hasValidDocs = uploadedDocs.length > 0 && !uploadedDocs.some((d: any) => d.status === 'Rejected');
   const hasDocs = serverSteps ? Boolean(serverSteps.documents && hasValidDocs) : hasValidDocs;
   const isHiddenFromCustomers = currentGarage?.isVisibleToCustomers === false;
+  const isProfileMandatory = typeof contextIsProfileMandatory === 'boolean'
+    ? contextIsProfileMandatory
+    : Boolean((currentGarage as any)?.requireFullProfileForVisibility);
 
   const checklistTasks = [
     {
@@ -419,8 +422,27 @@ export default function AdminDashboardScreen({ navigation }: any) {
           {/* Header Row: Tag + Percent Badge */}
           <View style={styles.gettingStartedHeader}>
             <View style={styles.gettingStartedTagBox}>
-              <MaterialCommunityIcons name="rocket-launch-outline" size={13} color="#EA580C" />
-              <Text style={styles.gettingStartedTag}>COMPLETE YOUR PROFILE</Text>
+              <MaterialCommunityIcons 
+                name={
+                  isProfileMandatory 
+                    ? "shield-lock-outline" 
+                    : (currentGarage?.status === 'Pending' ? "clock-outline" : "rocket-launch-outline")
+                } 
+                size={13} 
+                color={
+                  isProfileMandatory 
+                    ? "#EA580C" 
+                    : (currentGarage?.status === 'Pending' ? "#F59E0B" : "#10B981")
+                } 
+              />
+              <Text style={[
+                styles.gettingStartedTag, 
+                { color: isProfileMandatory ? "#EA580C" : (currentGarage?.status === 'Pending' ? "#F59E0B" : "#10B981") }
+              ]}>
+                {isProfileMandatory 
+                  ? "MANDATORY PROFILE SETUP" 
+                  : (currentGarage?.status === 'Pending' ? "APPLICATION UNDER REVIEW" : "COMPLETE YOUR PROFILE TO GET VERIFIED")}
+              </Text>
             </View>
             <View style={styles.headerRightActions}>
               <View style={[styles.percentBadge, { backgroundColor: progressPercent === 100 ? '#10B98115' : '#EA580C15' }]}>
@@ -432,15 +454,26 @@ export default function AdminDashboardScreen({ navigation }: any) {
           </View>
 
           {/* Subtitle / Description */}
-          <Text style={[styles.gettingStartedSubtitle, { color: theme.colors.placeholder }]}>
-            Finish setup to go live & receive customer bookings
-          </Text>
-          {isHiddenFromCustomers && (
+          {isProfileMandatory ? (
             <Text style={[styles.gettingStartedSubtitle, { color: '#EA580C', fontFamily: fonts.semiBold }]}>
               {currentGarage?.status === 'Approved'
-                ? 'Your garage is hidden from customers until every step below is complete.'
-                : 'Your garage is hidden from customers until it is approved and every step below is complete.'}
+                ? 'Mandatory Setup Active: Your garage is approved, but hidden from customers until every step below is complete.'
+                : 'Mandatory Setup Active: Your application is under review. Your garage is hidden from customers until approved and 100% complete.'}
             </Text>
+          ) : currentGarage?.status === 'Pending' ? (
+            <View style={{ flexDirection: 'row', alignItems: 'center', marginTop: 3, marginBottom: 2 }}>
+              <MaterialCommunityIcons name="clock-outline" size={14} color="#F59E0B" style={{ marginRight: 4 }} />
+              <Text style={[styles.gettingStartedSubtitle, { color: '#D97706', fontFamily: fonts.semiBold, marginTop: 0 }]}>
+                Under review by Super Admin. Once approved, your garage goes live immediately to customers!
+              </Text>
+            </View>
+          ) : (
+            <View style={{ flexDirection: 'row', alignItems: 'center', marginTop: 3, marginBottom: 2 }}>
+              <MaterialCommunityIcons name="check-circle-outline" size={14} color="#10B981" style={{ marginRight: 4 }} />
+              <Text style={[styles.gettingStartedSubtitle, { color: '#10B981', fontFamily: fonts.semiBold, marginTop: 0 }]}>
+                Your garage is live to customers! Complete all steps below to earn the Verified badge.
+              </Text>
+            </View>
           )}
 
           {/* Progress Bar */}

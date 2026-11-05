@@ -244,8 +244,12 @@ export default function GarageSetupScreen({ route, navigation }: any) {
     updateGarageProfile,
     uploadGarageDocument,
     submitCurrentGarageForReview,
-    fetchServiceCatalog
+    fetchServiceCatalog,
+    isProfileMandatory: contextIsProfileMandatory,
   } = useAppValues();
+  const isProfileMandatory = typeof contextIsProfileMandatory === 'boolean'
+    ? contextIsProfileMandatory
+    : Boolean((currentGarage as any)?.requireFullProfileForVisibility);
   // Text/icons on primary buttons - readable in both light and dark themes
   const onPrimary = theme.colors.card;
 
@@ -823,7 +827,9 @@ export default function GarageSetupScreen({ route, navigation }: any) {
                     ? 'Only the rejected document needs updating - open Legal Docs and upload a new copy. Nothing else has to change.'
                     : isApproved
                       ? 'Your garage is live. Drivers can discover your garage and book MOT slots online.'
-                      : 'Complete your Location, Services & Docs below to request Super Admin approval and go live!'}
+                      : (isProfileMandatory
+                          ? 'Mandatory Setup Active: Complete your Location, Services & Docs below to request Super Admin approval and go live.'
+                          : 'Profile setup is optional (7-day document grace period). Your garage will go live as soon as Super Admin approves your application.')}
               </Text>
             </View>
           </View>

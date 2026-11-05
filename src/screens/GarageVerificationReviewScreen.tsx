@@ -31,7 +31,10 @@ const REJECTION_PRESETS = [
 
 export default function GarageVerificationReviewScreen({ route, navigation }: any) {
   const { theme } = useAppTheme();
-  const { token, updateGarageStatus, updateGarageDocumentStatus, updateGarageStationStatus, refreshData, authFetch } = useAppValues();
+  const { token, updateGarageStatus, updateGarageDocumentStatus, updateGarageStationStatus, refreshData, authFetch, isProfileMandatory: contextIsProfileMandatory } = useAppValues();
+  const isProfileMandatory = typeof contextIsProfileMandatory === 'boolean'
+    ? contextIsProfileMandatory
+    : Boolean((route.params?.garage as any)?.requireFullProfileForVisibility);
 
   const initialGarageId = route.params?.garageId || route.params?.garage?.id || route.params?.garage?._id;
   const initialGarage = route.params?.garage;
@@ -417,7 +420,23 @@ export default function GarageVerificationReviewScreen({ route, navigation }: an
             <Text style={[styles.sectionHelper, { color: '#EF4444', marginTop: 8, marginBottom: 0 }]}>
               Hidden from customers (Status: {garage.status}).
             </Text>
-          ) : null}
+          ) : garage.status === 'Pending' ? (
+            <Text style={[styles.sectionHelper, { color: '#F59E0B', marginTop: 8, marginBottom: 0 }]}>
+              Pending review (Hidden from customers until approved by Super Admin).
+            </Text>
+          ) : isProfileMandatory && profilePercent < 100 ? (
+            <Text style={[styles.sectionHelper, { color: '#EA580C', marginTop: 8, marginBottom: 0 }]}>
+              Hidden from customers (Mandatory Setup Active: 100% profile & documents required).
+            </Text>
+          ) : profilePercent === 100 ? (
+            <Text style={[styles.sectionHelper, { color: '#10B981', marginTop: 8, marginBottom: 0 }]}>
+              Live to customers • Verified Badge Active ✅
+            </Text>
+          ) : (
+            <Text style={[styles.sectionHelper, { color: '#10B981', marginTop: 8, marginBottom: 0 }]}>
+              Live to customers • Optional Setup Mode (7-day document grace period).
+            </Text>
+          )}
         </View>
 
         {/* SECTION 1: GARAGE & OWNER PROFILE */}
