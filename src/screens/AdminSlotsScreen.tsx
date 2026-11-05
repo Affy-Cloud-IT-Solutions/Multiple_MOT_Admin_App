@@ -232,7 +232,7 @@ export default function AdminSlotsScreen({ navigation, route }: any) {
   // Add station modal
   const [modalVisible, setModalVisible] = useState(false);
   const [newStationName, setNewStationName] = useState('');
-  const [newStationType, setNewStationType] = useState('Class 4 MOT Bay');
+  const [newStationDuration, setNewStationDuration] = useState<30 | 45>(45);
   const [submittingStation, setSubmittingStation] = useState(false);
 
   // Manage slot modal state (for single & multi-bay slot blocking controls)
@@ -561,8 +561,7 @@ export default function AdminSlotsScreen({ navigation, route }: any) {
         },
         body: JSON.stringify({
           name: newStationName.trim(),
-          type: newStationType,
-          slotDuration: 45,
+          slotDuration: newStationDuration,
         }),
       });
 
@@ -570,9 +569,10 @@ export default function AdminSlotsScreen({ navigation, route }: any) {
       if (res.ok) {
         Alert.alert(
           'Station Submitted',
-          `"${newStationName}" has been submitted for Platform Super Admin approval. Once approved, it will automatically increase your MOT booking capacity.`
+          `"${newStationName}" (${newStationDuration}-minute slots) has been submitted for Platform Super Admin approval. Once approved, your daily MOT slots will be active.`
         );
         setNewStationName('');
+        setNewStationDuration(45);
         setModalVisible(false);
         fetchSlots();
         refreshData();
@@ -1004,7 +1004,7 @@ export default function AdminSlotsScreen({ navigation, route }: any) {
           <View style={styles.loaderContainer}>
             <ActivityIndicator size="large" color={theme.colors.primary} />
             <Text style={[styles.loaderText, { color: theme.colors.placeholder }]}>
-              Loading 45-min slots for {selectedDate}...
+              Loading {slotData?.slotDuration || 45}-min slots for {selectedDate}...
             </Text>
           </View>
         ) : (slotData?.slots || []).length === 0 ? (
@@ -1832,7 +1832,7 @@ export default function AdminSlotsScreen({ navigation, route }: any) {
             </View>
 
             <Text style={[styles.modalSubtitle, { color: theme.colors.placeholder }]}>
-              Adding a new station unlocks 1 extra vehicle per 45-minute slot once approved by Platform Super Admin.
+              Adding a new station unlocks 1 extra vehicle per {newStationDuration}-minute slot once approved by Platform Super Admin.
             </Text>
 
             <View style={styles.formGroup}>
@@ -1854,33 +1854,43 @@ export default function AdminSlotsScreen({ navigation, route }: any) {
             </View>
 
             <View style={styles.formGroup}>
-              <Text style={[styles.inputLabel, { color: theme.colors.text }]}>Bay Type</Text>
+              <Text style={[styles.inputLabel, { color: theme.colors.text }]}>Slot Duration</Text>
               <View style={styles.typeSelectorRow}>
-                {['Class 4 MOT Bay', 'Class 4 & 7 Dual Bay', 'Dedicated MOT Ramp'].map((t) => (
+                {([30, 45] as const).map((mins) => (
                   <TouchableOpacity
-                    key={t}
+                    key={mins}
                     style={[
                       styles.typeOptionPill,
                       {
+                        flex: 1,
+                        paddingVertical: 10,
+                        alignItems: 'center',
+                        justifyContent: 'center',
                         backgroundColor:
-                          newStationType === t ? theme.colors.primary : theme.colors.background,
+                          newStationDuration === mins ? theme.colors.primary : theme.colors.background,
                         borderColor:
-                          newStationType === t ? theme.colors.primary : theme.colors.border,
+                          newStationDuration === mins ? theme.colors.primary : theme.colors.border,
                       },
                     ]}
-                    onPress={() => setNewStationType(t)}
+                    onPress={() => setNewStationDuration(mins)}
                   >
                     <Text
                       style={[
                         styles.typeOptionText,
-                        { color: newStationType === t ? '#FFFFFF' : theme.colors.text },
+                        {
+                          fontWeight: '700',
+                          color: newStationDuration === mins ? '#FFFFFF' : theme.colors.text,
+                        },
                       ]}
                     >
-                      {t}
+                      {mins} mins
                     </Text>
                   </TouchableOpacity>
                 ))}
               </View>
+              <Text style={{ fontSize: 11, color: theme.colors.placeholder, marginTop: 4 }}>
+                Daily appointment slots will be generated at {newStationDuration}-minute intervals.
+              </Text>
             </View>
 
             <View style={[styles.approvalNotice, { backgroundColor: '#F59E0B15' }]}>

@@ -828,7 +828,7 @@ export default function SuperAdminGaragesScreen({ navigation }: any) {
                               <View style={{ flex: 1 }}>
                                 <Text style={{ fontFamily: fonts.bold, fontSize: 13, color: theme.colors.text }}>{st.name}</Text>
                                 <Text style={{ fontFamily: fonts.regular, fontSize: 11, color: theme.colors.placeholder, marginTop: 2 }}>
-                                  {st.type || 'Class 4 MOT Bay'} • {st.slotDuration || 40} mins/slot
+                                  {st.slotDuration || 45} mins/slot
                                 </Text>
                               </View>
                               <View
