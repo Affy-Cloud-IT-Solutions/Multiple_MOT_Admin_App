@@ -70,7 +70,7 @@ export default function AdminAlertsScreen() {
     if (user?.role === 'admin') {
       return true; // Super admin sees all pending alerts including station requests & custom services
     }
-    return a.type !== 'GARAGE_REGISTRATION' && a.type !== 'NEW_STATION' && a.type !== 'CUSTOM_SERVICE';
+    return a.type !== 'GARAGE_REGISTRATION' && a.type !== 'NEW_STATION' && a.type !== 'CUSTOM_SERVICE' && a.type !== 'GARAGE_DOCUMENT';
   });
 
   const handleApprove = async (alertId: string, alertType: string) => {
