@@ -99,6 +99,8 @@ export default function GarageVerificationReviewScreen({ route, navigation }: an
   }
 
   const garageId = garage.id || garage._id || '';
+  const ownerUser = ((garage as any).staffList || []).find((s: any) => s && (s.role === 'garage_admin' || s.role === 'admin'));
+  const ownerDisplayName = ownerUser?.name || (garage as any).ownerName || (garage as any).contactPerson || '';
   const docs = garage.verificationDocuments || [];
   const validDocs = docs.filter(d => d && (d.fileUrl || d.name));
   const verifiedDocsCount = validDocs.filter(d => d.status === 'Verified').length;
@@ -316,10 +318,10 @@ export default function GarageVerificationReviewScreen({ route, navigation }: an
           </View>
           <View style={{ flex: 1 }}>
             <Text style={[styles.headerTitle, { color: theme.colors.text }]} numberOfLines={1}>
-              Verification & Audit Center
+              {garage.name}
             </Text>
             <Text style={[styles.headerSubtitle, { color: theme.colors.placeholder }]} numberOfLines={1}>
-              {garage.name}
+              {ownerDisplayName ? `Owner: ${ownerDisplayName}` : 'Verification & Audit Center'}
             </Text>
           </View>
         </View>
@@ -439,7 +441,12 @@ export default function GarageVerificationReviewScreen({ route, navigation }: an
               )}
             </View>
             <View style={{ flex: 1 }}>
-              <Text style={{ fontFamily: fonts.bold, fontSize: 16, color: theme.colors.text }}>{garage.name}</Text>
+              <Text style={{ fontFamily: fonts.bold, fontSize: 18, color: theme.colors.text }}>{garage.name}</Text>
+              {ownerDisplayName ? (
+                <Text style={{ fontFamily: fonts.medium, fontSize: 13, color: theme.colors.placeholder, marginTop: 1 }}>
+                  Owner: {ownerDisplayName}
+                </Text>
+              ) : null}
               <View style={{ flexDirection: 'row', alignItems: 'center', marginTop: 3 }}>
                 <MaterialCommunityIcons
                   name={garage.logoUrl ? "check-decagram" : "image-off-outline"}

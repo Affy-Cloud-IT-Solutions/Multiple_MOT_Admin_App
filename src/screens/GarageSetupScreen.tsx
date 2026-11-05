@@ -782,9 +782,11 @@ export default function GarageSetupScreen({ route, navigation }: any) {
           <MaterialCommunityIcons name="arrow-left" size={24} color={theme.colors.text} />
         </TouchableOpacity>
         <View style={styles.headerTitleWrap}>
-          <Text style={[styles.headerTitle, { color: theme.colors.text }]}>Finish Your Garage Profile</Text>
-          <Text style={[styles.headerSubtitle, { color: theme.colors.placeholder }]}>
-            {currentGarage?.name || 'Garage Portal'}
+          <Text style={[styles.headerTitle, { color: theme.colors.text }]} numberOfLines={1}>
+            {currentGarage?.name || 'Finish Your Garage Profile'}
+          </Text>
+          <Text style={[styles.headerSubtitle, { color: theme.colors.placeholder }]} numberOfLines={1}>
+            {user?.name ? `Owner: ${user.name}` : 'Setup & Verification Portal'}
           </Text>
         </View>
       </View>

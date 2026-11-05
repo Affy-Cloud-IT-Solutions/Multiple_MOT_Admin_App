@@ -283,9 +283,25 @@ export default function ProfileScreen({ navigation }: any) {
           )}
         </View>
         <View style={styles.headerMeta}>
-          <Text style={[styles.userName, { color: theme.colors.text }]}>
-            {user?.name || 'Guest User'}
+          <Text style={[styles.userName, { color: theme.colors.text }]} numberOfLines={1}>
+            {isGarageStaffOrAdmin ? (currentGarage?.name || user?.name || 'Garage Portal') : (user?.name || 'Guest User')}
           </Text>
+          {isGarageStaffOrAdmin && currentGarage?.name && user?.name ? (
+            <View style={styles.ownerRow}>
+              <MaterialCommunityIcons
+                name="account-tie-outline"
+                size={14}
+                color={theme.colors.placeholder}
+                style={{ marginRight: 4 }}
+              />
+              <Text
+                style={[styles.ownerNameText, { color: theme.colors.placeholder }]}
+                numberOfLines={1}
+              >
+                Owner: {user.name}
+              </Text>
+            </View>
+          ) : null}
           <View style={styles.userEmailRow}>
             <MaterialCommunityIcons
               name="email-outline"
@@ -1084,6 +1100,15 @@ const styles = StyleSheet.create({
     fontSize: 18,
     fontFamily: fonts.bold,
     marginBottom: 2,
+  },
+  ownerRow: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    marginBottom: 4,
+  },
+  ownerNameText: {
+    fontSize: 13,
+    fontFamily: fonts.medium,
   },
   userEmailRow: {
     flexDirection: 'row',

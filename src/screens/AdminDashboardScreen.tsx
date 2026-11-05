@@ -236,11 +236,21 @@ export default function AdminDashboardScreen({ navigation }: any) {
     >
       {/* Header */}
       <View style={styles.header}>
-        <View>
-          <Text style={[styles.title, { color: theme.colors.text }]}>Dashboard</Text>
-          <Text style={[styles.subtitle, { color: theme.colors.placeholder }]}>
-            Garage Overview & Operations
+        <View style={{ flex: 1, marginRight: 12 }}>
+          <Text style={[styles.title, { color: theme.colors.text }]} numberOfLines={1}>
+            {currentGarage?.name || 'Dashboard'}
           </Text>
+          <View style={{ flexDirection: 'row', alignItems: 'center', marginTop: 2 }}>
+            <MaterialCommunityIcons
+              name="account-tie-outline"
+              size={14}
+              color={theme.colors.placeholder}
+              style={{ marginRight: 4 }}
+            />
+            <Text style={[styles.subtitle, { color: theme.colors.placeholder, marginTop: 0 }]} numberOfLines={1}>
+              {user?.name ? `Owner: ${user.name}` : 'Garage Overview & Operations'}
+            </Text>
+          </View>
         </View>
         <View style={styles.headerActions}>
           {/* Bell Notification Icon with Pending Alerts Badge */}
