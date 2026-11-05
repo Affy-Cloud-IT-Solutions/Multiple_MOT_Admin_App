@@ -826,7 +826,7 @@ export default function GarageSetupScreen({ route, navigation }: any) {
                   ? 'Application Rejected - Start Again'
                   : hasDocIssuesOnly
                     ? (rejectedDocCount === 1 ? '1 Document Needs a New Copy' : `${rejectedDocCount} Documents Need a New Copy`)
-                    : isApproved ? 'Garage Approved & Live' : 'Pending Verification (Sandbox Mode)'}
+                    : isApproved ? 'Garage Approved & Live' : 'Pending Verification'}
               </Text>
               {isRejected && currentGarage?.rejectionReason ? (
                 <Text style={[styles.statusReason, { color: theme.colors.text }]}>
