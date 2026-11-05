@@ -36,9 +36,9 @@ const MIN_GARAGE_PHOTOS = 3;
 const MAX_GARAGE_PHOTOS = 8;
 const PHOTO_GAP = 10;
 const DOCUMENT_CHECKLIST = [
-  { type: 'VTS Certificate', label: 'DVLA VTS Authorisation Certificate', required: true, icon: 'shield-car' },
-  { type: 'AE Certificate', label: 'MOT Authorised Examiner (AE) Certificate', required: true, icon: 'card-account-details-outline' },
-  { type: 'Public Liability Insurance', label: 'Public Liability Insurance', required: true, icon: 'shield-account-outline' },
+  { type: 'VTS Certificate', label: 'DVLA VTS Authorisation Certificate', required: false, icon: 'shield-car' },
+  { type: 'AE Certificate', label: 'MOT Authorised Examiner (AE) Certificate', required: false, icon: 'card-account-details-outline' },
+  { type: 'Public Liability Insurance', label: 'Public Liability Insurance', required: false, icon: 'shield-account-outline' },
   { type: 'Business Registration', label: 'Company / Business Registration Proof', required: false, icon: 'office-building-outline' },
 ];
 
@@ -716,32 +716,8 @@ export default function GarageSetupScreen({ route, navigation }: any) {
 
   // Submit all for Super Admin Review
   const handleSubmitForReview = async () => {
-    if (!address.trim() || !postcode.trim() || address === 'Pending Location Setup') {
-      Alert.alert('Location Missing', 'Please fill in and save your garage address and postcode before submitting.');
-      setActiveTab('location');
-      return;
-    }
-
-    const currentServices = currentGarage?.services || [];
-    if (currentServices.length === 0) {
-      Alert.alert('Services Missing', 'Please select the services you offer and save your rates in Step 2.');
-      setActiveTab('services');
-      return;
-    }
-
-    // After a full rejection every step has to be saved again before resubmitting
-    if (redoSteps.includes('location')) {
-      Alert.alert('Location Not Saved Yet', 'Please review your garage location and save it again before resubmitting.');
-      setActiveTab('location');
-      return;
-    }
-    if (redoSteps.includes('services')) {
-      Alert.alert('Services Not Saved Yet', 'Please review your services & prices and save them again before resubmitting.');
-      setActiveTab('services');
-      return;
-    }
-
-    // Note: Document upload is not mandatory now - 7-day grace period applies
+    // Note: In setup profile, nothing is strictly required to block submitting or moving forward.
+    // Document upload and details can be completed anytime within 7 days to get Verified.
     setSubmittingReview(true);
     try {
       const garageId = currentGarage?.id || currentGarage?._id || user?.garageId;
@@ -750,7 +726,7 @@ export default function GarageSetupScreen({ route, navigation }: any) {
           vtsNumber: vtsNumber.trim().toUpperCase(),
           motAuthorisedExaminerNumber: motAuthorisedExaminerNumber.trim().toUpperCase(),
           businessRegistrationNumber: businessRegistrationNumber.trim().toUpperCase(),
-          documentsConfigured: true
+          documentsConfigured: (verificationDocuments || []).length > 0
         });
         await AsyncStorage.setItem(`garage_doc_${garageId}`, 'true');
       }
@@ -759,7 +735,7 @@ export default function GarageSetupScreen({ route, navigation }: any) {
         isRejected ? 'Application Resubmitted! 🎉' : 'Submitted for Review! 🎉',
         isRejected
           ? 'Your updated application has been sent back to Super Admin for review. Your garage will go live once it is approved.'
-          : 'Your garage profile has been submitted for Super Admin review. You have a 7-day grace period to upload any legal documents.',
+          : 'Your garage profile has been submitted for Super Admin review. You have a 7-day grace period to upload any legal documents to earn the Verified badge.',
         [{ text: 'Great!', onPress: () => navigation.goBack() }]
       );
     } catch (err: any) {
