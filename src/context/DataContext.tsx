@@ -49,6 +49,7 @@ export interface AlertNotification {
   rejectionReason?: string;
   garageId?: string;
   serviceName?: string;
+  serviceId?: string;
   services?: { name: string; category?: string; price?: number; duration?: number }[];
   hasMot?: boolean;
   isDateOnly?: boolean;

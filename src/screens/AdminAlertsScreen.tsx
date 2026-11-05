@@ -62,28 +62,48 @@ const formatBookingDate = (dateVal: any) => {
 
 export default function AdminAlertsScreen() {
   const { theme } = useAppTheme();
-  const { alerts, customers = [], approveAlert, acknowledgeAlert, rejectAlert, user, updateGarageStationStatus } = useAppValues();
+  const { alerts, customers = [], approveAlert, acknowledgeAlert, rejectAlert, user, updateGarageStationStatus, approveCustomService, rejectCustomService } = useAppValues();
 
   // Show only pending customer-facing alerts (do not show platform garage registration approval alerts to garage admin)
   const pendingAlerts = alerts.filter((a) => {
     if (a.status !== 'Pending') return false;
     if (user?.role === 'admin') {
-      return true; // Super admin sees all pending alerts including station requests
+      return true; // Super admin sees all pending alerts including station requests & custom services
     }
-    return a.type !== 'GARAGE_REGISTRATION' && a.type !== 'NEW_STATION';
+    return a.type !== 'GARAGE_REGISTRATION' && a.type !== 'NEW_STATION' && a.type !== 'CUSTOM_SERVICE';
   });
 
   const handleApprove = async (alertId: string, alertType: string) => {
     setLoadingAction(alertId);
     try {
-      await approveAlert(alertId);
       let message = 'Action approved successfully!';
-      if (alertType === 'NEW_VEHICLE') {
-        message = 'New vehicle has been approved and added to the customer profile!';
-      } else if (alertType === 'SOLD') {
-        message = 'Vehicle status updated to Sold. Future reminders stopped.';
-      } else if (alertType === 'BOOKED') {
-        message = 'MOT Booking confirmed!';
+      if (alertType === 'NEW_STATION') {
+        const item = pendingAlerts.find(a => a.id === alertId);
+        if (item?.garageId && item?.stationId) {
+          await updateGarageStationStatus(item.garageId, item.stationId, 'Approved');
+          message = 'MOT Testing Station approved successfully! Daily booking slots are now active.';
+        } else {
+          await approveAlert(alertId);
+          message = 'Station request approved!';
+        }
+      } else if (alertType === 'CUSTOM_SERVICE') {
+        const item = pendingAlerts.find(a => a.id === alertId);
+        if (item?.serviceId) {
+          await approveCustomService(item.serviceId);
+          message = `Custom service "${item.serviceName || 'Service'}" approved and live platform-wide!`;
+        } else {
+          await approveAlert(alertId);
+          message = 'Custom service approved!';
+        }
+      } else {
+        await approveAlert(alertId);
+        if (alertType === 'NEW_VEHICLE') {
+          message = 'New vehicle has been approved and added to the customer profile!';
+        } else if (alertType === 'SOLD') {
+          message = 'Vehicle status updated to Sold. Future reminders stopped.';
+        } else if (alertType === 'BOOKED') {
+          message = 'MOT Booking confirmed!';
+        }
       }
       Alert.alert('Approved', message);
     } catch (error: any) {
@@ -114,12 +134,29 @@ export default function AdminAlertsScreen() {
     setRejectModalVisible(false);
     setLoadingAction(alertId);
     try {
-      if (alertType === 'BOOKED' || alertType === 'NEW_VEHICLE') {
+      if (alertType === 'NEW_STATION') {
+        const item = pendingAlerts.find(a => a.id === alertId);
+        if (item?.garageId && item?.stationId) {
+          await updateGarageStationStatus(item.garageId, item.stationId, 'Rejected', rejectionReason || 'Station request rejected by platform admin');
+        } else {
+          await acknowledgeAlert(alertId);
+        }
+        Alert.alert('Rejected', 'Station request has been rejected.');
+      } else if (alertType === 'CUSTOM_SERVICE') {
+        const item = pendingAlerts.find(a => a.id === alertId);
+        if (item?.serviceId) {
+          await rejectCustomService(item.serviceId, rejectionReason || 'Does not meet platform service criteria');
+        } else {
+          await acknowledgeAlert(alertId);
+        }
+        Alert.alert('Rejected', 'Custom service has been rejected.');
+      } else if (alertType === 'BOOKED' || alertType === 'NEW_VEHICLE') {
         await rejectAlert(alertId, rejectionReason);
+        Alert.alert('Rejected', 'Request has been rejected.');
       } else {
         await acknowledgeAlert(alertId);
+        Alert.alert('Rejected', 'Request has been rejected.');
       }
-      Alert.alert('Rejected', 'Request has been rejected.');
     } catch (error: any) {
       Alert.alert('Error', error?.message || 'Could not reject request.');
     } finally {
@@ -170,6 +207,14 @@ export default function AdminAlertsScreen() {
               iconName = (item.isDateOnly || item.hasMot === false) ? 'car-clock' : 'calendar-check';
               iconColor = theme.colors.secondary; // Blue
               typeText = (item.isDateOnly || item.hasMot === false) ? 'Service Drop-off Requested' : 'MOT Booking Requested';
+            } else if (item.type === 'NEW_STATION') {
+              iconName = 'garage-alert';
+              iconColor = '#F59E0B'; // Amber
+              typeText = 'MOT Testing Station Request';
+            } else if (item.type === 'CUSTOM_SERVICE') {
+              iconName = 'shape-plus';
+              iconColor = '#8B5CF6'; // Purple
+              typeText = 'Custom Service Approval Request';
             }
 
             const customer = customers.find(c => 
@@ -194,10 +239,16 @@ export default function AdminAlertsScreen() {
 
                 <View style={styles.cardBody}>
                   <Text style={[styles.bodyText, { color: theme.colors.text }]}>
-                    Customer <Text style={{ fontFamily: fonts.bold }}>{item.customerName}</Text>{' '}
-                    {item.type === 'NEW_VEHICLE' && 'wishes to register a new vehicle:'}
-                    {item.type === 'SOLD' && 'reported they sold their vehicle:'}
-                    {item.type === 'BOOKED' && ((item.isDateOnly || item.hasMot === false) ? 'requested service workshop booking for:' : 'requested MOT booking for:')}
+                    {item.type === 'NEW_STATION' ? (
+                      <>Garage <Text style={{ fontFamily: fonts.bold }}>{item.customerName}</Text> requested approval to add a new MOT station:</>
+                    ) : item.type === 'CUSTOM_SERVICE' ? (
+                      <>Garage <Text style={{ fontFamily: fonts.bold }}>{item.customerName}</Text> submitted a new custom service for platform approval:</>
+                    ) : (
+                      <>Customer <Text style={{ fontFamily: fonts.bold }}>{item.customerName}</Text>{' '}
+                      {item.type === 'NEW_VEHICLE' && 'wishes to register a new vehicle:'}
+                      {item.type === 'SOLD' && 'reported they sold their vehicle:'}
+                      {item.type === 'BOOKED' && ((item.isDateOnly || item.hasMot === false) ? 'requested service workshop booking for:' : 'requested MOT booking for:')}</>
+                    )}
                   </Text>
 
                   {(custPhone || custEmail) ? (
@@ -225,14 +276,50 @@ export default function AdminAlertsScreen() {
                     </View>
                   ) : null}
 
-                  <View style={styles.vehicleRow}>
-                    <View style={styles.plate}>
-                      <Text style={styles.plateText}>{item.registrationNumber}</Text>
+                  {item.type === 'NEW_STATION' ? (
+                    <View style={{ backgroundColor: '#F59E0B15', borderWidth: 1, borderColor: '#F59E0B40', padding: 12, borderRadius: 8, marginTop: 8 }}>
+                      <View style={{ flexDirection: 'row', alignItems: 'center', justifyContent: 'space-between' }}>
+                        <View style={{ flexDirection: 'row', alignItems: 'center' }}>
+                          <MaterialCommunityIcons name="garage" size={18} color="#F59E0B" style={{ marginRight: 6 }} />
+                          <Text style={{ fontFamily: fonts.bold, fontSize: 13.5, color: theme.colors.text }}>
+                            {item.stationName || item.makeModel?.split(' - ')[1]?.split(' (')[0] || 'Testing Station'}
+                          </Text>
+                        </View>
+                        <View style={{ backgroundColor: '#F59E0B25', paddingHorizontal: 6, paddingVertical: 2, borderRadius: 4 }}>
+                          <Text style={{ fontFamily: fonts.bold, fontSize: 10.5, color: '#F59E0B' }}>Pending Approval</Text>
+                        </View>
+                      </View>
+                      <Text style={{ fontFamily: fonts.medium, fontSize: 12, color: theme.colors.placeholder, marginTop: 4 }}>
+                        {item.makeModel || `${item.customerName} - Station Request`}
+                      </Text>
                     </View>
-                    <Text style={[styles.makeModelText, { color: theme.colors.text }]}>
-                      {item.makeModel}
-                    </Text>
-                  </View>
+                  ) : item.type === 'CUSTOM_SERVICE' ? (
+                    <View style={{ backgroundColor: '#8B5CF615', borderWidth: 1, borderColor: '#8B5CF640', padding: 12, borderRadius: 8, marginTop: 8 }}>
+                      <View style={{ flexDirection: 'row', alignItems: 'center', justifyContent: 'space-between' }}>
+                        <View style={{ flexDirection: 'row', alignItems: 'center' }}>
+                          <MaterialCommunityIcons name="shape-plus" size={18} color="#8B5CF6" style={{ marginRight: 6 }} />
+                          <Text style={{ fontFamily: fonts.bold, fontSize: 13.5, color: theme.colors.text }}>
+                            {item.serviceName || item.makeModel?.split(' - ')[1] || 'Custom Service'}
+                          </Text>
+                        </View>
+                        <View style={{ backgroundColor: '#8B5CF625', paddingHorizontal: 6, paddingVertical: 2, borderRadius: 4 }}>
+                          <Text style={{ fontFamily: fonts.bold, fontSize: 10.5, color: '#8B5CF6' }}>Pending Approval</Text>
+                        </View>
+                      </View>
+                      <Text style={{ fontFamily: fonts.medium, fontSize: 12, color: theme.colors.placeholder, marginTop: 4 }}>
+                        {item.makeModel || `${item.customerName} - Custom Service Request`}
+                      </Text>
+                    </View>
+                  ) : (
+                    <View style={styles.vehicleRow}>
+                      <View style={styles.plate}>
+                        <Text style={styles.plateText}>{item.registrationNumber}</Text>
+                      </View>
+                      <Text style={[styles.makeModelText, { color: theme.colors.text }]}>
+                        {item.makeModel}
+                      </Text>
+                    </View>
+                  )}
 
                   {/* Multi-service chips if multiple services booked */}
                   {Array.isArray(item.services) && item.services.length > 1 && (
