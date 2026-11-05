@@ -238,7 +238,7 @@ function TabDot({ show }: { show: boolean }) {
 }
 
 export default function GarageSetupScreen({ route, navigation }: any) {
-  const { theme } = useAppTheme();
+  const { theme, isDarkMode } = useAppTheme();
   const {
     user,
     currentGarage,
@@ -283,11 +283,8 @@ export default function GarageSetupScreen({ route, navigation }: any) {
   const [catalogLoading, setCatalogLoading] = useState(true);
   const [catalogError, setCatalogError] = useState<string | null>(null);
   const [notOfferedCount, setNotOfferedCount] = useState(0);
-  const [customModalVisible, setCustomModalVisible] = useState(false);
-  const [customName, setCustomName] = useState('');
-  const [customCategory, setCustomCategory] = useState('');
-  const [customPrice, setCustomPrice] = useState('');
-  const [customDuration, setCustomDuration] = useState('45');
+  const [catalogSearch, setCatalogSearch] = useState('');
+  const [catalogActiveCategory, setCatalogActiveCategory] = useState('All');
 
   // Tab 3: Documents & Identification
   const [vtsNumber, setVtsNumber] = useState('');
@@ -355,10 +352,42 @@ export default function GarageSetupScreen({ route, navigation }: any) {
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [catalog, savedServicesKey]);
 
-  const servicesByCategory = useMemo(
-    () => (catalog || []).map(group => ({ group, items: servicesList.filter(item => item.category === group.name) })),
-    [catalog, servicesList]
-  );
+  const allCategoryTabs = useMemo(() => {
+    const catNames = (catalog || []).map(g => g.name);
+    return ['All', ...catNames];
+  }, [catalog]);
+
+  const filteredServices = useMemo(() => {
+    return servicesList.filter((item) => {
+      if (catalogActiveCategory !== 'All') {
+        const cat = (item.category || '').toLowerCase();
+        if (!cat.includes(catalogActiveCategory.toLowerCase())) return false;
+      }
+      if (catalogSearch.trim()) {
+        const q = catalogSearch.toLowerCase().trim();
+        const matchName = (item.name || '').toLowerCase().includes(q);
+        const matchCat = (item.category || '').toLowerCase().includes(q);
+        if (!matchName && !matchCat) return false;
+      }
+      return true;
+    });
+  }, [servicesList, catalogActiveCategory, catalogSearch]);
+
+  const selectedCount = useMemo(() => {
+    return servicesList.filter(item => item.selected).length;
+  }, [servicesList]);
+
+  const getCategoryMeta = useCallback((catName: string) => {
+    const group = findCatalogGroup(catalog || [], catName);
+    if (group) {
+      return {
+        bg: group.iconBg || '#1677FF15',
+        text: group.iconColor || '#1677FF',
+        icon: group.icon || 'wrench',
+      };
+    }
+    return { bg: '#F1F5F9', text: '#64748B', icon: 'wrench' };
+  }, [catalog]);
 
   // Upload file helper
   const uploadToBackend = async (fileUri: string, fileName: string, fileType: string, endpoint: 'image' | 'document') => {
@@ -610,51 +639,6 @@ export default function GarageSetupScreen({ route, navigation }: any) {
 
   const handleDurationChange = (id: string, newDuration: string) => {
     setServicesList(prev => prev.map(item => item.id === id ? { ...item, duration: newDuration } : item));
-  };
-
-  const openCustomServiceModal = (categoryName: string) => {
-    setCustomCategory(categoryName);
-    setCustomName('');
-    setCustomPrice('');
-    setCustomDuration('45');
-    setCustomModalVisible(true);
-  };
-
-  const handleAddCustomService = () => {
-    if (!customName.trim()) {
-      Alert.alert('Required', 'Please enter the service name.');
-      return;
-    }
-    if (!customCategory) {
-      Alert.alert('Required', 'Please choose a category for this service.');
-      return;
-    }
-    if (servicesList.some(item => normaliseName(item.name) === normaliseName(customName))) {
-      Alert.alert('Already Listed', `"${customName.trim()}" is already in your list - just tick it and set your price.`);
-      return;
-    }
-    const numPrice = parseFloat(customPrice.trim());
-    if (isNaN(numPrice) || numPrice < 0) {
-      Alert.alert('Required', 'Please enter a valid price/rate.');
-      return;
-    }
-
-    const newItem: ServiceItemState = {
-      id: `custom_${Date.now()}`,
-      name: customName.trim(),
-      category: customCategory,
-      defaultPrice: numPrice,
-      price: String(numPrice),
-      selected: true,
-      duration: parseInt(customDuration.trim(), 10) || 45,
-      icon: findCatalogGroup(catalog || [], customCategory)?.icon || 'cog-outline',
-      isCustom: true
-    };
-
-    setServicesList(prev => [...prev, newItem]);
-    setCustomName('');
-    setCustomPrice('');
-    setCustomModalVisible(false);
   };
 
   // Save Services (Tab 2)
@@ -1247,121 +1231,155 @@ export default function GarageSetupScreen({ route, navigation }: any) {
                   <Text style={[styles.retryBtnText, { color: onPrimary }]}>Try Again</Text>
                 </TouchableOpacity>
               </View>
-            ) : servicesByCategory.length === 0 ? (
+            ) : servicesList.length === 0 ? (
               <View style={styles.catalogState}>
                 <MaterialCommunityIcons name="shape-outline" size={30} color={theme.colors.placeholder} />
                 <Text style={[styles.catalogStateText, { color: theme.colors.text }]}>No service categories are available yet.</Text>
                 <Text style={[styles.catalogStateText, { color: theme.colors.placeholder }]}>Please check back soon or contact support.</Text>
               </View>
             ) : (
-              servicesByCategory.map(({ group, items }) => {
-                const selectedCount = items.filter(item => item.selected).length;
-                return (
-                  <View key={group.id} style={[styles.categorySection, { borderColor: theme.colors.border }]}>
-                    <View style={styles.categoryHeaderRow}>
-                      <View style={[styles.categoryIconBox, { backgroundColor: group.iconBg }]}>
-                        <MaterialCommunityIcons name={group.icon as any} size={18} color={group.iconColor} />
-                      </View>
-                      <View style={styles.categoryHeaderText}>
-                        <Text style={[styles.categoryTitle, { color: theme.colors.text }]}>{group.name}</Text>
-                        {group.description && group.description.trim() ? (
-                          <Text style={[styles.categoryDesc, { color: theme.colors.placeholder }]} numberOfLines={2}>{group.description}</Text>
-                        ) : null}
-                      </View>
-                      {selectedCount > 0 && (
-                        <View style={[styles.selectedPill, { backgroundColor: theme.colors.primary + '14' }]}>
-                          <Text style={[styles.selectedPillText, { color: theme.colors.primary }]}>{selectedCount} selected</Text>
-                        </View>
-                      )}
-                    </View>
+              <>
+                {/* Catalog Search & Category Tabs */}
+                <View style={{ marginBottom: 12 }}>
+                  <View style={[styles.searchInputWrapper, { backgroundColor: isDarkMode ? '#1E293B' : '#F1F5F9', borderColor: theme.colors.border, marginBottom: 10 }]}>
+                    <MaterialCommunityIcons name="magnify" size={18} color={theme.colors.placeholder} style={{ marginRight: 6 }} />
+                    <TextInput
+                      style={[styles.searchInput, { color: theme.colors.text }]}
+                      placeholder="Search catalog services..."
+                      placeholderTextColor={theme.colors.placeholder}
+                      value={catalogSearch}
+                      onChangeText={setCatalogSearch}
+                    />
+                    {catalogSearch.length > 0 && (
+                      <TouchableOpacity onPress={() => setCatalogSearch('')}>
+                        <MaterialCommunityIcons name="close-circle" size={16} color={theme.colors.placeholder} />
+                      </TouchableOpacity>
+                    )}
+                  </View>
 
-                    <View style={styles.servicesContainer}>
-                      {items.length === 0 && (
-                        <Text style={[styles.categoryEmpty, { color: theme.colors.placeholder }]}>
-                          No suggested services yet - add the ones you offer below.
-                        </Text>
-                      )}
-                      {items.map((item) => (
+                  <ScrollView horizontal showsHorizontalScrollIndicator={false}>
+                    {allCategoryTabs.map((cat) => {
+                      const isSelected = catalogActiveCategory === cat;
+                      return (
+                        <TouchableOpacity
+                          key={cat}
+                          style={[
+                            styles.catSelectPill,
+                            isSelected
+                              ? { backgroundColor: theme.colors.primary, borderColor: theme.colors.primary }
+                              : { backgroundColor: isDarkMode ? '#1E293B' : '#F1F5F9', borderColor: theme.colors.border },
+                          ]}
+                          onPress={() => setCatalogActiveCategory(cat)}
+                        >
+                          <Text style={{ fontFamily: fonts.bold, color: isSelected ? '#FFFFFF' : theme.colors.text, fontSize: 11.5 }}>
+                            {cat}
+                          </Text>
+                        </TouchableOpacity>
+                      );
+                    })}
+                  </ScrollView>
+                </View>
+
+                {/* Filtered Services List */}
+                {filteredServices.length === 0 ? (
+                  <View style={{ padding: 30, alignItems: 'center' }}>
+                    <MaterialCommunityIcons name="magnify-close" size={36} color={theme.colors.placeholder} style={{ marginBottom: 6 }} />
+                    <Text style={{ fontFamily: fonts.bold, color: theme.colors.text, fontSize: 14 }}>No catalog services found</Text>
+                    <Text style={{ fontFamily: fonts.regular, color: theme.colors.placeholder, fontSize: 12, marginTop: 2 }}>
+                      Try another search or category.
+                    </Text>
+                  </View>
+                ) : (
+                  <View style={styles.servicesContainer}>
+                    {filteredServices.map((item) => {
+                      const isSelected = item.selected;
+                      const catInfo = getCategoryMeta(item.category);
+
+                      return (
                         <View
                           key={item.id}
                           style={[
-                            styles.serviceCard,
+                            styles.catalogItemCard,
                             {
-                              backgroundColor: item.selected ? theme.colors.primary + '0A' : theme.colors.background,
-                              borderColor: item.selected ? theme.colors.primary : theme.colors.border
-                            }
+                              backgroundColor: isSelected ? theme.colors.primary + '0C' : (isDarkMode ? '#1E293B' : '#F8FAFC'),
+                              borderColor: isSelected ? theme.colors.primary : theme.colors.border,
+                            },
                           ]}
                         >
                           <TouchableOpacity
-                            style={styles.serviceHeaderRow}
+                            style={{ flexDirection: 'row', alignItems: 'center', width: '100%' }}
                             onPress={() => handleToggleService(item.id)}
                             activeOpacity={0.7}
                           >
-                            <MaterialCommunityIcons
-                              name={item.selected ? 'checkbox-marked-circle' : 'checkbox-blank-circle-outline'}
-                              size={24}
-                              color={item.selected ? theme.colors.primary : theme.colors.placeholder}
-                            />
-                            <View style={styles.serviceInfo}>
-                              <Text style={[styles.serviceName, { color: theme.colors.text }]}>{item.name}</Text>
-                              <Text style={[styles.serviceMeta, { color: theme.colors.placeholder }]}>
-                                {item.duration} mins{item.isCustom ? ' · Your service' : ''}
+                            <View style={[styles.checkboxSquare, { borderColor: isSelected ? theme.colors.primary : theme.colors.border, backgroundColor: isSelected ? theme.colors.primary : 'transparent' }]}>
+                              {isSelected && <MaterialCommunityIcons name="check" size={14} color="#FFFFFF" />}
+                            </View>
+
+                            <View style={[styles.catIconCircle, { width: 34, height: 34, marginLeft: 10, marginRight: 10, backgroundColor: catInfo.bg }]}>
+                              <MaterialCommunityIcons name={(item.icon || catInfo.icon) as any} size={18} color={catInfo.text} />
+                            </View>
+
+                            <View style={{ flex: 1 }}>
+                              <Text style={[styles.catalogItemName, { color: theme.colors.text }]} numberOfLines={1}>
+                                {item.name}
+                              </Text>
+                              <Text style={[styles.catalogItemCat, { color: theme.colors.placeholder }]}>
+                                {item.category}
                               </Text>
                             </View>
+
+                            {isSelected && (
+                              <View style={[styles.catalogActiveTag, { backgroundColor: theme.colors.primary + '18' }]}>
+                                <Text style={[styles.catalogActiveTagText, { color: theme.colors.primary }]}>Active</Text>
+                              </View>
+                            )}
                           </TouchableOpacity>
 
-                          {item.selected && (
-                            <View style={styles.priceRow}>
-                              <View style={styles.fieldCol}>
-                                <Text style={[styles.priceLabel, { color: theme.colors.placeholder }]}>
-                                  Rate:
+                          {/* Custom Rate & Timing Fields */}
+                          {isSelected && (
+                            <View style={[styles.catalogConfigBox, { backgroundColor: isDarkMode ? '#0F172A' : '#FFFFFF', borderColor: theme.colors.border }]}>
+                              <View style={styles.catalogConfigField}>
+                                <Text style={[styles.catalogConfigLabel, { color: theme.colors.placeholder }]}>
+                                  Rate (£)
                                 </Text>
-                                <View style={[styles.priceInputWrapper, { borderColor: theme.colors.border, backgroundColor: theme.colors.card }]}>
-                                  <Text style={[styles.currencyPrefix, { color: theme.colors.primary }]}>£</Text>
+                                <View style={[styles.catalogInputWrap, { backgroundColor: isDarkMode ? '#1E293B' : '#F8FAFC', borderColor: theme.colors.border }]}>
+                                  <Text style={[styles.catalogCurrencyText, { color: theme.colors.primary }]}>£</Text>
                                   <TextInput
-                                    style={[styles.priceInput, { color: theme.colors.text }]}
+                                    style={[styles.catalogInputText, { color: theme.colors.text }]}
                                     keyboardType="decimal-pad"
                                     value={item.price}
-                                    placeholder={String(item.defaultPrice)}
+                                    placeholder={String(item.defaultPrice || '45')}
                                     placeholderTextColor={theme.colors.placeholder}
-                                    onChangeText={(text) => handlePriceChange(item.id, text)}
+                                    onChangeText={(val) => handlePriceChange(item.id, val)}
                                   />
                                 </View>
                               </View>
 
-                              <View style={styles.fieldCol}>
-                                <Text style={[styles.priceLabel, { color: theme.colors.placeholder }]}>
-                                  Timing:
+                              <View style={styles.catalogConfigField}>
+                                <Text style={[styles.catalogConfigLabel, { color: theme.colors.placeholder }]}>
+                                  Timing (mins)
                                 </Text>
-                                <View style={[styles.priceInputWrapper, { borderColor: theme.colors.border, backgroundColor: theme.colors.card }]}>
-                                  <MaterialCommunityIcons name="clock-outline" size={13} color={theme.colors.placeholder} style={{ marginRight: 3 }} />
+                                <View style={[styles.catalogInputWrap, { backgroundColor: isDarkMode ? '#1E293B' : '#F8FAFC', borderColor: theme.colors.border }]}>
+                                  <MaterialCommunityIcons name="clock-outline" size={13} color={theme.colors.placeholder} style={{ marginRight: 4 }} />
                                   <TextInput
-                                    style={[styles.priceInput, { color: theme.colors.text, minWidth: 36 }]}
+                                    style={[styles.catalogInputText, { color: theme.colors.text }]}
                                     keyboardType="number-pad"
                                     value={String(item.duration)}
                                     placeholder="45"
                                     placeholderTextColor={theme.colors.placeholder}
-                                    onChangeText={(text) => handleDurationChange(item.id, text)}
+                                    onChangeText={(val) => handleDurationChange(item.id, val)}
                                   />
-                                  <Text style={{ fontFamily: fonts.medium, fontSize: 11, color: theme.colors.placeholder, marginLeft: 2 }}>m</Text>
+                                  <Text style={[styles.catalogUnitText, { color: theme.colors.placeholder }]}>min</Text>
                                 </View>
                               </View>
                             </View>
                           )}
                         </View>
-                      ))}
-                    </View>
-
-                    <TouchableOpacity
-                      style={[styles.addCustomBtn, { borderColor: theme.colors.primary }]}
-                      onPress={() => openCustomServiceModal(group.name)}
-                    >
-                      <MaterialCommunityIcons name="plus-circle-outline" size={18} color={theme.colors.primary} />
-                      <Text style={[styles.addCustomBtnText, { color: theme.colors.primary }]}>Add a {group.name} service</Text>
-                    </TouchableOpacity>
+                      );
+                    })}
                   </View>
-                );
-              })
+                )}
+              </>
             )}
 
             <TouchableOpacity
@@ -1374,7 +1392,7 @@ export default function GarageSetupScreen({ route, navigation }: any) {
               ) : (
                 <>
                   <MaterialCommunityIcons name="content-save-check" size={20} color={onPrimary} />
-                  <Text style={[styles.saveBtnText, { color: onPrimary }]}>Save Services & Continue to Docs ➔</Text>
+                  <Text style={[styles.saveBtnText, { color: onPrimary }]}>Save & Continue ({selectedCount}) ➔</Text>
                 </>
               )}
             </TouchableOpacity>
@@ -1530,93 +1548,6 @@ export default function GarageSetupScreen({ route, navigation }: any) {
           setFoundLocation(null);
         }}
       />
-
-      {/* Custom Service Modal */}
-      <Modal visible={customModalVisible} transparent animationType="slide">
-        <View style={styles.modalOverlay}>
-          <View style={[styles.modalContent, { backgroundColor: theme.colors.card }]}>
-            <Text style={[styles.modalTitle, { color: theme.colors.text }]}>Add a Service</Text>
-
-            <View style={styles.fieldGroup}>
-              <Text style={[styles.fieldLabel, { color: theme.colors.text }]}>Category *</Text>
-              <View style={styles.categoryChips}>
-                {(catalog || []).map(group => {
-                  const active = customCategory === group.name;
-                  return (
-                    <TouchableOpacity
-                      key={group.id}
-                      style={[
-                        styles.categoryChip,
-                        {
-                          backgroundColor: active ? theme.colors.primary : theme.colors.background,
-                          borderColor: active ? theme.colors.primary : theme.colors.border
-                        }
-                      ]}
-                      onPress={() => setCustomCategory(group.name)}
-                    >
-                      <MaterialCommunityIcons name={group.icon as any} size={14} color={active ? onPrimary : group.iconColor} />
-                      <Text style={[styles.categoryChipText, { color: active ? onPrimary : theme.colors.text }]}>{group.name}</Text>
-                    </TouchableOpacity>
-                  );
-                })}
-              </View>
-            </View>
-
-            <View style={styles.fieldGroup}>
-              <Text style={[styles.fieldLabel, { color: theme.colors.text }]}>Service Name *</Text>
-              <TextInput
-                style={[styles.input, { backgroundColor: theme.colors.background, borderColor: theme.colors.border, color: theme.colors.text }]}
-                placeholder="e.g. Timing Belt Replacement"
-                placeholderTextColor={theme.colors.placeholder}
-                value={customName}
-                onChangeText={setCustomName}
-              />
-            </View>
-
-            <View style={styles.rowFields}>
-              <View style={[styles.fieldGroup, { flex: 1, marginRight: 8 }]}>
-                <Text style={[styles.fieldLabel, { color: theme.colors.text }]}>Price (£) *</Text>
-                <TextInput
-                  style={[styles.input, { backgroundColor: theme.colors.background, borderColor: theme.colors.border, color: theme.colors.text }]}
-                  placeholder="e.g. 195.00"
-                  placeholderTextColor={theme.colors.placeholder}
-                  keyboardType="decimal-pad"
-                  value={customPrice}
-                  onChangeText={setCustomPrice}
-                />
-              </View>
-
-              <View style={[styles.fieldGroup, { flex: 1, marginLeft: 8 }]}>
-                <Text style={[styles.fieldLabel, { color: theme.colors.text }]}>Duration (Mins)</Text>
-                <TextInput
-                  style={[styles.input, { backgroundColor: theme.colors.background, borderColor: theme.colors.border, color: theme.colors.text }]}
-                  placeholder="e.g. 60"
-                  placeholderTextColor={theme.colors.placeholder}
-                  keyboardType="numeric"
-                  value={customDuration}
-                  onChangeText={setCustomDuration}
-                />
-              </View>
-            </View>
-
-            <View style={styles.modalActionRow}>
-              <TouchableOpacity
-                style={[styles.modalCancelBtn, { borderColor: theme.colors.border }]}
-                onPress={() => setCustomModalVisible(false)}
-              >
-                <Text style={[styles.modalCancelText, { color: theme.colors.text }]}>Cancel</Text>
-              </TouchableOpacity>
-
-              <TouchableOpacity
-                style={[styles.modalAddBtn, { backgroundColor: theme.colors.primary }]}
-                onPress={handleAddCustomService}
-              >
-                <Text style={[styles.modalAddText, { color: onPrimary }]}>Add Service</Text>
-              </TouchableOpacity>
-            </View>
-          </View>
-        </View>
-      </Modal>
     </KeyboardAvoidingView>
   );
 }
@@ -2113,159 +2044,112 @@ const styles = StyleSheet.create({
     fontFamily: fonts.bold,
     fontSize: 13,
   },
-  categorySection: {
-    borderTopWidth: 1,
-    paddingTop: 14,
-    marginBottom: 16,
-  },
-  categoryHeaderRow: {
+  searchInputWrapper: {
     flexDirection: 'row',
     alignItems: 'center',
-    gap: 10,
-    marginBottom: 10,
-  },
-  categoryIconBox: {
-    width: 34,
-    height: 34,
-    borderRadius: 9,
-    alignItems: 'center',
-    justifyContent: 'center',
-  },
-  categoryHeaderText: {
-    flex: 1,
-  },
-  categoryTitle: {
-    fontSize: 15,
-    fontFamily: fonts.bold,
-  },
-  categoryDesc: {
-    fontSize: 11.5,
-    fontFamily: fonts.regular,
-    marginTop: 1,
-  },
-  selectedPill: {
-    paddingHorizontal: 8,
-    paddingVertical: 3,
-    borderRadius: 999,
-  },
-  selectedPillText: {
-    fontSize: 10.5,
-    fontFamily: fonts.bold,
-  },
-  categoryEmpty: {
-    fontSize: 12,
-    fontFamily: fonts.regular,
-    fontStyle: 'italic',
-  },
-  serviceMeta: {
-    fontSize: 11.5,
-    fontFamily: fonts.medium,
-    marginTop: 2,
-  },
-  categoryChips: {
-    flexDirection: 'row',
-    flexWrap: 'wrap',
-    gap: 8,
-  },
-  categoryChip: {
-    flexDirection: 'row',
-    alignItems: 'center',
-    gap: 5,
+    paddingHorizontal: 10,
+    borderRadius: 8,
     borderWidth: 1,
-    borderRadius: 999,
-    paddingHorizontal: 11,
-    paddingVertical: 6,
+    height: 38,
   },
-  categoryChipText: {
+  searchInput: {
+    fontFamily: fonts.regular,
     fontSize: 12.5,
-    fontFamily: fonts.semiBold,
+    flex: 1,
+    padding: 0,
+  },
+  catSelectPill: {
+    paddingHorizontal: 12,
+    paddingVertical: 6,
+    borderRadius: 14,
+    borderWidth: 1,
+    marginRight: 6,
   },
   servicesContainer: {
-    gap: 10,
+    gap: 8,
     marginBottom: 14,
   },
-  serviceCard: {
+  catalogItemCard: {
+    padding: 10,
     borderRadius: 10,
+    borderWidth: 1,
+    marginBottom: 8,
+  },
+  checkboxSquare: {
+    width: 20,
+    height: 20,
+    borderRadius: 5,
     borderWidth: 1.5,
-    padding: 12,
+    alignItems: 'center',
+    justifyContent: 'center',
   },
-  serviceHeaderRow: {
+  catIconCircle: {
+    width: 34,
+    height: 34,
+    borderRadius: 8,
+    alignItems: 'center',
+    justifyContent: 'center',
+  },
+  catalogItemName: {
+    fontFamily: fonts.bold,
+    fontSize: 12.5,
+  },
+  catalogItemCat: {
+    fontFamily: fonts.medium,
+    fontSize: 10.5,
+    marginTop: 1,
+  },
+  catalogActiveTag: {
+    paddingHorizontal: 8,
+    paddingVertical: 3,
+    borderRadius: 6,
+  },
+  catalogActiveTagText: {
+    fontFamily: fonts.bold,
+    fontSize: 10.5,
+  },
+  catalogConfigBox: {
     flexDirection: 'row',
     alignItems: 'center',
-    gap: 12,
-  },
-  serviceInfo: {
-    flex: 1,
-  },
-  serviceName: {
-    fontSize: 14,
-    fontFamily: fonts.bold,
-  },
-  categoryBadge: {
-    alignSelf: 'flex-start',
-    backgroundColor: '#0284C715',
-    paddingHorizontal: 6,
-    paddingVertical: 2,
-    borderRadius: 4,
-    marginTop: 3,
-  },
-  categoryBadgeText: {
-    fontSize: 10,
-    fontFamily: fonts.bold,
-    color: '#0284C7',
-  },
-  priceRow: {
-    flexDirection: 'row',
-    alignItems: 'center',
-    justifyContent: 'flex-end',
-    gap: 12,
+    gap: 10,
     marginTop: 8,
     paddingTop: 8,
-    borderTopWidth: 1,
-    borderTopColor: 'rgba(150,150,150,0.15)',
+    paddingHorizontal: 8,
+    paddingBottom: 8,
+    borderRadius: 8,
+    borderWidth: 1,
   },
-  fieldCol: {
-    flexDirection: 'row',
-    alignItems: 'center',
-    gap: 6,
+  catalogConfigField: {
+    flex: 1,
   },
-  priceLabel: {
-    fontSize: 12,
-    fontFamily: fonts.semiBold,
+  catalogConfigLabel: {
+    fontFamily: fonts.bold,
+    fontSize: 10.5,
+    marginBottom: 4,
   },
-  priceInputWrapper: {
+  catalogInputWrap: {
     flexDirection: 'row',
     alignItems: 'center',
     borderWidth: 1,
-    borderRadius: 8,
+    borderRadius: 6,
     paddingHorizontal: 8,
-    height: 36,
-    minWidth: 90,
+    height: 34,
   },
-  currencyPrefix: {
-    fontSize: 14,
+  catalogCurrencyText: {
     fontFamily: fonts.bold,
+    fontSize: 12.5,
     marginRight: 4,
   },
-  priceInput: {
-    fontSize: 14,
+  catalogInputText: {
     fontFamily: fonts.bold,
+    fontSize: 12.5,
+    flex: 1,
     padding: 0,
-    minWidth: 50,
   },
-  addCustomBtn: {
-    flexDirection: 'row',
-    alignItems: 'center',
-    justifyContent: 'center',
-    paddingVertical: 12,
-    borderWidth: 1.5,
-    borderStyle: 'dashed',
-    borderRadius: 10,
-    gap: 6,
-  },
-  addCustomBtnText: {
-    fontFamily: fonts.bold,
-    fontSize: 13,
+  catalogUnitText: {
+    fontFamily: fonts.medium,
+    fontSize: 10.5,
+    marginLeft: 2,
   },
   // Document Styles
   docSubheader: {

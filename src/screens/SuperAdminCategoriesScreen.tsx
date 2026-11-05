@@ -11,6 +11,7 @@ import {
   TextInput,
   RefreshControl,
   Dimensions,
+  Pressable,
 } from 'react-native';
 import MaterialCommunityIcons from 'react-native-vector-icons/MaterialCommunityIcons';
 import { SafeAreaView } from 'react-native-safe-area-context';
@@ -18,7 +19,7 @@ import { useAppTheme } from '../context/ThemeContext';
 import { useAppValues, ServiceCategory } from '../context/DataContext';
 import { fonts } from '../theme/theme';
 
-const { width } = Dimensions.get('window');
+const { width, height } = Dimensions.get('window');
 
 function resolveCategoryDesign(name = '') {
   const s = name.toLowerCase().trim();
@@ -43,10 +44,20 @@ const PRESET_ICONS = [
   { name: 'engine', label: 'Diagnostics' },
   { name: 'car-battery', label: 'Battery' },
   { name: 'snowflake', label: 'Air Con' },
+  { name: 'oil', label: 'Oil/Fluids' },
+  { name: 'cog-sync', label: 'Clutch' },
+  { name: 'car-traction-control', label: 'Suspension' },
   { name: 'pipe', label: 'Exhaust' },
   { name: 'car-wash', label: 'Valeting' },
+  { name: 'car-light-high', label: 'Lighting' },
+  { name: 'car-door', label: 'Bodywork' },
+  { name: 'car-windshield', label: 'Glass' },
+  { name: 'speedometer', label: 'Performance' },
+  { name: 'shield-car', label: 'Safety' },
+  { name: 'tow-truck', label: 'Recovery' },
   { name: 'car-electric', label: 'EV/Hybrid' },
   { name: 'wrench', label: 'General' },
+  { name: 'dots-horizontal-circle-outline', label: 'Other' },
 ];
 
 const PRESET_COLORS = [
@@ -67,6 +78,7 @@ export default function SuperAdminCategoriesScreen({ navigation }: any) {
     serviceCategories,
     fetchServiceCategories,
     createServiceCategory,
+    updateServiceCategory,
     deleteServiceCategory,
     fetchPlatformServices,
     createPlatformService,
@@ -94,6 +106,9 @@ export default function SuperAdminCategoriesScreen({ navigation }: any) {
   const [categoryModalVisible, setCategoryModalVisible] = useState(false);
   const [savingCategory, setSavingCategory] = useState(false);
   const [deletingCatId, setDeletingCatId] = useState<string | null>(null);
+  const [editingCatId, setEditingCatId] = useState<string | null>(null);
+  const [isManualIconSet, setIsManualIconSet] = useState(false);
+  const [activeMenuCatId, setActiveMenuCatId] = useState<string | null>(null);
 
   // Category Form State
   const [catName, setCatName] = useState('');
@@ -155,18 +170,55 @@ export default function SuperAdminCategoriesScreen({ navigation }: any) {
   }, [loadData]);
 
   const onRefresh = () => {
+    setActiveMenuCatId(null);
     setRefreshing(true);
     loadData();
   };
 
   // ─── CATEGORY HANDLERS ───
   const handleOpenAddCategory = () => {
+    setActiveMenuCatId(null);
+    setEditingCatId(null);
     setCatName('');
     setCatDescription('');
-    setCatIcon('wrench');
+    setCatIcon('car-cog');
     setCatColor('#1677FF');
     setCatBg('#1677FF15');
+    setIsManualIconSet(false);
     setCategoryModalVisible(true);
+  };
+
+  const handleOpenEditCategory = (cat: ServiceCategory) => {
+    setActiveMenuCatId(null);
+    setEditingCatId(cat._id || cat.id || null);
+    setCatName(cat.name || '');
+    setCatDescription(cat.description || '');
+    setCatIcon(cat.icon || 'wrench');
+    setCatColor(cat.iconColor || '#1677FF');
+    setCatBg(cat.iconBg || (cat.iconColor ? cat.iconColor + '15' : '#1677FF15'));
+    setIsManualIconSet(true);
+    setCategoryModalVisible(true);
+  };
+
+  const handleCatNameChange = (text: string) => {
+    setCatName(text);
+    if (!isManualIconSet && !editingCatId && text.trim().length >= 2) {
+      const design = resolveCategoryDesign(text);
+      setCatIcon(design.icon);
+      setCatColor(design.iconColor);
+      setCatBg(design.iconBg);
+    }
+  };
+
+  const handleSelectIcon = (iconName: string) => {
+    setCatIcon(iconName);
+    setIsManualIconSet(true);
+  };
+
+  const handleSelectColor = (colorHex: string, bgHex?: string) => {
+    setCatColor(colorHex);
+    setCatBg(bgHex || colorHex + '18');
+    setIsManualIconSet(true);
   };
 
   const handleSaveCategory = async () => {
@@ -178,20 +230,34 @@ export default function SuperAdminCategoriesScreen({ navigation }: any) {
 
     setSavingCategory(true);
     try {
-      const design = resolveCategoryDesign(cleanName);
-      await createServiceCategory({
-        name: cleanName,
-        description: catDescription.trim(),
-        icon: design.icon,
-        iconColor: design.iconColor,
-        iconBg: design.iconBg,
-      });
+      const finalIcon = catIcon || 'wrench';
+      const finalColor = catColor || '#1677FF';
+      const finalBg = catBg || finalColor + '15';
 
-      Alert.alert('Success', `Category "${cleanName}" created! You can now create services under it.`);
+      if (editingCatId) {
+        await updateServiceCategory(editingCatId, {
+          name: cleanName,
+          description: catDescription.trim(),
+          icon: finalIcon,
+          iconColor: finalColor,
+          iconBg: finalBg,
+        });
+        Alert.alert('Success', `Category "${cleanName}" updated successfully!`);
+      } else {
+        await createServiceCategory({
+          name: cleanName,
+          description: catDescription.trim(),
+          icon: finalIcon,
+          iconColor: finalColor,
+          iconBg: finalBg,
+        });
+        Alert.alert('Success', `Category "${cleanName}" created! You can now create services under it.`);
+      }
+
       setCategoryModalVisible(false);
       loadData();
     } catch (err: any) {
-      Alert.alert('Error', err?.message || 'Failed to create category.');
+      Alert.alert('Error', err?.message || 'Failed to save category.');
     } finally {
       setSavingCategory(false);
     }
@@ -425,7 +491,10 @@ export default function SuperAdminCategoriesScreen({ navigation }: any) {
             styles.tabItem,
             activeTab === 'categories' && [styles.activeTabItem, { borderColor: theme.colors.primary }],
           ]}
-          onPress={() => setActiveTab('categories')}
+          onPress={() => {
+            setActiveMenuCatId(null);
+            setActiveTab('categories');
+          }}
           activeOpacity={0.7}
         >
           <MaterialCommunityIcons
@@ -449,7 +518,10 @@ export default function SuperAdminCategoriesScreen({ navigation }: any) {
             styles.tabItem,
             activeTab === 'services' && [styles.activeTabItem, { borderColor: theme.colors.primary }],
           ]}
-          onPress={() => setActiveTab('services')}
+          onPress={() => {
+            setActiveMenuCatId(null);
+            setActiveTab('services');
+          }}
           activeOpacity={0.7}
         >
           <MaterialCommunityIcons
@@ -473,7 +545,10 @@ export default function SuperAdminCategoriesScreen({ navigation }: any) {
             styles.tabItem,
             activeTab === 'approvals' && [styles.activeTabItem, { borderColor: theme.colors.primary }],
           ]}
-          onPress={() => setActiveTab('approvals')}
+          onPress={() => {
+            setActiveMenuCatId(null);
+            setActiveTab('approvals');
+          }}
           activeOpacity={0.7}
         >
           <MaterialCommunityIcons
@@ -503,10 +578,17 @@ export default function SuperAdminCategoriesScreen({ navigation }: any) {
         contentContainerStyle={styles.contentContainer}
         refreshControl={<RefreshControl refreshing={refreshing} onRefresh={onRefresh} colors={[theme.colors.primary]} />}
         showsVerticalScrollIndicator={false}
+        onScrollBeginDrag={() => setActiveMenuCatId(null)}
       >
         {/* ════════════ TAB 1: CATEGORIES ════════════ */}
         {activeTab === 'categories' && (
-          <View>
+          <View style={{ position: 'relative' }}>
+            {activeMenuCatId ? (
+              <Pressable
+                style={[StyleSheet.absoluteFill, { zIndex: 10 }]}
+                onPress={() => setActiveMenuCatId(null)}
+              />
+            ) : null}
             <View style={styles.sectionHeaderRow}>
               <Text style={[styles.sectionHeading, { color: theme.colors.text }]}>
                 Platform Service Categories
@@ -536,13 +618,18 @@ export default function SuperAdminCategoriesScreen({ navigation }: any) {
                 const svcsInCat = platformServices.filter(
                   (s) => (s.category || '').toLowerCase().trim() === cat.name.toLowerCase().trim()
                 ).length;
+                const isMenuOpen = activeMenuCatId === catId;
 
                 return (
                   <View
                     key={catId}
                     style={[
                       styles.categoryCard,
-                      { backgroundColor: theme.colors.card, borderColor: theme.colors.border },
+                      {
+                        backgroundColor: theme.colors.card,
+                        borderColor: theme.colors.border,
+                        zIndex: isMenuOpen ? 99 : 1,
+                      },
                     ]}
                   >
                     <View style={[styles.categoryIconCircle, { backgroundColor: cat.iconBg || '#1677FF15' }]}>
@@ -570,18 +657,82 @@ export default function SuperAdminCategoriesScreen({ navigation }: any) {
                       ) : null}
                     </View>
 
+                    {/* Three Dots Button */}
                     <TouchableOpacity
-                      style={[styles.deleteBtn, { backgroundColor: '#EF444415' }]}
-                      onPress={() => handleDeleteCategory(cat)}
-                      disabled={isDeleting}
+                      style={[
+                        styles.threeDotsBtn,
+                        {
+                          backgroundColor: isMenuOpen
+                            ? theme.colors.primary + '18'
+                            : isDarkMode
+                            ? '#33415530'
+                            : '#F1F5F9',
+                        },
+                      ]}
+                      onPress={() => setActiveMenuCatId(isMenuOpen ? null : catId)}
                       hitSlop={{ top: 8, bottom: 8, left: 8, right: 8 }}
+                      activeOpacity={0.7}
                     >
-                      {isDeleting ? (
-                        <ActivityIndicator size="small" color="#EF4444" />
-                      ) : (
-                        <MaterialCommunityIcons name="trash-can-outline" size={19} color="#EF4444" />
-                      )}
+                      <MaterialCommunityIcons
+                        name="dots-vertical"
+                        size={20}
+                        color={isMenuOpen ? theme.colors.primary : theme.colors.text}
+                      />
                     </TouchableOpacity>
+
+                    {/* Absolute Popover Menu for Edit & Delete */}
+                    {isMenuOpen && (
+                      <View
+                        style={[
+                          styles.categoryMenuPopup,
+                          {
+                            backgroundColor: isDarkMode ? '#1E293B' : '#FFFFFF',
+                            borderColor: theme.colors.border,
+                          },
+                        ]}
+                      >
+                        <TouchableOpacity
+                          style={styles.categoryMenuItem}
+                          onPress={() => {
+                            setActiveMenuCatId(null);
+                            handleOpenEditCategory(cat);
+                          }}
+                          activeOpacity={0.7}
+                        >
+                          <MaterialCommunityIcons
+                            name="pencil-outline"
+                            size={16}
+                            color={theme.colors.primary}
+                            style={{ marginRight: 8 }}
+                          />
+                          <Text style={[styles.categoryMenuText, { color: theme.colors.text }]}>Edit</Text>
+                        </TouchableOpacity>
+
+                        <View style={[styles.categoryMenuDivider, { backgroundColor: theme.colors.border }]} />
+
+                        <TouchableOpacity
+                          style={styles.categoryMenuItem}
+                          onPress={() => {
+                            setActiveMenuCatId(null);
+                            handleDeleteCategory(cat);
+                          }}
+                          disabled={isDeleting}
+                          activeOpacity={0.7}
+                        >
+                          {isDeleting ? (
+                            <ActivityIndicator size="small" color="#EF4444" style={{ marginRight: 8 }} />
+                          ) : (
+                            <MaterialCommunityIcons
+                              name="trash-can-outline"
+                              size={16}
+                              color="#EF4444"
+                              style={{ marginRight: 8 }}
+                            />
+                          )}
+                          <Text style={[styles.categoryMenuText, { color: '#EF4444' }]}>Delete</Text>
+                        </TouchableOpacity>
+                      </View>
+                    )}
                   </View>
                 );
               })
@@ -877,7 +1028,7 @@ export default function SuperAdminCategoriesScreen({ navigation }: any) {
         )}
       </ScrollView>
 
-      {/* ─── ADD CATEGORY MODAL ─── */}
+      {/* ─── ADD / EDIT CATEGORY MODAL ─── */}
       <Modal
         visible={categoryModalVisible}
         animationType="slide"
@@ -888,26 +1039,105 @@ export default function SuperAdminCategoriesScreen({ navigation }: any) {
           <View style={[styles.modalCard, { backgroundColor: theme.colors.card, borderColor: theme.colors.border }]}>
             <View style={[styles.modalHeader, { borderBottomColor: theme.colors.border }]}>
               <View style={{ flexDirection: 'row', alignItems: 'center' }}>
-                <View style={[styles.modalHeaderIcon, { backgroundColor: theme.colors.primary + '15' }]}>
-                  <MaterialCommunityIcons name="shape-plus" size={20} color={theme.colors.primary} />
+                <View style={[styles.modalHeaderIcon, { backgroundColor: catBg }]}>
+                  <MaterialCommunityIcons name={(catIcon || 'shape-plus') as any} size={20} color={catColor} />
                 </View>
-                <Text style={[styles.modalHeaderTitle, { color: theme.colors.text }]}>Add Service Category</Text>
+                <Text style={[styles.modalHeaderTitle, { color: theme.colors.text }]}>
+                  {editingCatId ? 'Edit Service Category' : 'Add Service Category'}
+                </Text>
               </View>
               <TouchableOpacity onPress={() => setCategoryModalVisible(false)} hitSlop={{ top: 8, bottom: 8, left: 8, right: 8 }}>
                 <MaterialCommunityIcons name="close" size={20} color={theme.colors.placeholder} />
               </TouchableOpacity>
             </View>
 
-            <ScrollView contentContainerStyle={styles.modalBody}>
-              <Text style={[styles.inputLabel, { color: theme.colors.text }]}>Category Name *</Text>
+            <ScrollView contentContainerStyle={styles.modalBody} showsVerticalScrollIndicator={false}>
+              {/* Live Preview Card */}
+              <Text style={[styles.inputLabel, { color: theme.colors.text, marginTop: 0 }]}>Live Preview</Text>
+              <View style={[styles.previewCard, { backgroundColor: isDarkMode ? '#1E293B' : '#F8FAFC', borderColor: theme.colors.border }]}>
+                <View style={[styles.previewIconCircle, { backgroundColor: catBg }]}>
+                  <MaterialCommunityIcons name={(catIcon || 'wrench') as any} size={24} color={catColor} />
+                </View>
+                <View style={{ flex: 1, marginLeft: 12 }}>
+                  <Text style={[styles.previewName, { color: theme.colors.text }]} numberOfLines={1}>
+                    {catName.trim() || 'Category Name Preview'}
+                  </Text>
+                  <Text style={[styles.previewSub, { color: theme.colors.placeholder }]}>
+                    Icon: {catIcon} • Accent: {catColor}
+                  </Text>
+                </View>
+              </View>
+
+              <Text style={[styles.inputLabel, { color: theme.colors.text, marginTop: 14 }]}>Category Name *</Text>
               <TextInput
                 style={[styles.textInput, { backgroundColor: theme.colors.background, borderColor: theme.colors.border, color: theme.colors.text }]}
                 placeholder="e.g. Tyres, Air Conditioning, Brakes..."
                 placeholderTextColor={theme.colors.placeholder}
                 value={catName}
-                onChangeText={setCatName}
+                onChangeText={handleCatNameChange}
                 maxLength={40}
               />
+
+              {/* Color Theme Selector */}
+              <Text style={[styles.inputLabel, { color: theme.colors.text, marginTop: 14 }]}>Icon & Accent Color</Text>
+              <View style={styles.colorPaletteRow}>
+                {PRESET_COLORS.map((item) => {
+                  const isSelected = catColor.toLowerCase() === item.color.toLowerCase();
+                  return (
+                    <TouchableOpacity
+                      key={item.color}
+                      style={[
+                        styles.colorSwatch,
+                        { backgroundColor: item.color },
+                        isSelected && styles.colorSwatchSelected,
+                      ]}
+                      onPress={() => handleSelectColor(item.color, item.bg)}
+                      activeOpacity={0.8}
+                    >
+                      {isSelected && (
+                        <MaterialCommunityIcons name="check" size={16} color="#FFFFFF" />
+                      )}
+                    </TouchableOpacity>
+                  );
+                })}
+              </View>
+
+              {/* Icon Grid Selector */}
+              <Text style={[styles.inputLabel, { color: theme.colors.text, marginTop: 14 }]}>Choose Category Icon</Text>
+              <View style={styles.iconGrid}>
+                {PRESET_ICONS.map((item) => {
+                  const isSelected = catIcon === item.name;
+                  return (
+                    <TouchableOpacity
+                      key={item.name}
+                      style={[
+                        styles.iconTile,
+                        {
+                          backgroundColor: isSelected ? catBg : (isDarkMode ? '#1E293B' : '#F1F5F9'),
+                          borderColor: isSelected ? catColor : 'transparent',
+                        },
+                      ]}
+                      onPress={() => handleSelectIcon(item.name)}
+                      activeOpacity={0.7}
+                    >
+                      <MaterialCommunityIcons
+                        name={item.name as any}
+                        size={22}
+                        color={isSelected ? catColor : theme.colors.placeholder}
+                      />
+                      <Text
+                        style={[
+                          styles.iconTileText,
+                          { color: isSelected ? catColor : theme.colors.text },
+                        ]}
+                        numberOfLines={1}
+                      >
+                        {item.label}
+                      </Text>
+                    </TouchableOpacity>
+                  );
+                })}
+              </View>
 
               <Text style={[styles.inputLabel, { color: theme.colors.text, marginTop: 14 }]}>Description (Optional)</Text>
               <TextInput
@@ -938,7 +1168,9 @@ export default function SuperAdminCategoriesScreen({ navigation }: any) {
                 {savingCategory ? (
                   <ActivityIndicator size="small" color="#FFFFFF" />
                 ) : (
-                  <Text style={styles.modalSaveBtnText}>Create Category</Text>
+                  <Text style={styles.modalSaveBtnText}>
+                    {editingCatId ? 'Save Changes' : 'Create Category'}
+                  </Text>
                 )}
               </TouchableOpacity>
             </View>
@@ -1286,12 +1518,45 @@ const styles = StyleSheet.create({
     paddingHorizontal: 20,
   },
   categoryCard: {
+    position: 'relative',
     flexDirection: 'row',
     alignItems: 'center',
     padding: 14,
     borderRadius: 12,
     borderWidth: 1,
     marginBottom: 10,
+  },
+  threeDotsBtn: {
+    width: 36,
+    height: 36,
+    borderRadius: 8,
+    alignItems: 'center',
+    justifyContent: 'center',
+  },
+  categoryMenuPopup: {
+    position: 'absolute',
+    top: 50,
+    right: 10,
+    minWidth: 128,
+    borderRadius: 10,
+    borderWidth: 1,
+    paddingVertical: 4,
+    elevation: 0,
+    zIndex: 999,
+  },
+  categoryMenuItem: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    paddingHorizontal: 14,
+    paddingVertical: 10,
+  },
+  categoryMenuText: {
+    fontFamily: fonts.semiBold,
+    fontSize: 13,
+  },
+  categoryMenuDivider: {
+    height: StyleSheet.hairlineWidth,
+    marginHorizontal: 8,
   },
   categoryIconCircle: {
     width: 44,
@@ -1327,6 +1592,13 @@ const styles = StyleSheet.create({
     fontFamily: fonts.regular,
     fontSize: 12,
     marginTop: 3,
+  },
+  editBtn: {
+    width: 36,
+    height: 36,
+    borderRadius: 8,
+    alignItems: 'center',
+    justifyContent: 'center',
   },
   deleteBtn: {
     width: 36,
@@ -1514,24 +1786,76 @@ const styles = StyleSheet.create({
     borderWidth: 1,
     marginRight: 8,
   },
-  presetIconsGrid: {
+  previewCard: {
     flexDirection: 'row',
-    flexWrap: 'wrap',
-    gap: 8,
-    marginTop: 6,
-  },
-  presetIconBtn: {
-    width: (width - 36 - 24) / 4,
-    height: 60,
-    borderRadius: 8,
+    alignItems: 'center',
+    padding: 12,
+    borderRadius: 12,
     borderWidth: 1,
+    marginBottom: 6,
+  },
+  previewIconCircle: {
+    width: 46,
+    height: 46,
+    borderRadius: 23,
     alignItems: 'center',
     justifyContent: 'center',
   },
-  presetIconLabel: {
-    fontSize: 10,
+  previewName: {
+    fontFamily: fonts.bold,
+    fontSize: 15,
+  },
+  previewSub: {
     fontFamily: fonts.medium,
+    fontSize: 12,
+    marginTop: 2,
+  },
+  colorPaletteRow: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    justifyContent: 'space-between',
+    paddingVertical: 6,
+    marginBottom: 6,
+  },
+  colorSwatch: {
+    width: 34,
+    height: 34,
+    borderRadius: 17,
+    alignItems: 'center',
+    justifyContent: 'center',
+    borderWidth: 2,
+    borderColor: 'transparent',
+  },
+  colorSwatchSelected: {
+    borderColor: '#FFFFFF',
+    elevation: 3,
+    shadowColor: '#000',
+    shadowOffset: { width: 0, height: 2 },
+    shadowOpacity: 0.25,
+    shadowRadius: 3,
+    transform: [{ scale: 1.15 }],
+  },
+  iconGrid: {
+    flexDirection: 'row',
+    flexWrap: 'wrap',
+    gap: 8,
+    marginTop: 4,
+    marginBottom: 6,
+  },
+  iconTile: {
+    width: (width - 36 - 24) / 4,
+    height: 60,
+    borderRadius: 10,
+    borderWidth: 1.5,
+    alignItems: 'center',
+    justifyContent: 'center',
+    paddingHorizontal: 4,
+  },
+  iconTileText: {
+    fontSize: 10,
+    fontFamily: fonts.semiBold,
     marginTop: 3,
+    textAlign: 'center',
   },
   modalFooter: {
     flexDirection: 'row',

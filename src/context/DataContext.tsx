@@ -159,6 +159,7 @@ interface DataContextType {
   fetchServiceCategories: () => Promise<ServiceCategory[]>;
   fetchServiceCatalog: () => Promise<ServiceCatalogGroup[]>;
   createServiceCategory: (catData: Partial<ServiceCategory>) => Promise<ServiceCategory>;
+  updateServiceCategory: (categoryId: string, updates: Partial<ServiceCategory>) => Promise<ServiceCategory>;
   deleteServiceCategory: (categoryId: string) => Promise<void>;
   fetchPlatformServices: (params?: any) => Promise<any[]>;
   createPlatformService: (serviceData: any) => Promise<any>;
@@ -1375,6 +1376,27 @@ export const DataProvider = ({ children }: { children: ReactNode }) => {
     }
   }, [authFetch, fetchServiceCategories]);
 
+  const updateServiceCategory = useCallback(async (categoryId: string, updates: Partial<ServiceCategory>): Promise<ServiceCategory> => {
+    try {
+      const response = await authFetch(`${BASE_URL}/service-categories/${categoryId}`, {
+        method: 'PUT',
+        headers: {
+          'Content-Type': 'application/json',
+        },
+        body: JSON.stringify(updates),
+      });
+      const data = await response.json();
+      if (!response.ok) {
+        throw new Error(data.error || 'Failed to update service category');
+      }
+      await fetchServiceCategories();
+      return data.category;
+    } catch (error) {
+      console.error('[DATA CONTEXT] updateServiceCategory error:', error);
+      throw error;
+    }
+  }, [authFetch, fetchServiceCategories]);
+
   const deleteServiceCategory = useCallback(async (categoryId: string): Promise<void> => {
     try {
       const response = await authFetch(`${BASE_URL}/service-categories/${categoryId}`, {
@@ -1497,6 +1519,7 @@ export const DataProvider = ({ children }: { children: ReactNode }) => {
         fetchServiceCategories,
         fetchServiceCatalog,
         createServiceCategory,
+        updateServiceCategory,
         deleteServiceCategory,
         fetchPlatformServices,
         createPlatformService,
