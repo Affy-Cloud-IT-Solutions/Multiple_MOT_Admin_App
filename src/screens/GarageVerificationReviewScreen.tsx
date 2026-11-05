@@ -17,6 +17,7 @@ import MaterialCommunityIcons from 'react-native-vector-icons/MaterialCommunityI
 import { useAppTheme } from '../context/ThemeContext';
 import { useAppValues, BASE_URL, Garage } from '../context/DataContext';
 import { fonts } from '../theme/theme';
+import { resolveImageUrl } from '../utils/imageUtils';
 
 const { width: SCREEN_WIDTH, height: SCREEN_HEIGHT } = Dimensions.get('window');
 
@@ -250,9 +251,9 @@ export default function GarageVerificationReviewScreen({ route, navigation }: an
         <View style={{ flexDirection: 'row', alignItems: 'center', flex: 1, marginHorizontal: 12 }}>
           <View style={{ width: 38, height: 38, borderRadius: 8, backgroundColor: theme.colors.primary + '15', alignItems: 'center', justifyContent: 'center', overflow: 'hidden', borderWidth: 1, borderColor: theme.colors.border, marginRight: 10 }}>
             {garage.logoUrl ? (
-              <Image source={{ uri: garage.logoUrl }} style={{ width: '100%', height: '100%' }} resizeMode="contain" />
+              <Image source={{ uri: resolveImageUrl(garage.logoUrl) }} style={{ width: '100%', height: '100%' }} resizeMode="contain" />
             ) : (garage.images && garage.images.length > 0) ? (
-              <Image source={{ uri: garage.images[0] }} style={{ width: '100%', height: '100%' }} resizeMode="cover" />
+              <Image source={{ uri: resolveImageUrl(garage.images[0]) }} style={{ width: '100%', height: '100%' }} resizeMode="cover" />
             ) : (
               <Text style={{ fontFamily: fonts.bold, fontSize: 16, color: theme.colors.primary }}>
                 {(garage.name || 'G').charAt(0).toUpperCase()}
@@ -479,7 +480,7 @@ export default function GarageVerificationReviewScreen({ route, navigation }: an
                   }}
                   style={[styles.photoCard, { borderColor: theme.colors.border }]}
                 >
-                  <Image source={{ uri: imgUrl }} style={styles.photoImg} resizeMode="cover" />
+                  <Image source={{ uri: resolveImageUrl(imgUrl) }} style={styles.photoImg} resizeMode="cover" />
                   <View style={styles.photoBadge}>
                     <Text style={styles.photoBadgeText}>Photo {idx + 1}</Text>
                   </View>

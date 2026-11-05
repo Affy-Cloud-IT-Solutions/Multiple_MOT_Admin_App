@@ -16,6 +16,7 @@ import MaterialCommunityIcons from 'react-native-vector-icons/MaterialCommunityI
 import { useAppTheme } from '../context/ThemeContext';
 import { useAppValues } from '../context/DataContext';
 import { fonts } from '../theme/theme';
+import { resolveImageUrl } from '../utils/imageUtils';
 import {
   validateFirstName,
   validateLastName,
@@ -217,7 +218,7 @@ export default function ProfileScreen({ navigation }: any) {
         >
           {((user?.role === 'garage_admin' || user?.role === 'staff') && currentGarage?.logoUrl) ? (
             <Image
-              source={{ uri: currentGarage.logoUrl }}
+              source={{ uri: resolveImageUrl(currentGarage.logoUrl) }}
               style={styles.avatarImg}
               resizeMode="cover"
             />

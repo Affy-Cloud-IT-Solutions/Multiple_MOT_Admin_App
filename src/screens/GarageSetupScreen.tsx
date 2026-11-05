@@ -21,6 +21,7 @@ import AsyncStorage from '@react-native-async-storage/async-storage';
 import { useAppTheme } from '../context/ThemeContext';
 import { useAppValues, BASE_URL, ServiceCatalogGroup } from '../context/DataContext';
 import { fonts } from '../theme/theme';
+import { resolveImageUrl, API_ORIGIN } from '../utils/imageUtils';
 import {
   detectGarageLocation,
   DetectedGarageLocation,
@@ -34,9 +35,6 @@ import {
 const MIN_GARAGE_PHOTOS = 3;
 const MAX_GARAGE_PHOTOS = 8;
 const PHOTO_GAP = 10;
-// Uploaded files are served from the API host (e.g. https://api.example.com/uploads/...)
-const API_ORIGIN = BASE_URL.replace(/\/api\/?$/, '');
-
 const DOCUMENT_CHECKLIST = [
   { type: 'VTS Certificate', label: 'DVLA VTS Authorisation Certificate', required: true, icon: 'shield-car' },
   { type: 'AE Certificate', label: 'MOT Authorised Examiner (AE) Certificate', required: true, icon: 'card-account-details-outline' },
@@ -742,15 +740,8 @@ export default function GarageSetupScreen({ route, navigation }: any) {
       setActiveTab('services');
       return;
     }
-    if (rejectedDocCount > 0) {
-      Alert.alert(
-        'Documents Still Rejected',
-        `Please upload a new copy of the ${rejectedDocCount === 1 ? 'rejected document' : `${rejectedDocCount} rejected documents`} before submitting.`
-      );
-      setActiveTab('documents');
-      return;
-    }
 
+    // Note: Document upload is not mandatory now - 7-day grace period applies
     setSubmittingReview(true);
     try {
       const garageId = currentGarage?.id || currentGarage?._id || user?.garageId;
@@ -768,7 +759,7 @@ export default function GarageSetupScreen({ route, navigation }: any) {
         isRejected ? 'Application Resubmitted! 🎉' : 'Submitted for Review! 🎉',
         isRejected
           ? 'Your updated application has been sent back to Super Admin for review. Your garage will go live once it is approved.'
-          : 'Your garage location, services, and MOT authorization documents have been sent to Super Admin for verification. Once approved, your slots will go live on the customer app.',
+          : 'Your garage profile has been submitted for Super Admin review. You have a 7-day grace period to upload any legal documents.',
         [{ text: 'Great!', onPress: () => navigation.goBack() }]
       );
     } catch (err: any) {
@@ -906,7 +897,7 @@ export default function GarageSetupScreen({ route, navigation }: any) {
               styles.tabText,
               { color: activeTab === 'documents' ? theme.colors.primary : theme.colors.placeholder }
             ]}>
-              3. Legal Docs
+              3. Legal Docs (Optional)
             </Text>
             <TabDot show={needsAction.documents} />
           </TouchableOpacity>
@@ -1055,7 +1046,7 @@ export default function GarageSetupScreen({ route, navigation }: any) {
             {logoUrl ? (
               <View style={[styles.logoCardWrapper, { borderColor: theme.colors.border, backgroundColor: theme.colors.background }]}>
                 <View style={[styles.logoPreviewBox, { borderColor: theme.colors.border }]}>
-                  <Image source={{ uri: logoUrl }} style={styles.logoPreviewImg} resizeMode="contain" />
+                  <Image source={{ uri: resolveImageUrl(logoUrl) }} style={styles.logoPreviewImg} resizeMode="contain" />
                 </View>
                 <View style={styles.logoInfoColumn}>
                   <Text style={[styles.logoStatusTitle, { color: theme.colors.text }]}>Official Brand Logo</Text>
@@ -1144,7 +1135,7 @@ export default function GarageSetupScreen({ route, navigation }: any) {
               <View style={styles.photoGrid} onLayout={e => setPhotoGridWidth(e.nativeEvent.layout.width)}>
                 {images.map(url => (
                   <View key={url} style={[styles.photoTile, photoTileSize, { borderColor: theme.colors.border }]}>
-                    <Image source={{ uri: url }} style={styles.photoImage} resizeMode="cover" />
+                    <Image source={{ uri: resolveImageUrl(url) }} style={styles.photoImage} resizeMode="cover" />
                     <TouchableOpacity
                       style={styles.photoRemoveBtn}
                       onPress={() => handleRemovePhoto(url)}
@@ -1407,9 +1398,22 @@ export default function GarageSetupScreen({ route, navigation }: any) {
             <View style={styles.sectionHeader}>
               <MaterialCommunityIcons name="file-certificate" size={24} color={theme.colors.primary} />
               <View style={styles.sectionTitleWrap}>
-                <Text style={[styles.sectionTitle, { color: theme.colors.text }]}>MOT Authorizations & Legal Docs</Text>
+                <Text style={[styles.sectionTitle, { color: theme.colors.text }]}>MOT Authorizations & Legal Docs (Optional)</Text>
                 <Text style={[styles.sectionDesc, { color: theme.colors.placeholder }]}>
-                  Upload your DVLA VTS certification and liability insurance to receive Super Admin approval.
+                  Upload your DVLA VTS certification and liability insurance. Document upload is not mandatory right now.
+                </Text>
+              </View>
+            </View>
+
+            {/* 7-Day Grace Period Notice Banner */}
+            <View style={[styles.gracePeriodBox, { backgroundColor: isDarkMode ? '#1E293B' : '#F0F9FF', borderColor: '#0284C740' }]}>
+              <MaterialCommunityIcons name="clock-outline" size={20} color="#0284C7" style={{ marginRight: 8, marginTop: 1 }} />
+              <View style={{ flex: 1 }}>
+                <Text style={[styles.gracePeriodTitle, { color: '#0284C7' }]}>
+                  7-Day Document Grace Period
+                </Text>
+                <Text style={[styles.gracePeriodSub, { color: theme.colors.placeholder }]}>
+                  Document upload is not mandatory right now. You can submit your garage profile now to start the review process and upload your documents within 7 days.
                 </Text>
               </View>
             </View>
@@ -1486,7 +1490,7 @@ export default function GarageSetupScreen({ route, navigation }: any) {
                                 : theme.colors.placeholder
                         }
                       ]}>
-                        {isVerifiedDoc ? 'Verified ✓' : isRejectedDoc ? 'Rejected - Re-upload' : uploaded ? 'Uploaded (Pending Review)' : 'Not Uploaded'}
+                        {isVerifiedDoc ? 'Verified ✓' : isRejectedDoc ? 'Rejected - Re-upload' : uploaded ? 'Uploaded (Pending Review)' : 'Not Uploaded (Optional - 7 Days)'}
                       </Text>
                     </View>
                     {isRejectedDoc && uploaded?.rejectionReason && (
@@ -2157,6 +2161,25 @@ const styles = StyleSheet.create({
     fontFamily: fonts.bold,
     marginTop: 10,
     marginBottom: 12,
+  },
+  gracePeriodBox: {
+    flexDirection: 'row',
+    alignItems: 'flex-start',
+    padding: 12,
+    borderRadius: 10,
+    borderWidth: 1,
+    marginTop: 10,
+    marginBottom: 14,
+  },
+  gracePeriodTitle: {
+    fontFamily: fonts.bold,
+    fontSize: 13,
+  },
+  gracePeriodSub: {
+    fontFamily: fonts.regular,
+    fontSize: 12,
+    marginTop: 2,
+    lineHeight: 16,
   },
   docCard: {
     flexDirection: 'row',
