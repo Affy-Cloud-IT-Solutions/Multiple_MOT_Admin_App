@@ -38,9 +38,55 @@ export default function ProfileScreen({ navigation }: any) {
     customers = [],
     vehicles = [],
     alerts = [],
+    getPlatformSettings,
+    updatePlatformSettings,
   } = useAppValues();
   const [notificationsEnabled, setNotificationsEnabled] = useState(true);
   const [loggingOut, setLoggingOut] = useState(false);
+
+  // Super Admin Platform Settings
+  const [requireFullProfile, setRequireFullProfile] = useState(false);
+  const [loadingPlatformSettings, setLoadingPlatformSettings] = useState(false);
+  const [savingPlatformSetting, setSavingPlatformSetting] = useState(false);
+
+  React.useEffect(() => {
+    if (user?.role === 'admin' && typeof getPlatformSettings === 'function') {
+      let isMounted = true;
+      setLoadingPlatformSettings(true);
+      getPlatformSettings()
+        .then((res) => {
+          if (isMounted && res) {
+            setRequireFullProfile(Boolean(res.requireFullProfileForVisibility));
+          }
+        })
+        .catch((err) => {
+          console.error('[ProfileScreen] Failed to load platform settings:', err);
+        })
+        .finally(() => {
+          if (isMounted) setLoadingPlatformSettings(false);
+        });
+      return () => { isMounted = false; };
+    }
+  }, [user?.role, getPlatformSettings]);
+
+  const handleToggleRequireProfile = async (newValue: boolean) => {
+    if (!updatePlatformSettings) return;
+    setSavingPlatformSetting(true);
+    try {
+      await updatePlatformSettings(newValue);
+      setRequireFullProfile(newValue);
+      Alert.alert(
+        'Platform Setting Updated',
+        newValue
+          ? 'Strict Mode Enabled: Garages must have 100% completed profile & documents before they appear to customers.'
+          : 'Marketing Mode Enabled: Approved garages are now visible to customers immediately (7-day grace period for documents).'
+      );
+    } catch (err: any) {
+      Alert.alert('Update Failed', err.message || 'Could not update platform setting.');
+    } finally {
+      setSavingPlatformSetting(false);
+    }
+  };
 
   const [staffName, setStaffName] = useState('');
   const [staffEmail, setStaffEmail] = useState('');
@@ -522,6 +568,36 @@ export default function ProfileScreen({ navigation }: any) {
               isLast
             />
           )}
+        </Section>
+      )}
+
+      {/* Super Admin Platform Governance & Visibility */}
+      {user?.role === 'admin' && (
+        <Section title="Platform Governance & Visibility" theme={theme}>
+          <SettingRow
+            icon="shield-account"
+            title="Setup Profile Mandatory"
+            subtitle={
+              requireFullProfile
+                ? 'Strict Mode: Approved garages must be 100% complete with documents before appearing to customers.'
+                : 'Marketing Mode: Approved garages appear to customers immediately (7-day grace period for documents).'
+            }
+            control={
+              loadingPlatformSettings || savingPlatformSetting ? (
+                <ActivityIndicator size="small" color={theme.colors.primary} />
+              ) : (
+                <Switch
+                  value={requireFullProfile}
+                  onValueChange={handleToggleRequireProfile}
+                  trackColor={{ false: '#E0E0E0', true: theme.colors.primary }}
+                  thumbColor="#FFFFFF"
+                  ios_backgroundColor="#E0E0E0"
+                />
+              )
+            }
+            theme={theme}
+            isLast
+          />
         </Section>
       )}
 

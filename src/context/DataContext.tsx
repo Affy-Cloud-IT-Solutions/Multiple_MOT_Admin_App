@@ -225,6 +225,8 @@ interface DataContextType {
   updateGarageService: (garageId: string, serviceId: string, updates: any) => Promise<any>;
   deleteGarageService: (garageId: string, serviceId: string) => Promise<any>;
   seedGarageDefaultServices: (garageId: string) => Promise<any>;
+  getPlatformSettings: () => Promise<{ requireFullProfileForVisibility: boolean }>;
+  updatePlatformSettings: (requireFullProfileForVisibility: boolean) => Promise<{ requireFullProfileForVisibility: boolean }>;
 }
 
 const DataContext = createContext<DataContextType | undefined>(undefined);
@@ -1559,6 +1561,28 @@ export const DataProvider = ({ children }: { children: ReactNode }) => {
     return data;
   }, [authFetch]);
 
+  const getPlatformSettings = useCallback(async (): Promise<{ requireFullProfileForVisibility: boolean }> => {
+    const response = await authFetch(`${BASE_URL}/settings/platform`);
+    const data = await response.json();
+    if (!response.ok) {
+      throw new Error(data.error || 'Failed to fetch platform settings');
+    }
+    return data;
+  }, [authFetch]);
+
+  const updatePlatformSettings = useCallback(async (requireFullProfileForVisibility: boolean): Promise<{ requireFullProfileForVisibility: boolean }> => {
+    const response = await authFetch(`${BASE_URL}/settings/platform`, {
+      method: 'PATCH',
+      headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify({ requireFullProfileForVisibility }),
+    });
+    const data = await response.json();
+    if (!response.ok) {
+      throw new Error(data.error || 'Failed to update platform settings');
+    }
+    return data;
+  }, [authFetch]);
+
   return (
     <DataContext.Provider
       value={{
@@ -1623,6 +1647,8 @@ export const DataProvider = ({ children }: { children: ReactNode }) => {
         updateGarageService,
         deleteGarageService,
         seedGarageDefaultServices,
+        getPlatformSettings,
+        updatePlatformSettings,
       }}
     >
       {children}
