@@ -87,7 +87,7 @@ export default function RootNavigator() {
       <Stack.Screen
         name="AdminAlerts"
         component={AdminAlertsScreen}
-        options={{ title: 'Action Alerts', headerShown: true }}
+        options={{ title: 'Notifications', headerShown: true }}
       />
       <Stack.Screen
         name="AdminReminders"

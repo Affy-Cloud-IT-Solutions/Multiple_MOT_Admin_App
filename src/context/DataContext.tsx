@@ -238,6 +238,7 @@ const DataContext = createContext<DataContextType | undefined>(undefined);
 // export const BASE_URL = `http://${LOCAL_IP}:5000/api`;
 // export const BASE_URL = 'http://10.0.2.2:5000/api'; // Android Emulator alias
 export const BASE_URL = 'https://api.ondoorcarservice.com/api'; // Production server
+// export const BASE_URL = 'http://localhost:5000/api';
 
 const parseJsonResponse = async (response: Response): Promise<any> => {
   const text = await response.text();

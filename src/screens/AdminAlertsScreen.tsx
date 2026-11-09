@@ -60,17 +60,21 @@ const formatBookingDate = (dateVal: any) => {
   return String(dateVal);
 };
 
-export default function AdminAlertsScreen() {
+export default function AdminAlertsScreen({ navigation }: any) {
   const { theme } = useAppTheme();
-  const { alerts, customers = [], approveAlert, acknowledgeAlert, rejectAlert, user, updateGarageStationStatus, approveCustomService, rejectCustomService } = useAppValues();
+  const { alerts, customers = [], approveAlert, acknowledgeAlert, rejectAlert, user, updateGarageStationStatus, updateGarageStatus, approveCustomService, rejectCustomService } = useAppValues();
 
-  // Show only pending customer-facing alerts (do not show platform garage registration approval alerts to garage admin)
+  // Show only pending actionable alerts:
+  // - On a multi-garage platform, vehicles belong to customer accounts (no approval needed for NEW_VEHICLE / SOLD)
+  // - Garage Admin only acts on bookings for their garage (BOOKED)
+  // - Super Admin acts on platform requests (GARAGE_REGISTRATION, GARAGE_DOCUMENT, NEW_STATION, CUSTOM_SERVICE)
   const pendingAlerts = alerts.filter((a) => {
     if (a.status !== 'Pending') return false;
+    if (a.type === 'NEW_VEHICLE' || a.type === 'SOLD') return false;
     if (user?.role === 'admin') {
-      return true; // Super admin sees all pending alerts including station requests & custom services
+      return true; // Super admin sees platform requests
     }
-    return a.type !== 'GARAGE_REGISTRATION' && a.type !== 'NEW_STATION' && a.type !== 'CUSTOM_SERVICE' && a.type !== 'GARAGE_DOCUMENT';
+    return a.type === 'BOOKED';
   });
 
   const handleApprove = async (alertId: string, alertType: string) => {
@@ -95,15 +99,35 @@ export default function AdminAlertsScreen() {
           await approveAlert(alertId);
           message = 'Custom service approved!';
         }
+      } else if (alertType === 'GARAGE_REGISTRATION') {
+        const item = pendingAlerts.find(a => a.id === alertId);
+        const gId = item?.garageId || (item as any)?.garage?.id || (item as any)?.garage?._id;
+        if (gId && navigation?.navigate) {
+          navigation.navigate('GarageVerificationReview', { garageId: gId });
+          setLoadingAction(null);
+          return;
+        } else if (gId) {
+          await updateGarageStatus(gId, 'Approved', 'Verified');
+          await approveAlert(alertId);
+          message = 'Garage approved successfully!';
+        } else {
+          await approveAlert(alertId);
+          message = 'Garage registration approved!';
+        }
+      } else if (alertType === 'GARAGE_DOCUMENT') {
+        const item = pendingAlerts.find(a => a.id === alertId);
+        const gId = item?.garageId || (item as any)?.garage?.id || (item as any)?.garage?._id;
+        if (gId && navigation?.navigate) {
+          navigation.navigate('GarageVerificationReview', { garageId: gId });
+          setLoadingAction(null);
+          return;
+        } else {
+          await approveAlert(alertId);
+          message = 'Document reviewed and acknowledged.';
+        }
       } else {
         await approveAlert(alertId);
-        if (alertType === 'NEW_VEHICLE') {
-          message = 'New vehicle has been approved and added to the customer profile!';
-        } else if (alertType === 'SOLD') {
-          message = 'Vehicle status updated to Sold. Future reminders stopped.';
-        } else if (alertType === 'BOOKED') {
-          message = 'MOT Booking confirmed!';
-        }
+        message = alertType === 'BOOKED' ? 'Booking confirmed successfully!' : 'Request approved!';
       }
       Alert.alert('Approved', message);
     } catch (error: any) {
@@ -150,9 +174,20 @@ export default function AdminAlertsScreen() {
           await acknowledgeAlert(alertId);
         }
         Alert.alert('Rejected', 'Custom service has been rejected.');
-      } else if (alertType === 'BOOKED' || alertType === 'NEW_VEHICLE') {
+      } else if (alertType === 'GARAGE_REGISTRATION') {
+        const item = pendingAlerts.find(a => a.id === alertId);
+        const gId = item?.garageId || (item as any)?.garage?.id || (item as any)?.garage?._id;
+        if (gId) {
+          await updateGarageStatus(gId, 'Rejected', 'Rejected', rejectionReason || 'Registration criteria not met.');
+        }
+        await acknowledgeAlert(alertId);
+        Alert.alert('Rejected', 'Garage registration has been rejected.');
+      } else if (alertType === 'GARAGE_DOCUMENT') {
+        await acknowledgeAlert(alertId);
+        Alert.alert('Rejected', 'Garage document has been rejected.');
+      } else if (alertType === 'BOOKED') {
         await rejectAlert(alertId, rejectionReason);
-        Alert.alert('Rejected', 'Request has been rejected.');
+        Alert.alert('Rejected', 'Booking request has been rejected.');
       } else {
         await acknowledgeAlert(alertId);
         Alert.alert('Rejected', 'Request has been rejected.');
@@ -176,13 +211,6 @@ export default function AdminAlertsScreen() {
 
   return (
     <ScrollView style={[styles.container, { backgroundColor: theme.colors.background }]}>
-      <View style={styles.header}>
-        <Text style={[styles.title, { color: theme.colors.text }]}>Admin Notifications</Text>
-        <Text style={[styles.subtitle, { color: theme.colors.placeholder }]}>
-          Review self-service requests submitted by customers
-        </Text>
-      </View>
-
       <View style={styles.listContainer}>
         {pendingAlerts.length === 0 ? (
           <View style={styles.emptyContainer}>
@@ -215,6 +243,14 @@ export default function AdminAlertsScreen() {
               iconName = 'shape-plus';
               iconColor = '#8B5CF6'; // Purple
               typeText = 'Custom Service Approval Request';
+            } else if (item.type === 'GARAGE_REGISTRATION') {
+              iconName = 'storefront-outline';
+              iconColor = '#3B82F6'; // Blue
+              typeText = 'Garage Registration Request';
+            } else if (item.type === 'GARAGE_DOCUMENT') {
+              iconName = 'file-document-check-outline';
+              iconColor = '#10B981'; // Green
+              typeText = 'Garage Document Upload';
             }
 
             const customer = customers.find(c => 
@@ -240,14 +276,16 @@ export default function AdminAlertsScreen() {
                 <View style={styles.cardBody}>
                   <Text style={[styles.bodyText, { color: theme.colors.text }]}>
                     {item.type === 'NEW_STATION' ? (
-                      <>Garage <Text style={{ fontFamily: fonts.bold }}>{item.customerName}</Text> requested approval to add a new MOT station:</>
+                      <>Garage <Text style={{ fontFamily: fonts.bold }}>{(item as any).garage?.name || item.customerName}</Text> requested approval to add a new MOT station:</>
                     ) : item.type === 'CUSTOM_SERVICE' ? (
-                      <>Garage <Text style={{ fontFamily: fonts.bold }}>{item.customerName}</Text> submitted a new custom service for platform approval:</>
+                      <>Garage <Text style={{ fontFamily: fonts.bold }}>{(item as any).garage?.name || item.customerName}</Text> submitted a new custom service for platform approval:</>
+                    ) : item.type === 'GARAGE_REGISTRATION' ? (
+                      <>New garage registration from owner <Text style={{ fontFamily: fonts.bold }}>{item.customerName}</Text>:</>
+                    ) : item.type === 'GARAGE_DOCUMENT' ? (
+                      <>Garage <Text style={{ fontFamily: fonts.bold }}>{(item as any).garage?.name || item.customerName}</Text> uploaded a verification document for review:</>
                     ) : (
                       <>Customer <Text style={{ fontFamily: fonts.bold }}>{item.customerName}</Text>{' '}
-                      {item.type === 'NEW_VEHICLE' && 'wishes to register a new vehicle:'}
-                      {item.type === 'SOLD' && 'reported they sold their vehicle:'}
-                      {item.type === 'BOOKED' && ((item.isDateOnly || item.hasMot === false) ? 'requested service workshop booking for:' : 'requested MOT booking for:')}</>
+                      {(item.isDateOnly || item.hasMot === false) ? 'requested service workshop booking for:' : 'requested MOT booking for:'}</>
                     )}
                   </Text>
 
@@ -308,6 +346,40 @@ export default function AdminAlertsScreen() {
                       </View>
                       <Text style={{ fontFamily: fonts.medium, fontSize: 12, color: theme.colors.placeholder, marginTop: 4 }}>
                         {item.makeModel || `${item.customerName} - Custom Service Request`}
+                      </Text>
+                    </View>
+                  ) : item.type === 'GARAGE_REGISTRATION' ? (
+                    <View style={{ backgroundColor: '#3B82F615', borderWidth: 1, borderColor: '#3B82F640', padding: 12, borderRadius: 8, marginTop: 8 }}>
+                      <View style={{ flexDirection: 'row', alignItems: 'center', justifyContent: 'space-between' }}>
+                        <View style={{ flexDirection: 'row', alignItems: 'center', flex: 1, marginRight: 8 }}>
+                          <MaterialCommunityIcons name="storefront" size={18} color="#3B82F6" style={{ marginRight: 6 }} />
+                          <Text style={{ fontFamily: fonts.bold, fontSize: 13.5, color: theme.colors.text }} numberOfLines={1}>
+                            {(item as any).garage?.name || item.makeModel?.split(' - ')[0] || item.makeModel}
+                          </Text>
+                        </View>
+                        <View style={{ backgroundColor: '#3B82F625', paddingHorizontal: 6, paddingVertical: 2, borderRadius: 4 }}>
+                          <Text style={{ fontFamily: fonts.bold, fontSize: 10.5, color: '#3B82F6' }}>New Garage</Text>
+                        </View>
+                      </View>
+                      <Text style={{ fontFamily: fonts.medium, fontSize: 12, color: theme.colors.placeholder, marginTop: 4 }}>
+                        {item.makeModel}
+                      </Text>
+                    </View>
+                  ) : item.type === 'GARAGE_DOCUMENT' ? (
+                    <View style={{ backgroundColor: '#10B98115', borderWidth: 1, borderColor: '#10B98140', padding: 12, borderRadius: 8, marginTop: 8 }}>
+                      <View style={{ flexDirection: 'row', alignItems: 'center', justifyContent: 'space-between' }}>
+                        <View style={{ flexDirection: 'row', alignItems: 'center', flex: 1, marginRight: 8 }}>
+                          <MaterialCommunityIcons name="file-document-check" size={18} color="#10B981" style={{ marginRight: 6 }} />
+                          <Text style={{ fontFamily: fonts.bold, fontSize: 13.5, color: theme.colors.text }} numberOfLines={1}>
+                            {(item as any).garage?.name || item.makeModel?.split(' - ')[0] || 'Garage Document'}
+                          </Text>
+                        </View>
+                        <View style={{ backgroundColor: '#10B98125', paddingHorizontal: 6, paddingVertical: 2, borderRadius: 4 }}>
+                          <Text style={{ fontFamily: fonts.bold, fontSize: 10.5, color: '#10B981' }}>New Document</Text>
+                        </View>
+                      </View>
+                      <Text style={{ fontFamily: fonts.medium, fontSize: 12, color: theme.colors.placeholder, marginTop: 4 }}>
+                        {item.makeModel}
                       </Text>
                     </View>
                   ) : (
@@ -400,7 +472,15 @@ export default function AdminAlertsScreen() {
                       <ActivityIndicator color="#FFFFFF" size="small" />
                     ) : (
                       <Text style={[styles.actionBtnText, { color: "#FFFFFF" }]}>
-                        {item.type === 'BOOKED' ? 'Confirm Booking' : item.type === 'NEW_STATION' ? 'Approve Station' : 'Approve'}
+                        {item.type === 'BOOKED' 
+                          ? 'Confirm Booking' 
+                          : item.type === 'NEW_STATION' 
+                          ? 'Approve Station' 
+                          : item.type === 'GARAGE_REGISTRATION'
+                          ? 'Review & Approve'
+                          : item.type === 'GARAGE_DOCUMENT'
+                          ? 'Review Document'
+                          : 'Approve'}
                       </Text>
                     )}
                   </TouchableOpacity>
@@ -421,15 +501,23 @@ export default function AdminAlertsScreen() {
         <View style={styles.modalOverlay}>
           <View style={[styles.modalContent, { backgroundColor: theme.colors.card, borderColor: theme.colors.border }]}>
             <Text style={[styles.modalTitle, { color: theme.colors.text }]}>
-              {selectedAlertType === 'NEW_VEHICLE' ? 'Reject Vehicle Registration' : selectedAlertType === 'NEW_STATION' ? 'Reject Station Request' : 'Reject Booking Request'}
+              {selectedAlertType === 'NEW_STATION' 
+                ? 'Reject Station Request' 
+                : selectedAlertType === 'CUSTOM_SERVICE'
+                ? 'Reject Custom Service'
+                : selectedAlertType === 'GARAGE_REGISTRATION'
+                ? 'Reject Garage Registration'
+                : selectedAlertType === 'GARAGE_DOCUMENT'
+                ? 'Reject Garage Document'
+                : 'Reject Booking Request'}
             </Text>
             <Text style={[styles.modalSubtitle, { color: theme.colors.placeholder }]}>
-              Please enter the reason for rejecting this {selectedAlertType === 'NEW_VEHICLE' ? 'registration' : 'booking'} request. This reason will be displayed to the customer.
+              Please enter the reason for rejecting this request.
             </Text>
             
             <TextInput
               style={[styles.modalInput, { color: theme.colors.text, borderColor: theme.colors.border, backgroundColor: theme.colors.background }]}
-              placeholder={selectedAlertType === 'NEW_VEHICLE' ? "e.g. Invalid document, vehicle scrapped" : "e.g. No slots available, garage closed"}
+              placeholder="e.g. No slots available, garage closed, or criteria not met"
               placeholderTextColor={theme.colors.placeholder}
               value={rejectionReason}
               onChangeText={setRejectionReason}
