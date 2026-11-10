@@ -17,6 +17,7 @@ import { useFocusEffect } from '@react-navigation/native';
 import { useAppTheme } from '../context/ThemeContext';
 import { useAppValues, BASE_URL } from '../context/DataContext';
 import { fonts } from '../theme/theme';
+import { formatShortDate } from '../utils/dateUtils';
 
 interface Station {
   id?: string;
@@ -134,20 +135,8 @@ function formatToDDMMYYYY(d: Date): string {
   return `${day}-${month}-${year}`;
 }
 
-// Format DD-MM-YYYY string to human readable e.g. "22 Oct 2026"
-function formatDisplayDate(dateStr: string): string {
-  try {
-    const parts = dateStr.split('-');
-    if (parts.length === 3) {
-      const d = parseInt(parts[0], 10);
-      const m = parseInt(parts[1], 10) - 1;
-      const y = parseInt(parts[2], 10);
-      const months = ['Jan', 'Feb', 'Mar', 'Apr', 'May', 'Jun', 'Jul', 'Aug', 'Sep', 'Oct', 'Nov', 'Dec'];
-      return `${d} ${months[m]} ${y}`;
-    }
-  } catch (e) {}
-  return dateStr;
-}
+// Format date string to human readable e.g. "22 Oct 2026"
+const formatDisplayDate = (dateStr: string): string => formatShortDate(dateStr);
 
 export default function AdminSlotsScreen({ navigation, route }: any) {
   const { theme } = useAppTheme();
@@ -758,7 +747,7 @@ export default function AdminSlotsScreen({ navigation, route }: any) {
               <View style={styles.summaryTitleBox}>
                 <MaterialCommunityIcons name="clipboard-text-clock" size={20} color={theme.colors.primary} />
                 <Text style={[styles.summaryCardTitle, { color: theme.colors.text }]}>
-                  {isAllSelected ? `Bookings for ${selectedDate}` : `Bookings for ${selectedDate}`}
+                  {`Bookings for ${formatDisplayDate(selectedDate)}`}
                 </Text>
               </View>
               <View style={[styles.bookingCountBadge, { backgroundColor: displayedBookings.length > 0 ? '#10B98120' : '#6B728020' }]}>
@@ -883,7 +872,7 @@ export default function AdminSlotsScreen({ navigation, route }: any) {
             <View style={[styles.emptyBookingBox, { backgroundColor: theme.colors.background }]}>
               <MaterialCommunityIcons name="check-circle-outline" size={24} color="#10B981" />
               <Text style={[styles.emptyBookingText, { color: theme.colors.placeholder }]}>
-                No bookings scheduled yet for {selectedDate}. {isMotSelected ? `All ${totalCapacityToday} slots are open.` : 'All workshop capacity is currently open.'}
+                No bookings scheduled yet for {formatDisplayDate(selectedDate)}. {isMotSelected ? `All ${totalCapacityToday} slots are open.` : 'All workshop capacity is currently open.'}
               </Text>
             </View>
           ) : (
@@ -1018,7 +1007,7 @@ export default function AdminSlotsScreen({ navigation, route }: any) {
           <View style={styles.timelineHeaderLeft}>
             <MaterialCommunityIcons name="view-grid-outline" size={20} color={theme.colors.primary} />
             <Text style={[styles.sectionTitle, { color: theme.colors.text }]}>
-              Daily 45-Min Slots ({selectedDate})
+              Daily 45-Min Slots ({formatDisplayDate(selectedDate)})
             </Text>
           </View>
           <Text style={[styles.sectionSubtitle, { color: theme.colors.placeholder }]}>
@@ -1030,7 +1019,7 @@ export default function AdminSlotsScreen({ navigation, route }: any) {
           <View style={styles.loaderContainer}>
             <ActivityIndicator size="large" color={theme.colors.primary} />
             <Text style={[styles.loaderText, { color: theme.colors.placeholder }]}>
-              Loading {slotData?.slotDuration || 45}-min slots for {selectedDate}...
+              Loading {slotData?.slotDuration || 45}-min slots for {formatDisplayDate(selectedDate)}...
             </Text>
           </View>
         ) : (slotData?.slots || []).length === 0 ? (
@@ -1058,7 +1047,7 @@ export default function AdminSlotsScreen({ navigation, route }: any) {
                 <MaterialCommunityIcons name="calendar-clock" size={44} color={theme.colors.placeholder} style={{ marginBottom: 12 }} />
                 <Text style={[styles.emptySlotsTitle, { color: theme.colors.text }]}>No Slots Configured</Text>
                 <Text style={[styles.emptySlotsSubtitle, { color: theme.colors.placeholder }]}>
-                  This garage does not have any active MOT bays or time slots configured for {selectedDate}.
+                  This garage does not have any active MOT bays or time slots configured for {formatDisplayDate(selectedDate)}.
                 </Text>
                 <TouchableOpacity
                   style={[styles.emptyAddStationBtn, { backgroundColor: theme.colors.primary }]}
@@ -1329,7 +1318,7 @@ export default function AdminSlotsScreen({ navigation, route }: any) {
             </Text>
           </View>
           <Text style={[styles.dateOnlyBannerBody, { color: theme.colors.text }]}>
-            Unlike MOT tests which require strict 45-minute lane intervals, this service is booked for the entire date. Customers drop their vehicle off on {selectedDate}, and your mechanics work on it during normal workshop hours.
+            Unlike MOT tests which require strict 45-minute lane intervals, this service is booked for the entire date. Customers drop their vehicle off on {formatDisplayDate(selectedDate)}, and your mechanics work on it during normal workshop hours.
           </Text>
         </View>
       </View>
@@ -1339,7 +1328,7 @@ export default function AdminSlotsScreen({ navigation, route }: any) {
         <View style={styles.intakeHeaderRow}>
           <View style={{ flex: 1 }}>
             <Text style={[styles.intakeCardTitle, { color: theme.colors.text }]}>
-              Intake Availability ({selectedDate})
+              Intake Availability ({formatDisplayDate(selectedDate)})
             </Text>
             <Text style={[styles.intakeCardSubtitle, { color: theme.colors.placeholder }]}>
               Manage workshop capacity & accept drop-offs on this date
@@ -1413,7 +1402,7 @@ export default function AdminSlotsScreen({ navigation, route }: any) {
           <Text style={[styles.capacityProgressText, { color: theme.colors.placeholder }]}>
             {isDateBlockedForService 
               ? 'Intake is closed on this date - customers cannot book this service' 
-              : `${serviceBookings.length} of 5 daily vehicle intake spots filled for ${selectedDate}`}
+              : `${serviceBookings.length} of 5 daily vehicle intake spots filled for ${formatDisplayDate(selectedDate)}`}
           </Text>
         </View>
 
@@ -1464,8 +1453,8 @@ export default function AdminSlotsScreen({ navigation, route }: any) {
                   { color: isDateBlockedForService ? '#10B981' : '#EF4444' }
                 ]}>
                   {isDateBlockedForService 
-                    ? `Re-Open ${selectedDate} for ${selectedService.name}` 
-                    : `Block / Close ${selectedDate} for ${selectedService.name}`}
+                    ? `Re-Open ${formatDisplayDate(selectedDate)} for ${selectedService.name}` 
+                    : `Block / Close ${formatDisplayDate(selectedDate)} for ${selectedService.name}`}
                 </Text>
               </>
             )}
@@ -1496,7 +1485,7 @@ export default function AdminSlotsScreen({ navigation, route }: any) {
               No {selectedService.name} Bookings
             </Text>
             <Text style={[styles.emptyDateOnlySubtitle, { color: theme.colors.placeholder }]}>
-              No vehicles scheduled for {selectedService.name} on {selectedDate}. {isDateBlockedForService ? 'This date is currently blocked.' : 'Intake is open to accept customer bookings.'}
+              No vehicles scheduled for {selectedService.name} on {formatDisplayDate(selectedDate)}. {isDateBlockedForService ? 'This date is currently blocked.' : 'Intake is open to accept customer bookings.'}
             </Text>
           </View>
         ) : (
@@ -1565,7 +1554,7 @@ export default function AdminSlotsScreen({ navigation, route }: any) {
               <View style={styles.vehicleDetailsRow}>
                 <MaterialCommunityIcons name="car-info" size={14} color={theme.colors.placeholder} />
                 <Text style={[styles.vehicleModelText, { color: theme.colors.placeholder }]}>
-                  {b.makeModel ? b.makeModel.split(' - ')[0] : 'Vehicle'} • Booked by Date (Drop-off on {selectedDate})
+                  {b.makeModel ? b.makeModel.split(' - ')[0] : 'Vehicle'} • Booked by Date (Drop-off on {formatDisplayDate(selectedDate)})
                 </Text>
               </View>
 
@@ -1736,7 +1725,7 @@ export default function AdminSlotsScreen({ navigation, route }: any) {
               <View style={[styles.activeDateTag, { backgroundColor: theme.colors.background, borderColor: theme.colors.border }]}>
                 <MaterialCommunityIcons name="calendar-check" size={14} color="#10B981" />
                 <Text style={[styles.activeDateTagText, { color: theme.colors.text }]}>
-                  Selected: <Text style={{ fontFamily: fonts.extraBold, color: theme.colors.primary }}>{selectedDate}</Text>
+                  Selected: <Text style={{ fontFamily: fonts.extraBold, color: theme.colors.primary }}>{formatDisplayDate(selectedDate)}</Text>
                 </Text>
               </View>
             </View>
@@ -2018,7 +2007,7 @@ export default function AdminSlotsScreen({ navigation, route }: any) {
                           Manage Slot {slotToManage.time}
                         </Text>
                         <Text style={[styles.manageSlotSubtitle, { color: theme.colors.placeholder }]}>
-                          Date: {selectedDate} • MOT Bay Controls
+                          Date: {formatDisplayDate(selectedDate)} • MOT Bay Controls
                         </Text>
                       </View>
                     </View>

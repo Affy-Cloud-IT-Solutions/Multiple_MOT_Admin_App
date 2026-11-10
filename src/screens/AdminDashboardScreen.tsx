@@ -5,46 +5,11 @@ import AsyncStorage from '@react-native-async-storage/async-storage';
 import { useAppTheme } from '../context/ThemeContext';
 import { useAppValues } from '../context/DataContext';
 import { fonts } from '../theme/theme';
+import { formatBookingDate } from '../utils/dateUtils';
 
 const { width } = Dimensions.get('window');
 
-const formatBookingDate = (dateVal: any) => {
-  if (!dateVal) return '';
-  try {
-    const months = [
-      'Jan', 'Feb', 'Mar', 'Apr', 'May', 'Jun',
-      'Jul', 'Aug', 'Sep', 'Oct', 'Nov', 'Dec'
-    ];
-    if (typeof dateVal === 'string') {
-      const matchIso = dateVal.match(/^(\d{4})-(\d{1,2})-(\d{1,2})/);
-      if (matchIso) {
-        const y = matchIso[1];
-        const m = parseInt(matchIso[2], 10) - 1;
-        const d = parseInt(matchIso[3], 10);
-        if (m >= 0 && m < 12) {
-          return `${d} ${months[m]} ${y}`;
-        }
-      }
-      const matchUk = dateVal.match(/^(\d{1,2})[/-](\d{1,2})[/-](\d{4})/);
-      if (matchUk) {
-        const d = parseInt(matchUk[1], 10);
-        const m = parseInt(matchUk[2], 10) - 1;
-        const y = matchUk[3];
-        if (m >= 0 && m < 12) {
-          return `${d} ${months[m]} ${y}`;
-        }
-      }
-    }
-    const d = new Date(dateVal);
-    if (!isNaN(d.getTime())) {
-      const day = d.getDate();
-      const monthStr = months[d.getMonth()];
-      const year = d.getFullYear();
-      return `${day} ${monthStr} ${year}`;
-    }
-  } catch (e) {}
-  return String(dateVal);
-};
+
 
 export default function AdminDashboardScreen({ navigation }: any) {
   const { theme } = useAppTheme();
@@ -615,7 +580,7 @@ export default function AdminDashboardScreen({ navigation }: any) {
             <View style={[styles.quickActionIcon, { backgroundColor: '#3B82F615' }]}>
               <MaterialCommunityIcons name="calendar-month-outline" size={22} color="#3B82F6" />
             </View>
-            <Text style={[styles.quickActionTitle, { color: theme.colors.text }]}>Bookings & Slots</Text>
+            <Text style={[styles.quickActionTitle, { color: theme.colors.text }]}>Bookings</Text>
             <Text style={[styles.quickActionSubtitle, { color: theme.colors.placeholder }]}>Manage appointments</Text>
           </TouchableOpacity>
 
@@ -724,7 +689,7 @@ export default function AdminDashboardScreen({ navigation }: any) {
             }
 
             const rawStatus = (booking.status || 'Booked').toLowerCase();
-            const formattedDate = formatBookingDate(booking.date);
+            const formattedDate = booking.date ? formatBookingDate(booking.date) : '';
 
             // Correct status colors: Completed (Green), Approved (Sky Blue / Teal), Cancelled/Rejected (Red), Pending (Amber)
             let statusColor = '#3B82F6';

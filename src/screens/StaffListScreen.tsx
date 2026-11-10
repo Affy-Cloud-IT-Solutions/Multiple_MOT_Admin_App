@@ -14,6 +14,7 @@ import { useAppTheme } from '../context/ThemeContext';
 import { useAppValues } from '../context/DataContext';
 import { SafeAreaView } from 'react-native-safe-area-context';
 import { fonts } from '../theme/theme';
+import { formatShortDate } from '../utils/dateUtils';
 
 export default function StaffListScreen({ navigation }: any) {
   const { theme } = useAppTheme();
@@ -116,7 +117,7 @@ export default function StaffListScreen({ navigation }: any) {
                   <Text style={[styles.staffName, { color: theme.colors.text }]}>{staff.username}</Text>
                   <Text style={[styles.staffEmail, { color: theme.colors.placeholder }]}>{staff.email}</Text>
                   <Text style={{ fontSize: 10, color: theme.colors.placeholder, marginTop: 4 }}>
-                    Registered: {new Date(staff.createdAt).toLocaleDateString('en-GB', { day: 'numeric', month: 'short', year: 'numeric' })}
+                    Registered: {formatShortDate(staff.createdAt)}
                   </Text>
                 </View>
 

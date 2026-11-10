@@ -27,6 +27,7 @@ import {
   validatePhoneNumber,
   validateMotExpiryDate,
 } from '../utils/validationUtils';
+import { formatShortDate, formatShortDayMonth } from '../utils/dateUtils';
 
 if (Platform.OS === 'android' && UIManager.setLayoutAnimationEnabledExperimental) {
   UIManager.setLayoutAnimationEnabledExperimental(true);
@@ -141,12 +142,7 @@ export default function AdminCustomersScreen({ navigation }: any) {
     return formatted;
   };
 
-  const formatShortDate = (dateStr?: string) => {
-    if (!dateStr) return 'N/A';
-    const date = new Date(dateStr);
-    if (isNaN(date.getTime())) return dateStr;
-    return date.toLocaleDateString('en-GB', { day: 'numeric', month: 'short', year: 'numeric' });
-  };
+
 
   const toggleExpandCustomer = (id: string) => {
     LayoutAnimation.configureNext(LayoutAnimation.Presets.easeInEaseOut);
@@ -623,7 +619,7 @@ export default function AdminCustomersScreen({ navigation }: any) {
                             if (existingBooking) {
                               Alert.alert(
                                 'Vehicle Already Booked',
-                                `${singleVeh.registrationNumber} already has an upcoming booking (${existingBooking.status === 'Approved' ? 'Confirmed' : 'Pending'}) for ${new Date(existingBooking.date).toLocaleDateString('en-GB', { day: 'numeric', month: 'short' })} at ${existingBooking.slotTime || 'Slot'}.\n\nWould you like to manage/reschedule this booking?`,
+                                `${singleVeh.registrationNumber} already has an upcoming booking (${existingBooking.status === 'Approved' ? 'Confirmed' : 'Pending'}) for ${formatShortDayMonth(existingBooking.date)} at ${existingBooking.slotTime || 'Slot'}.\n\nWould you like to manage/reschedule this booking?`,
                                 [
                                   { text: 'Cancel', style: 'cancel' },
                                   {
@@ -692,7 +688,7 @@ export default function AdminCustomersScreen({ navigation }: any) {
                                 if (hasActiveBooking && existingBooking) {
                                   Alert.alert(
                                     'Vehicle Already Booked',
-                                    `${v.registrationNumber} already has an active booking for ${new Date(existingBooking.date).toLocaleDateString('en-GB', { day: 'numeric', month: 'short' })}${existingBooking.slotTime ? ` at ${existingBooking.slotTime}` : ''}.\n\nWould you like to manage or reschedule this appointment?`,
+                                    `${v.registrationNumber} already has an active booking for ${formatShortDayMonth(existingBooking.date)}${existingBooking.slotTime ? ` at ${existingBooking.slotTime}` : ''}.\n\nWould you like to manage or reschedule this appointment?`,
                                     [
                                       { text: 'Cancel', style: 'cancel' },
                                       {
@@ -742,7 +738,7 @@ export default function AdminCustomersScreen({ navigation }: any) {
                                     <View style={{ flexDirection: 'row', alignItems: 'center', backgroundColor: '#F59E0B18', borderColor: '#F59E0B60', borderWidth: 1, paddingHorizontal: 6, paddingVertical: 2, borderRadius: 4 }}>
                                       <MaterialCommunityIcons name="calendar-check" size={11} color="#D97706" style={{ marginRight: 4 }} />
                                       <Text style={{ fontSize: 10, fontFamily: fonts.bold, color: '#D97706' }}>
-                                        Already Booked: {new Date(existingBooking.date).toLocaleDateString('en-GB', { day: 'numeric', month: 'short' })} ({existingBooking.slotTime || 'Slot'})
+                                        Already Booked: {formatShortDayMonth(existingBooking.date)} ({existingBooking.slotTime || 'Slot'})
                                       </Text>
                                     </View>
                                   ) : isPending ? (

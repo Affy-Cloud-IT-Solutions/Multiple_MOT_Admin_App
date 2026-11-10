@@ -20,6 +20,7 @@ import SearchableDropdown from '../components/SearchableDropdown';
 import { SafeAreaView } from 'react-native-safe-area-context';
 import { validateMotExpiryDate } from '../utils/validationUtils';
 import { fonts } from '../theme/theme';
+import { formatShortDate, formatBookingDate, formatDateTime, formatMemberSince } from '../utils/dateUtils';
 
 if (Platform.OS === 'android' && UIManager.setLayoutAnimationEnabledExperimental) {
   UIManager.setLayoutAnimationEnabledExperimental(true);
@@ -109,22 +110,7 @@ export default function CustomerPortalScreen({ route, navigation }: any) {
     return parts.length > 1 ? parts[1] : makeModel;
   };
 
-  const formatShortDate = (dateStr?: string) => {
-    if (!dateStr) return 'N/A';
-    const parts = dateStr.split('-');
-    if (parts.length === 3) {
-      const year = parts[0];
-      const monthIndex = parseInt(parts[1], 10) - 1;
-      const day = parseInt(parts[2], 10);
-      const months = ['Jan', 'Feb', 'Mar', 'Apr', 'May', 'Jun', 'Jul', 'Aug', 'Sep', 'Oct', 'Nov', 'Dec'];
-      if (monthIndex >= 0 && monthIndex < 12) {
-        return `${day} ${months[monthIndex]} ${year}`;
-      }
-    }
-    const date = new Date(dateStr);
-    if (isNaN(date.getTime())) return dateStr;
-    return date.toLocaleDateString('en-GB', { day: 'numeric', month: 'short', year: 'numeric' });
-  };
+
 
   const formatDateInput = (text: string) => {
     const cleaned = text.replace(/[^0-9]/g, '');
@@ -517,7 +503,7 @@ export default function CustomerPortalScreen({ route, navigation }: any) {
                             <View style={styles.bookingInfoRow}>
                               <Text style={[styles.bookingInfoLabel, { color: theme.colors.placeholder }]}>Requested On:</Text>
                               <Text style={[styles.bookingInfoValue, { color: theme.colors.text }]}>
-                                {new Date(bookingAlert.date).toLocaleDateString('en-GB', { day: 'numeric', month: 'short', year: 'numeric', hour: '2-digit', minute: '2-digit' })}
+                                {formatDateTime(bookingAlert.createdAt || bookingAlert.date)}
                               </Text>
                             </View>
                           </View>
@@ -548,7 +534,7 @@ export default function CustomerPortalScreen({ route, navigation }: any) {
                             <View style={styles.bookingInfoRow}>
                               <Text style={[styles.bookingInfoLabel, { color: theme.colors.placeholder }]}>Requested On:</Text>
                               <Text style={[styles.bookingInfoValue, { color: theme.colors.text }]}>
-                                {new Date(bookingAlert.date).toLocaleDateString('en-GB', { day: 'numeric', month: 'short', year: 'numeric', hour: '2-digit', minute: '2-digit' })}
+                                {formatDateTime(bookingAlert.createdAt || bookingAlert.date)}
                               </Text>
                             </View>
                           </View>
@@ -703,7 +689,7 @@ export default function CustomerPortalScreen({ route, navigation }: any) {
                         <View style={{ flexDirection: 'row', alignItems: 'center', marginTop: 6 }}>
                           <MaterialCommunityIcons name="calendar-clock" size={14} color={theme.colors.placeholder} style={{ marginRight: 4 }} />
                           <Text style={{ fontSize: 13, color: theme.colors.text }}>
-                            Slot: {getBookingSlot(item.makeModel)}
+                            {item.date ? `${formatBookingDate(item.date)} • ` : ''}Slot: {getBookingSlot(item.makeModel)}
                           </Text>
                         </View>
 
@@ -725,7 +711,7 @@ export default function CustomerPortalScreen({ route, navigation }: any) {
                       </View>
 
                       <Text style={[styles.historyDate, { color: theme.colors.placeholder }]}>
-                        Requested: {new Date(item.date).toLocaleDateString('en-GB', { day: 'numeric', month: 'short', year: 'numeric' })}
+                        Booked on: {formatDateTime(item.createdAt || item.date)}
                       </Text>
                     </View>
                   );
@@ -751,7 +737,7 @@ export default function CustomerPortalScreen({ route, navigation }: any) {
                   <MaterialCommunityIcons name="check-decagram" size={16} color={theme.colors.success} style={{ marginLeft: 4 }} />
                 </View>
                 <Text style={{ color: theme.colors.placeholder, fontSize: 12, marginTop: 2 }}>
-                  Member since {new Date(customer.createdDate || Date.now()).toLocaleDateString('en-GB', { month: 'long', year: 'numeric' })}
+                  Member since {formatMemberSince(customer.createdDate)}
                 </Text>
               </View>
             </View>

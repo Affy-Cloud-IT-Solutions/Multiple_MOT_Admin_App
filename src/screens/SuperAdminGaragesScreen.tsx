@@ -16,6 +16,7 @@ import MaterialCommunityIcons from 'react-native-vector-icons/MaterialCommunityI
 import { useAppTheme } from '../context/ThemeContext';
 import { useAppValues, Garage, BASE_URL } from '../context/DataContext';
 import { fonts } from '../theme/theme';
+import { formatShortDate } from '../utils/dateUtils';
 
 export default function SuperAdminGaragesScreen({ navigation }: any) {
   const { theme } = useAppTheme();
@@ -655,7 +656,7 @@ export default function SuperAdminGaragesScreen({ navigation }: any) {
                             <View style={{ flex: 1 }}>
                               <Text style={{ fontFamily: fonts.bold, fontSize: 13, color: theme.colors.text }}>{doc.name}</Text>
                               <Text style={{ fontFamily: fonts.regular, fontSize: 10.5, color: theme.colors.placeholder, marginTop: 2 }}>
-                                Uploaded: {doc.uploadDate ? new Date(doc.uploadDate).toLocaleDateString() : 'Recent'}
+                                Uploaded: {doc.uploadDate ? formatShortDate(doc.uploadDate) : 'Recent'}
                               </Text>
                             </View>
 

@@ -4,6 +4,7 @@ import MaterialCommunityIcons from 'react-native-vector-icons/MaterialCommunityI
 import { useAppTheme } from '../context/ThemeContext';
 import { fonts } from '../theme/theme';
 import { useAppValues } from '../context/DataContext';
+import { formatBookingDate, formatDateTime } from '../utils/dateUtils';
 
 const STANDARD_SLOTS = [
   '08:30', '09:15', '10:00', '10:45',
@@ -49,16 +50,7 @@ const getSlotTimeDisplay = (item: any) => {
   return slotTime || '45-Min MOT Slot';
 };
 
-const formatBookingDate = (dateVal: any) => {
-  if (!dateVal) return 'Date not specified';
-  try {
-    const d = new Date(dateVal);
-    if (!isNaN(d.getTime())) {
-      return d.toLocaleDateString('en-GB', { day: 'numeric', month: 'short', year: 'numeric' });
-    }
-  } catch (e) {}
-  return String(dateVal);
-};
+
 
 export default function AdminAlertsScreen({ navigation }: any) {
   const { theme } = useAppTheme();
@@ -270,7 +262,9 @@ export default function AdminAlertsScreen({ navigation }: any) {
                     <MaterialCommunityIcons name={iconName} size={22} color={iconColor} style={{ marginRight: 8 }} />
                     <Text style={[styles.typeText, { color: theme.colors.text }]}>{typeText}</Text>
                   </View>
-                  <Text style={{ fontSize: 11, color: theme.colors.placeholder }}>{item.date}</Text>
+                  <Text style={{ fontSize: 11, color: theme.colors.placeholder }}>
+                    {formatDateTime(item.createdAt || item.date)}
+                  </Text>
                 </View>
 
                 <View style={styles.cardBody}>
@@ -418,7 +412,7 @@ export default function AdminAlertsScreen({ navigation }: any) {
                             style={{ marginRight: 6 }}
                           />
                           <Text style={{ fontSize: 13, fontFamily: fonts.bold, color: theme.colors.text }}>
-                            {(item.isDateOnly || item.hasMot === false) ? 'Drop-off Date: ' : 'Requested Date: '}
+                            {(item.isDateOnly || item.hasMot === false) ? 'Drop-off Date: ' : 'Appointment Date: '}
                             {formatBookingDate(item.date)}
                           </Text>
                         </View>

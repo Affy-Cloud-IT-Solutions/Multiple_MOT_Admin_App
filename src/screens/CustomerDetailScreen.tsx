@@ -21,6 +21,7 @@ import { fonts } from '../theme/theme';
 import { useAppValues, BASE_URL } from '../context/DataContext';
 import { SafeAreaView } from 'react-native-safe-area-context';
 import { validateMotExpiryDate } from '../utils/validationUtils';
+import { formatShortDate, formatShortDayMonth, formatAuditDateTime } from '../utils/dateUtils';
 
 if (Platform.OS === 'android' && UIManager.setLayoutAnimationEnabledExperimental) {
   UIManager.setLayoutAnimationEnabledExperimental(true);
@@ -174,7 +175,7 @@ export default function CustomerDetailScreen({ route, navigation }: any) {
               <View style={styles.contactItem}>
                 <MaterialCommunityIcons name="calendar-account" size={13} color={theme.colors.placeholder} />
                 <Text style={[styles.contactText, { color: theme.colors.placeholder }]}>
-                  Since: {customer.createdDate ? new Date(customer.createdDate).toLocaleDateString('en-GB', { day: 'numeric', month: 'short', year: 'numeric' }) : 'N/A'}
+                  Since: {formatShortDate(customer.createdDate)}
                 </Text>
               </View>
               {customer.address && (
@@ -290,7 +291,7 @@ export default function CustomerDetailScreen({ route, navigation }: any) {
                           <View style={[styles.statusBadge, { backgroundColor: '#F59E0B18', borderColor: '#F59E0B60', borderWidth: 1, flexDirection: 'row', alignItems: 'center' }]}>
                             <MaterialCommunityIcons name="calendar-clock" size={11} color="#D97706" style={{ marginRight: 3 }} />
                             <Text style={[styles.statusText, { color: '#D97706', fontFamily: fonts.bold }]}>
-                              Already Booked • {new Date(vBooking.date).toLocaleDateString('en-GB', { day: 'numeric', month: 'short' })}
+                              Already Booked • {formatShortDayMonth(vBooking.date)}
                             </Text>
                           </View>
                         ) : (
@@ -307,11 +308,11 @@ export default function CustomerDetailScreen({ route, navigation }: any) {
                         {v.year} • {v.make} {v.model}
                       </Text>
                       <Text style={{ fontSize: 12, color: theme.colors.placeholder, marginTop: 4 }}>
-                        MOT Expiry: {new Date(v.motExpiryDate).toLocaleDateString('en-GB', { day: 'numeric', month: 'short', year: 'numeric' })}
+                        MOT Expiry: {formatShortDate(v.motExpiryDate)}
                       </Text>
                       {v.lastServiceDate && (
                         <Text style={{ fontSize: 12, color: theme.colors.placeholder, marginTop: 2 }}>
-                          Last Serviced: {new Date(v.lastServiceDate).toLocaleDateString('en-GB', { day: 'numeric', month: 'short', year: 'numeric' })}
+                          Last Serviced: {formatShortDate(v.lastServiceDate)}
                         </Text>
                       )}
                       
@@ -328,7 +329,7 @@ export default function CustomerDetailScreen({ route, navigation }: any) {
                           if (isBooked && vBooking) {
                             Alert.alert(
                               'Vehicle Already Booked',
-                              `${v.registrationNumber} already has an active booking for ${new Date(vBooking.date).toLocaleDateString('en-GB', { day: 'numeric', month: 'short' })}${vBooking.slotTime ? ` at ${vBooking.slotTime}` : ''}.\n\nWould you like to manage or reschedule this appointment?`,
+                              `${v.registrationNumber} already has an active booking for ${formatShortDayMonth(vBooking.date)}${vBooking.slotTime ? ` at ${vBooking.slotTime}` : ''}.\n\nWould you like to manage or reschedule this appointment?`,
                               [
                                 { text: 'Cancel', style: 'cancel' },
                                 {
@@ -450,7 +451,7 @@ export default function CustomerDetailScreen({ route, navigation }: any) {
                       <View style={{ flexDirection: 'row', alignItems: 'center', marginTop: 6 }}>
                         <MaterialCommunityIcons name="calendar-clock" size={14} color={theme.colors.placeholder} style={{ marginRight: 4 }} />
                         <Text style={{ fontSize: 13, color: theme.colors.text }}>
-                          {new Date(b.date).toLocaleDateString('en-GB', { day: 'numeric', month: 'short', year: 'numeric' })} • Slot: {getBookingSlot(b.makeModel)}
+                          {formatShortDate(b.date)} • Slot: {getBookingSlot(b.makeModel)}
                         </Text>
                       </View>
 
@@ -499,7 +500,7 @@ export default function CustomerDetailScreen({ route, navigation }: any) {
                   <View style={styles.auditHeader}>
                     <Text style={[styles.auditActivity, { color: theme.colors.text }]}>{a.activity}</Text>
                     <Text style={{ fontSize: 10, color: theme.colors.placeholder }}>
-                      {new Date(a.date).toLocaleDateString('en-GB', { day: 'numeric', month: 'short', hour: '2-digit', minute: '2-digit' })}
+                      {formatAuditDateTime(a.date)}
                     </Text>
                   </View>
                   <Text style={{ fontSize: 12, color: theme.colors.placeholder, marginTop: 4 }}>

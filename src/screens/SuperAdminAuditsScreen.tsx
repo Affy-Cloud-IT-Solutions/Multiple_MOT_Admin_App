@@ -12,6 +12,7 @@ import MaterialCommunityIcons from 'react-native-vector-icons/MaterialCommunityI
 import { useAppTheme } from '../context/ThemeContext';
 import { useAppValues } from '../context/DataContext';
 import { fonts } from '../theme/theme';
+import { formatAuditDateTime } from '../utils/dateUtils';
 
 export default function SuperAdminAuditsScreen({ navigation }: any) {
   const { theme } = useAppTheme();
@@ -75,20 +76,7 @@ export default function SuperAdminAuditsScreen({ navigation }: any) {
     return { icon: 'clipboard-text-clock', color: '#EC4899' };
   };
 
-  const formatDate = (dateStr: string) => {
-    try {
-      const d = new Date(dateStr);
-      return d.toLocaleDateString('en-GB', {
-        day: '2-digit',
-        month: 'short',
-        year: 'numeric',
-        hour: '2-digit',
-        minute: '2-digit',
-      });
-    } catch {
-      return dateStr;
-    }
-  };
+  const formatDate = (dateStr: string) => formatAuditDateTime(dateStr);
 
   return (
     <View style={[styles.container, { backgroundColor: theme.colors.background }]}>

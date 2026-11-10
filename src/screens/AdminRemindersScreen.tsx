@@ -4,6 +4,7 @@ import MaterialCommunityIcons from 'react-native-vector-icons/MaterialCommunityI
 import { useAppTheme } from '../context/ThemeContext';
 import { useAppValues, BASE_URL } from '../context/DataContext';
 import { fonts } from '../theme/theme';
+import { formatAuditDateTime } from '../utils/dateUtils';
 
 export default function AdminRemindersScreen() {
   const { theme } = useAppTheme();
@@ -159,7 +160,9 @@ export default function AdminRemindersScreen() {
                         <MaterialCommunityIcons name={iconName} size={15} color={borderLeftColor} style={{ marginRight: 6 }} />
                         <Text style={[styles.logActivity, { color: theme.colors.text }]} numberOfLines={1}>{log.activity}</Text>
                       </View>
-                      <Text style={[styles.logDate, { color: theme.colors.placeholder }]}>{log.date}</Text>
+                      <Text style={[styles.logDate, { color: theme.colors.placeholder }]}>
+                        {formatAuditDateTime(log.date)}
+                      </Text>
                     </View>
                     <Text style={[styles.logDetails, { color: theme.colors.text + 'CC' }]}>{log.details}</Text>
                   </View>

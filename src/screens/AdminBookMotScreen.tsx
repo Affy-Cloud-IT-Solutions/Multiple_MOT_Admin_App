@@ -16,6 +16,7 @@ import { useAppTheme } from '../context/ThemeContext';
 import { fonts } from '../theme/theme';
 import { useAppValues, BASE_URL } from '../context/DataContext';
 import { SafeAreaView } from 'react-native-safe-area-context';
+import { formatBookingDate, formatShortDate } from '../utils/dateUtils';
 
 const STANDARD_SLOTS = [
   '08:30', '09:15', '10:00', '10:45',
@@ -39,16 +40,7 @@ const getSlotNumber = (item: any) => {
   return null;
 };
 
-const formatBookingDate = (dateVal: any) => {
-  if (!dateVal) return 'N/A';
-  try {
-    const d = new Date(dateVal);
-    if (!isNaN(d.getTime())) {
-      return d.toLocaleDateString('en-GB', { day: 'numeric', month: 'short', year: 'numeric' });
-    }
-  } catch (e) {}
-  return String(dateVal);
-};
+
 
 interface GarageServiceItem {
   id?: string;
@@ -775,7 +767,7 @@ export default function AdminBookMotScreen({ route, navigation }: any) {
                     <Text style={[styles.dateColLabel, { color: theme.colors.placeholder }]}>MOT Expiry</Text>
                   </View>
                   <Text style={[styles.dateColValue, { color: theme.colors.text }]}>
-                    {new Date(selectedVehicle.motExpiryDate).toLocaleDateString('en-GB', { day: '2-digit', month: 'short', year: 'numeric' })}
+                    {formatShortDate(selectedVehicle.motExpiryDate)}
                   </Text>
                 </View>
               )}
@@ -786,7 +778,7 @@ export default function AdminBookMotScreen({ route, navigation }: any) {
                     <Text style={[styles.dateColLabel, { color: theme.colors.placeholder }]}>Last Service</Text>
                   </View>
                   <Text style={[styles.dateColValue, { color: theme.colors.text }]}>
-                    {new Date(selectedVehicle.lastServiceDate).toLocaleDateString('en-GB', { day: '2-digit', month: 'short', year: 'numeric' })}
+                    {formatShortDate(selectedVehicle.lastServiceDate)}
                   </Text>
                 </View>
               )}

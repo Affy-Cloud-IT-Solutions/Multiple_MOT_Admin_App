@@ -234,7 +234,7 @@ const DataContext = createContext<DataContextType | undefined>(undefined);
 
 // Local backend configuration:
 // Wi-Fi IP (for physical mobile device & emulator on same network)
-// export const LOCAL_IP = '192.168.1.7';
+export const LOCAL_IP = '192.168.1.45';
 // export const BASE_URL = `http://${LOCAL_IP}:5000/api`;
 // export const BASE_URL = 'http://10.0.2.2:5000/api'; // Android Emulator alias
 export const BASE_URL = 'https://api.ondoorcarservice.com/api'; // Production server

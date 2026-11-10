@@ -18,6 +18,7 @@ import { useAppTheme } from '../context/ThemeContext';
 import { useAppValues, BASE_URL, Garage } from '../context/DataContext';
 import { fonts } from '../theme/theme';
 import { resolveImageUrl } from '../utils/imageUtils';
+import { formatShortDate } from '../utils/dateUtils';
 
 const { width: SCREEN_WIDTH, height: SCREEN_HEIGHT } = Dimensions.get('window');
 
@@ -662,7 +663,7 @@ export default function GarageVerificationReviewScreen({ route, navigation }: an
                     <View style={{ flex: 1, paddingRight: 8 }}>
                       <Text style={[styles.docTitleText, { color: theme.colors.text }]}>{doc.name}</Text>
                       <Text style={[styles.docSubtitleText, { color: theme.colors.placeholder }]} numberOfLines={1}>
-                        {doc.uploadDate ? `Uploaded on ${new Date(doc.uploadDate).toLocaleDateString()}` : 'Recently Uploaded'}
+                        {doc.uploadDate ? `Uploaded on ${formatShortDate(doc.uploadDate)}` : 'Recently Uploaded'}
                       </Text>
                     </View>
 
