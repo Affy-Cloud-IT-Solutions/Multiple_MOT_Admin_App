@@ -13,6 +13,7 @@ import {
   Image,
   Modal,
   AppState,
+  Keyboard,
 } from 'react-native';
 import MaterialCommunityIcons from 'react-native-vector-icons/MaterialCommunityIcons';
 import { launchImageLibrary } from 'react-native-image-picker';
@@ -29,6 +30,10 @@ import {
   LocationErrorCode,
   openAppSettings,
   openLocationSettings,
+  fetchGooglePlacePredictions,
+  fetchGooglePlaceDetails,
+  GooglePlacePrediction,
+  GoogleGaragePlaceDetails,
 } from '../utils/garageLocation';
 
 // Customers see these photos on the garage profile
@@ -279,6 +284,13 @@ export default function GarageSetupScreen({ route, navigation }: any) {
   const [logoUrl, setLogoUrl] = useState('');
   const [uploadingLogo, setUploadingLogo] = useState(false);
 
+  // Tab 1: Google Places street recommendation state
+  const [streetPredictions, setStreetPredictions] = useState<GooglePlacePrediction[]>([]);
+  const [loadingPredictions, setLoadingPredictions] = useState(false);
+  const [selectingPlaceId, setSelectingPlaceId] = useState<string | null>(null);
+  const [autofillSuccessNotice, setAutofillSuccessNotice] = useState<string | null>(null);
+  const streetSearchDebounceRef = React.useRef<any>(null);
+
   // Tab 2: Services
   const [servicesList, setServicesList] = useState<ServiceItemState[]>([]);
   const [catalog, setCatalog] = useState<ServiceCatalogGroup[] | null>(null);
@@ -468,6 +480,81 @@ export default function GarageSetupScreen({ route, navigation }: any) {
     return () => subscription.remove();
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, []);
+
+  // Cleanup Google Places street search debounce on unmount
+  useEffect(() => {
+    return () => {
+      if (streetSearchDebounceRef.current) {
+        clearTimeout(streetSearchDebounceRef.current);
+      }
+    };
+  }, []);
+
+  // Street address autocomplete via Google Places API (UK restricted)
+  const handleAddressChange = (text: string) => {
+    setAddress(text);
+    if (autofillSuccessNotice) {
+      setAutofillSuccessNotice(null);
+    }
+
+    if (streetSearchDebounceRef.current) {
+      clearTimeout(streetSearchDebounceRef.current);
+    }
+
+    const trimmed = text.trim();
+    if (trimmed.length < 2) {
+      setStreetPredictions([]);
+      setLoadingPredictions(false);
+      return;
+    }
+
+    setLoadingPredictions(true);
+    streetSearchDebounceRef.current = setTimeout(async () => {
+      try {
+        const results = await fetchGooglePlacePredictions(trimmed);
+        setStreetPredictions(results);
+      } catch (e) {
+        setStreetPredictions([]);
+      } finally {
+        setLoadingPredictions(false);
+      }
+    }, 280);
+  };
+
+  const handleClearAddress = () => {
+    setAddress('');
+    setStreetPredictions([]);
+    setLoadingPredictions(false);
+    setAutofillSuccessNotice(null);
+    if (streetSearchDebounceRef.current) {
+      clearTimeout(streetSearchDebounceRef.current);
+    }
+  };
+
+  const handleSelectStreetPrediction = async (prediction: GooglePlacePrediction) => {
+    setSelectingPlaceId(prediction.placeId);
+    try {
+      const details = await fetchGooglePlaceDetails(prediction.placeId);
+      if (details) {
+        setAddress(details.address);
+        setCity(details.city);
+        setPostcode(details.postcode);
+        setLatitude(details.latitude.toFixed(6));
+        setLongitude(details.longitude.toFixed(6));
+        setAutofillSuccessNotice(`${details.address}, ${details.city} (${details.postcode})`);
+      } else {
+        setAddress(prediction.mainText);
+      }
+      setStreetPredictions([]);
+      Keyboard.dismiss();
+    } catch (err) {
+      console.error('Error selecting street prediction:', err);
+      setAddress(prediction.mainText);
+      setStreetPredictions([]);
+    } finally {
+      setSelectingPlaceId(null);
+    }
+  };
 
   // Garage photos from the gallery - uploaded straight away, saved with the location step
   const handleAddPhotos = async () => {
@@ -934,14 +1021,99 @@ export default function GarageSetupScreen({ route, navigation }: any) {
             </Text>
 
             <View style={styles.fieldGroup}>
-              <Text style={[styles.fieldLabel, { color: theme.colors.text }]}>Street Address *</Text>
-              <TextInput
-                style={[styles.input, { backgroundColor: theme.colors.background, borderColor: theme.colors.border, color: theme.colors.text }]}
-                placeholder="e.g. Unit 4, Commercial Trading Estate"
-                placeholderTextColor={theme.colors.placeholder}
-                value={address}
-                onChangeText={setAddress}
-              />
+              <View style={styles.fieldLabelRow}>
+                <Text style={[styles.fieldLabel, { color: theme.colors.text, marginBottom: 0 }]}>Street Address *</Text>
+                <View style={[styles.googleBadge, { backgroundColor: theme.colors.primary + '15' }]}>
+                  <MaterialCommunityIcons name="google-maps" size={12} color={theme.colors.primary} style={{ marginRight: 3 }} />
+                  <Text style={[styles.googleBadgeText, { color: theme.colors.primary }]}>Google Auto-suggest</Text>
+                </View>
+              </View>
+
+              <View style={[styles.addressInputContainer, { backgroundColor: theme.colors.background, borderColor: streetPredictions.length > 0 ? theme.colors.primary : theme.colors.border }]}>
+                <MaterialCommunityIcons name="magnify" size={18} color={theme.colors.placeholder} style={styles.addressInputIcon} />
+                <TextInput
+                  style={[styles.addressInput, { color: theme.colors.text }]}
+                  placeholder="Start typing your street address or garage name..."
+                  placeholderTextColor={theme.colors.placeholder}
+                  value={address}
+                  onChangeText={handleAddressChange}
+                  autoCapitalize="words"
+                />
+                {loadingPredictions ? (
+                  <ActivityIndicator size="small" color={theme.colors.primary} style={styles.addressInputTrailing} />
+                ) : address.length > 0 ? (
+                  <TouchableOpacity onPress={handleClearAddress} hitSlop={{ top: 8, bottom: 8, left: 8, right: 8 }} style={styles.addressInputTrailing}>
+                    <MaterialCommunityIcons name="close-circle" size={18} color={theme.colors.placeholder} />
+                  </TouchableOpacity>
+                ) : null}
+              </View>
+
+              {autofillSuccessNotice ? (
+                <View style={[styles.autofillBanner, { backgroundColor: theme.colors.success + '15', borderColor: theme.colors.success + '40' }]}>
+                  <MaterialCommunityIcons name="check-circle" size={16} color={theme.colors.success} style={{ marginRight: 6 }} />
+                  <View style={{ flex: 1 }}>
+                    <Text style={[styles.autofillBannerTitle, { color: theme.colors.success }]}>
+                      Address & Coordinates Filled from Google Maps
+                    </Text>
+                    <Text style={[styles.autofillBannerSub, { color: theme.colors.text }]} numberOfLines={1}>
+                      {autofillSuccessNotice} • Lat: {latitude}, Lng: {longitude}
+                    </Text>
+                  </View>
+                  <TouchableOpacity onPress={() => setAutofillSuccessNotice(null)} hitSlop={{ top: 6, bottom: 6, left: 6, right: 6 }}>
+                    <MaterialCommunityIcons name="close" size={14} color={theme.colors.placeholder} />
+                  </TouchableOpacity>
+                </View>
+              ) : null}
+
+              {streetPredictions.length > 0 ? (
+                <View style={[styles.predictionsDropdown, { backgroundColor: theme.colors.card, borderColor: theme.colors.border }]}>
+                  <View style={[styles.predictionsHeader, { borderBottomColor: theme.colors.border }]}>
+                    <View style={{ flexDirection: 'row', alignItems: 'center' }}>
+                      <MaterialCommunityIcons name="google-maps" size={14} color={theme.colors.primary} style={{ marginRight: 5 }} />
+                      <Text style={[styles.predictionsHeaderText, { color: theme.colors.placeholder }]}>
+                        Tap to autofill street, postcode & map pin:
+                      </Text>
+                    </View>
+                    <TouchableOpacity onPress={() => setStreetPredictions([])} hitSlop={{ top: 6, bottom: 6, left: 6, right: 6 }}>
+                      <Text style={[styles.predictionsDismissText, { color: theme.colors.primary }]}>Close</Text>
+                    </TouchableOpacity>
+                  </View>
+                  {streetPredictions.slice(0, 5).map((item, index) => {
+                    const isSelecting = selectingPlaceId === item.placeId;
+                    return (
+                      <TouchableOpacity
+                        key={item.placeId || String(index)}
+                        style={[
+                          styles.predictionRow,
+                          { borderBottomColor: index === Math.min(streetPredictions.length, 5) - 1 ? 'transparent' : theme.colors.border }
+                        ]}
+                        activeOpacity={0.7}
+                        onPress={() => handleSelectStreetPrediction(item)}
+                        disabled={isSelecting}
+                      >
+                        <View style={[styles.predictionIconWrap, { backgroundColor: theme.colors.primary + '12' }]}>
+                          {isSelecting ? (
+                            <ActivityIndicator size="small" color={theme.colors.primary} />
+                          ) : (
+                            <MaterialCommunityIcons name="map-marker-outline" size={16} color={theme.colors.primary} />
+                          )}
+                        </View>
+                        <View style={styles.predictionTextCol}>
+                          <Text style={[styles.predictionMainText, { color: theme.colors.text }]} numberOfLines={1}>
+                            {item.mainText}
+                          </Text>
+                          {item.secondaryText ? (
+                            <Text style={[styles.predictionSecondaryText, { color: theme.colors.placeholder }]} numberOfLines={1}>
+                              {item.secondaryText}
+                            </Text>
+                          ) : null}
+                        </View>
+                        <MaterialCommunityIcons name="arrow-top-right" size={16} color={theme.colors.placeholder} />
+                      </TouchableOpacity>
+                    );
+                  })}
+                </View>
+              ) : null}
             </View>
 
             <View style={styles.rowFields}>
@@ -1020,6 +1192,9 @@ export default function GarageSetupScreen({ route, navigation }: any) {
                 />
               </View>
             </View>
+            <Text style={[styles.coordsHint, { color: theme.colors.placeholder }]}>
+              📍 Pin coordinates set automatically from address suggestions. You can also adjust them manually if needed.
+            </Text>
 
             {/* Garage Logo */}
             <View style={styles.photoHeaderRow}>
@@ -1722,6 +1897,119 @@ const styles = StyleSheet.create({
     fontSize: 13,
     fontFamily: fonts.semiBold,
     marginBottom: 6,
+  },
+  fieldLabelRow: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    justifyContent: 'space-between',
+    marginBottom: 6,
+  },
+  googleBadge: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    paddingHorizontal: 7,
+    paddingVertical: 2,
+    borderRadius: 6,
+  },
+  googleBadgeText: {
+    fontSize: 10.5,
+    fontFamily: fonts.semiBold,
+  },
+  addressInputContainer: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    height: 48,
+    borderWidth: 1,
+    borderRadius: 10,
+    paddingHorizontal: 12,
+  },
+  addressInputIcon: {
+    marginRight: 8,
+  },
+  addressInput: {
+    flex: 1,
+    height: '100%',
+    fontSize: 14,
+    fontFamily: fonts.regular,
+    paddingVertical: 0,
+  },
+  addressInputTrailing: {
+    padding: 4,
+    marginLeft: 6,
+  },
+  autofillBanner: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    borderWidth: 1,
+    borderRadius: 8,
+    padding: 10,
+    marginTop: 8,
+  },
+  autofillBannerTitle: {
+    fontSize: 12,
+    fontFamily: fonts.bold,
+  },
+  autofillBannerSub: {
+    fontSize: 11,
+    fontFamily: fonts.regular,
+    marginTop: 1,
+  },
+  predictionsDropdown: {
+    borderWidth: 1,
+    borderRadius: 10,
+    marginTop: 6,
+    overflow: 'hidden',
+  },
+  predictionsHeader: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    justifyContent: 'space-between',
+    paddingHorizontal: 12,
+    paddingVertical: 8,
+    borderBottomWidth: 1,
+  },
+  predictionsHeaderText: {
+    fontSize: 11,
+    fontFamily: fonts.semiBold,
+  },
+  predictionsDismissText: {
+    fontSize: 11,
+    fontFamily: fonts.bold,
+  },
+  predictionRow: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    paddingHorizontal: 12,
+    paddingVertical: 10,
+    borderBottomWidth: 1,
+  },
+  predictionIconWrap: {
+    width: 28,
+    height: 28,
+    borderRadius: 14,
+    alignItems: 'center',
+    justifyContent: 'center',
+    marginRight: 10,
+  },
+  predictionTextCol: {
+    flex: 1,
+    marginRight: 8,
+  },
+  predictionMainText: {
+    fontSize: 13,
+    fontFamily: fonts.semiBold,
+  },
+  predictionSecondaryText: {
+    fontSize: 11,
+    fontFamily: fonts.regular,
+    marginTop: 1,
+  },
+  coordsHint: {
+    fontSize: 11,
+    fontFamily: fonts.regular,
+    marginTop: -8,
+    marginBottom: 14,
+    lineHeight: 15,
   },
   input: {
     height: 48,

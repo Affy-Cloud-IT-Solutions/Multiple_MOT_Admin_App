@@ -149,3 +149,133 @@ export async function detectGarageLocation(): Promise<DetectedGarageLocation> {
   const place = await reverseGeocode(coords.latitude, coords.longitude);
   return { ...coords, ...place };
 }
+
+export interface GooglePlacePrediction {
+  placeId: string;
+  description: string;
+  mainText: string;
+  secondaryText: string;
+  types: string[];
+}
+
+export interface GoogleGaragePlaceDetails {
+  address: string;
+  city: string;
+  postcode: string;
+  latitude: number;
+  longitude: number;
+  formattedAddress: string;
+}
+
+/**
+ * Autocomplete address/street recommendations from Google Places API (restricted to UK)
+ */
+export async function fetchGooglePlacePredictions(input: string): Promise<GooglePlacePrediction[]> {
+  const q = input.trim();
+  if (!q || q.length < 2 || !GOOGLE_MAPS_API_KEY) return [];
+
+  try {
+    const controller = new AbortController();
+    const timer = setTimeout(() => controller.abort(), 4000);
+    const url = `https://maps.googleapis.com/maps/api/place/autocomplete/json?input=${encodeURIComponent(
+      q
+    )}&components=country:gb&key=${GOOGLE_MAPS_API_KEY}`;
+
+    const res = await fetch(url, { signal: controller.signal });
+    clearTimeout(timer);
+
+    if (res.ok) {
+      const data = await res.json();
+      if (data.status === 'OK' && Array.isArray(data.predictions)) {
+        return data.predictions.map((p: any) => ({
+          placeId: p.place_id,
+          description: p.description,
+          mainText: p.structured_formatting?.main_text || p.description,
+          secondaryText: p.structured_formatting?.secondary_text || '',
+          types: p.types || [],
+        }));
+      }
+    }
+  } catch (e) {
+    console.warn('[garageLocation] fetchGooglePlacePredictions error:', e);
+  }
+  return [];
+}
+
+/**
+ * Fetch Place Details (exact street, city, postcode, and coordinates) from Google Places API
+ */
+export async function fetchGooglePlaceDetails(placeId: string): Promise<GoogleGaragePlaceDetails | null> {
+  if (!placeId || !GOOGLE_MAPS_API_KEY) return null;
+
+  try {
+    const controller = new AbortController();
+    const timer = setTimeout(() => controller.abort(), 5000);
+    const url = `https://maps.googleapis.com/maps/api/place/details/json?place_id=${encodeURIComponent(
+      placeId
+    )}&fields=address_components,geometry,formatted_address,name&key=${GOOGLE_MAPS_API_KEY}`;
+
+    const res = await fetch(url, { signal: controller.signal });
+    clearTimeout(timer);
+
+    if (res.ok) {
+      const data = await res.json();
+      if (data.status === 'OK' && data.result) {
+        const item = data.result;
+        const lat = item.geometry?.location?.lat;
+        const lon = item.geometry?.location?.lng;
+
+        if (typeof lat === 'number' && typeof lon === 'number') {
+          let premise = '';
+          let subpremise = '';
+          let streetNumber = '';
+          let route = '';
+          let neighborhood = '';
+          let sublocality = '';
+          let postalTown = '';
+          let locality = '';
+          let adminArea2 = '';
+          let postcode = '';
+
+          for (const comp of item.address_components || []) {
+            const types: string[] = comp.types || [];
+            if (types.includes('premise')) premise = comp.long_name || comp.short_name;
+            else if (types.includes('subpremise')) subpremise = comp.long_name || comp.short_name;
+            else if (types.includes('street_number')) streetNumber = comp.long_name || comp.short_name;
+            else if (types.includes('route')) route = comp.long_name || comp.short_name;
+            else if (types.includes('neighborhood')) neighborhood = comp.long_name || comp.short_name;
+            else if (types.includes('sublocality')) sublocality = comp.long_name || comp.short_name;
+            else if (types.includes('postal_town')) postalTown = comp.long_name || comp.short_name;
+            else if (types.includes('locality')) locality = comp.long_name || comp.short_name;
+            else if (types.includes('administrative_area_level_2')) adminArea2 = comp.long_name || comp.short_name;
+            else if (types.includes('postal_code')) postcode = comp.long_name || comp.short_name;
+          }
+
+          // Build unit and street line
+          const unitPart = [subpremise, premise].filter(Boolean).join(', ');
+          const streetLine = [streetNumber, route].filter(Boolean).join(' ');
+          const streetPart = [unitPart, streetLine].filter(Boolean).join(', ');
+
+          let finalAddress = streetPart;
+          if (!finalAddress) {
+            finalAddress = neighborhood || sublocality || item.name || (item.formatted_address ? item.formatted_address.split(',')[0] : '');
+          }
+
+          const finalCity = postalTown || locality || adminArea2 || sublocality || 'London';
+
+          return {
+            address: finalAddress,
+            city: finalCity,
+            postcode: postcode.toUpperCase(),
+            latitude: lat,
+            longitude: lon,
+            formattedAddress: item.formatted_address || finalAddress,
+          };
+        }
+      }
+    }
+  } catch (e) {
+    console.warn('[garageLocation] fetchGooglePlaceDetails error:', e);
+  }
+  return null;
+}
