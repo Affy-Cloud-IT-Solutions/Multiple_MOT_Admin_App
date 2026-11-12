@@ -143,6 +143,8 @@ export default function AdminSlotsScreen({ navigation, route }: any) {
   const { user, token, refreshData, garages, fetchGarageServices, alerts, authFetch } = useAppValues();
 
   const garageId = user?.garageId || (garages.length > 0 ? garages[0]._id || garages[0].id : '');
+  const isGarageAdmin = user?.role === 'garage_admin' || user?.role === 'admin';
+  const isStaff = user?.role === 'staff';
 
   // Selected service (defaults to All Services)
   const [selectedService, setSelectedService] = useState<GarageServiceItem>(ALL_SERVICES_ITEM);
@@ -163,15 +165,20 @@ export default function AdminSlotsScreen({ navigation, route }: any) {
   const [selectedDate, setSelectedDate] = useState<string>(() =>
     formatToDDMMYYYY(new Date())
   );
+  const [loading, setLoading] = useState(true);
+  const [refreshing, setRefreshing] = useState(false);
+  const [slotData, setSlotData] = useState<SlotsResponse | null>(null);
 
-  // Set of dates (in DD-MM-YYYY format) that have historical bookings
+  // Set of dates (in DD-MM-YYYY format) that have historical or upcoming bookings
   const datesWithBookingsSet = useMemo(() => {
     const set = new Set<string>();
     (alerts || []).forEach((a: any) => {
-      if (a.type === 'BOOKED' && a.date) {
+      const isBooking = a.type === 'BOOKED' || (typeof a.type === 'string' && a.type.toUpperCase() === 'BOOKED');
+      const rawDate = (typeof a.date === 'object' && a.date?.$date) ? a.date.$date : a.date;
+      if (isBooking && rawDate) {
         try {
-          if (typeof a.date === 'string') {
-            const matchIso = a.date.match(/^(\d{4})-(\d{1,2})-(\d{1,2})/);
+          if (typeof rawDate === 'string') {
+            const matchIso = rawDate.match(/^(\d{4})-(\d{1,2})-(\d{1,2})/);
             if (matchIso) {
               const y = matchIso[1];
               const m = matchIso[2].padStart(2, '0');
@@ -179,7 +186,7 @@ export default function AdminSlotsScreen({ navigation, route }: any) {
               set.add(`${d}-${m}-${y}`);
               return;
             }
-            const matchUk = a.date.match(/^(\d{1,2})[/-](\d{1,2})[/-](\d{4})/);
+            const matchUk = rawDate.match(/^(\d{1,2})[/-](\d{1,2})[/-](\d{4})/);
             if (matchUk) {
               const d = matchUk[1].padStart(2, '0');
               const m = matchUk[2].padStart(2, '0');
@@ -188,15 +195,21 @@ export default function AdminSlotsScreen({ navigation, route }: any) {
               return;
             }
           }
-          const d = new Date(a.date);
+          const d = new Date(rawDate);
           if (!isNaN(d.getTime())) {
             set.add(formatToDDMMYYYY(d));
           }
         } catch (e) {}
       }
     });
+
+    // Also include currently loaded slotData's date if it has bookings
+    if (selectedDate && slotData?.todayBookingsSummary && slotData.todayBookingsSummary.length > 0) {
+      set.add(selectedDate);
+    }
+
     return set;
-  }, [alerts]);
+  }, [alerts, selectedDate, slotData?.todayBookingsSummary]);
 
   // Is currently selected date in the past?
   const isSelectedDateInPast = useMemo(() => {
@@ -214,9 +227,6 @@ export default function AdminSlotsScreen({ navigation, route }: any) {
     } catch (e) {}
     return false;
   }, [selectedDate]);
-  const [loading, setLoading] = useState(true);
-  const [refreshing, setRefreshing] = useState(false);
-  const [slotData, setSlotData] = useState<SlotsResponse | null>(null);
 
   // Add station modal
   const [modalVisible, setModalVisible] = useState(false);
@@ -533,6 +543,10 @@ export default function AdminSlotsScreen({ navigation, route }: any) {
 
   // Request new station
   const handleAddStation = async () => {
+    if (!isGarageAdmin) {
+      Alert.alert('Permission Denied', 'Only the Garage Owner / Admin can add new bay stations.');
+      return;
+    }
     if (!newStationName.trim()) {
       Alert.alert('Validation', 'Please enter a name for the station (e.g. Station 2).');
       return;
@@ -1049,14 +1063,16 @@ export default function AdminSlotsScreen({ navigation, route }: any) {
                 <Text style={[styles.emptySlotsSubtitle, { color: theme.colors.placeholder }]}>
                   This garage does not have any active MOT bays or time slots configured for {formatDisplayDate(selectedDate)}.
                 </Text>
-                <TouchableOpacity
-                  style={[styles.emptyAddStationBtn, { backgroundColor: theme.colors.primary }]}
-                  onPress={() => setModalVisible(true)}
-                  activeOpacity={0.8}
-                >
-                  <MaterialCommunityIcons name="plus" size={16} color="#FFFFFF" style={{ marginRight: 6 }} />
-                  <Text style={styles.emptyAddStationBtnText}>Add MOT Bay Station</Text>
-                </TouchableOpacity>
+                {isGarageAdmin && (
+                  <TouchableOpacity
+                    style={[styles.emptyAddStationBtn, { backgroundColor: theme.colors.primary }]}
+                    onPress={() => setModalVisible(true)}
+                    activeOpacity={0.8}
+                  >
+                    <MaterialCommunityIcons name="plus" size={16} color="#FFFFFF" style={{ marginRight: 6 }} />
+                    <Text style={styles.emptyAddStationBtnText}>Add MOT Bay Station</Text>
+                  </TouchableOpacity>
+                )}
               </>
             )}
           </View>
@@ -1759,8 +1775,8 @@ export default function AdminSlotsScreen({ navigation, route }: any) {
                 const dayStart = new Date(day.getFullYear(), day.getMonth(), day.getDate());
                 const isToday = dayStart.getTime() === todayStart.getTime();
                 const isPast = dayStart.getTime() < todayStart.getTime();
-                const hasPastBookings = isPast && datesWithBookingsSet.has(dateStr);
-                const isDisabled = isPast && !hasPastBookings;
+                const hasBookings = datesWithBookingsSet.has(dateStr);
+                const isDisabled = isPast && !hasBookings;
                 const isSunday = day.getDay() === 0;
 
                 return (
@@ -1778,19 +1794,19 @@ export default function AdminSlotsScreen({ navigation, route }: any) {
                             ? theme.colors.primary
                             : isToday
                             ? theme.colors.primary + '18'
-                            : hasPastBookings
+                            : hasBookings
                             ? '#8B5CF618'
                             : 'transparent',
                           borderColor: isSelected
                             ? theme.colors.primary
                             : isToday
                             ? theme.colors.primary
-                            : hasPastBookings
+                            : hasBookings
                             ? '#8B5CF6'
                             : isDisabled
                             ? 'transparent'
                             : theme.colors.border + '60',
-                          borderWidth: isSelected || isToday || hasPastBookings ? 1.5 : 1,
+                          borderWidth: isSelected || isToday || hasBookings ? 1.5 : 1,
                           opacity: isDisabled ? 0.28 : 1,
                         }
                       ]}
@@ -1803,25 +1819,27 @@ export default function AdminSlotsScreen({ navigation, route }: any) {
                               ? '#FFFFFF'
                               : isDisabled
                               ? theme.colors.placeholder
-                              : hasPastBookings
+                              : hasBookings
                               ? '#8B5CF6'
                               : isSunday
                               ? '#EF4444'
                               : isToday
                               ? theme.colors.primary
                               : theme.colors.text,
-                            fontFamily: isSelected || isToday || hasPastBookings ? fonts.extraBold : fonts.semiBold,
+                            fontFamily: isSelected || isToday || hasBookings ? fonts.extraBold : fonts.semiBold,
                           }
                         ]}
                       >
                         {day.getDate()}
                       </Text>
-                      {isToday && !isSelected && (
-                        <View style={[styles.todayDot, { backgroundColor: theme.colors.primary }]} />
-                      )}
-                      {hasPastBookings && !isSelected && (
-                        <View style={[styles.pastBookingDot, { backgroundColor: '#8B5CF6' }]} />
-                      )}
+                      <View style={styles.dotsRow}>
+                        {isToday && !isSelected && (
+                          <View style={[styles.calDot, { backgroundColor: theme.colors.primary }]} />
+                        )}
+                        {hasBookings && !isSelected && (
+                          <View style={[styles.calDot, { backgroundColor: '#8B5CF6' }]} />
+                        )}
+                      </View>
                     </TouchableOpacity>
                   </View>
                 );
@@ -2550,6 +2568,19 @@ const styles = StyleSheet.create({
     borderRadius: 2,
     position: 'absolute',
     bottom: 3,
+  },
+  dotsRow: {
+    position: 'absolute',
+    bottom: 3,
+    flexDirection: 'row',
+    alignItems: 'center',
+    justifyContent: 'center',
+    gap: 3,
+  },
+  calDot: {
+    width: 4,
+    height: 4,
+    borderRadius: 2,
   },
   calendarLegendRow: {
     flexDirection: 'row',

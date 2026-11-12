@@ -33,13 +33,13 @@ const getSlotNumber = (item: any): number | null => {
   if (item?.slotNumber && typeof item.slotNumber === 'number' && item.slotNumber > 0) {
     return item.slotNumber;
   }
-  let timeStr = item?.slotTime || '';
-  if (!timeStr && item?.makeModel) {
+  let timeStr = typeof item?.slotTime === 'string' ? item.slotTime : '';
+  if (!timeStr && item?.makeModel && typeof item.makeModel === 'string') {
     const match = item.makeModel.match(/Slot:\s*(\d{1,2}:\d{2}(?:\s*[AP]M)?)/i) ||
                   item.makeModel.match(/at\s+(\d{1,2}:\d{2}(?:\s*[AP]M)?)/i);
     if (match) timeStr = match[1];
   }
-  if (timeStr) {
+  if (timeStr && typeof timeStr === 'string') {
     const start = timeStr.split(' - ')[0].trim();
     const idx = STANDARD_SLOTS.indexOf(start);
     if (idx !== -1) return idx + 1;
@@ -49,41 +49,41 @@ const getSlotNumber = (item: any): number | null => {
 
 const isMotBooking = (item: any): boolean => {
   if (item?.hasMot === true) return true;
-  if (item?.isDateOnly === true && !item?.slotTime && !item?.serviceName?.toUpperCase().includes('MOT')) {
+  if (item?.isDateOnly === true && !item?.slotTime && (!item?.serviceName || typeof item.serviceName !== 'string' || !item.serviceName.toUpperCase().includes('MOT'))) {
     return false;
   }
 
-  // Check serviceName
-  const sName = (item?.serviceName || '').toUpperCase();
+  // Check serviceName safely
+  const sName = typeof item?.serviceName === 'string' ? item.serviceName.toUpperCase() : '';
   if (sName.includes('MOT')) return true;
 
-  // Check multi-services array
+  // Check multi-services array safely
   if (Array.isArray(item?.services) && item.services.length > 0) {
     const hasMot = item.services.some((s: any) => {
-      const name = (typeof s === 'string' ? s : s?.name || '').toUpperCase();
-      const cat = (typeof s === 'object' ? s?.category || '' : '').toUpperCase();
+      const name = (typeof s === 'string' ? s : (s && typeof s.name === 'string' ? s.name : '')).toUpperCase();
+      const cat = (typeof s === 'object' && s && typeof s.category === 'string' ? s.category : '').toUpperCase();
       return name.includes('MOT') || cat === 'MOT';
     });
     if (hasMot) return true;
   }
 
-  // Check slotNumber or slotTime
+  // Check slotNumber or slotTime safely
   if (item?.slotNumber && typeof item.slotNumber === 'number' && item.slotNumber > 0) return true;
-  if (item?.slotTime && item.slotTime !== 'Full Day Drop-off' && item.slotTime !== 'Drop-off (Full Day)') return true;
+  if (item?.slotTime && typeof item.slotTime === 'string' && item.slotTime !== 'Full Day Drop-off' && item.slotTime !== 'Drop-off (Full Day)') return true;
 
-  // Check makeModel string for slot info (e.g. "AUDI A6 - Slot: 08:00")
-  if (item?.makeModel && /Slot:\s*\d{1,2}:\d{2}/i.test(item.makeModel)) return true;
+  // Check makeModel string for slot info safely (e.g. "AUDI A6 - Slot: 08:00")
+  if (typeof item?.makeModel === 'string' && /Slot:\s*\d{1,2}:\d{2}/i.test(item.makeModel)) return true;
 
   return false;
 };
 
 const getMotSlotDisplay = (item: any): string => {
   const num = getSlotNumber(item);
-  let timeStr = item?.slotTime || '';
-  if (!timeStr && item?.makeModel) {
+  let timeStr = typeof item?.slotTime === 'string' ? item.slotTime : '';
+  if (!timeStr && typeof item?.makeModel === 'string') {
     const match = item.makeModel.match(/(?:MOT\s+)?Slot:\s*([^\n\r&]+)/i);
     if (match) timeStr = match[1].trim();
-  } else if (timeStr && timeStr.includes(' & Service:')) {
+  } else if (timeStr && typeof timeStr === 'string' && timeStr.includes(' & Service:')) {
     timeStr = timeStr.split(' & Service:')[0].replace(/^(?:MOT\s+)?Slot:\s*/i, '').trim();
   }
 
@@ -155,17 +155,19 @@ const matchesDate = (dateVal: any, query: string) => {
 };
 
 // Search Helper: Matches VRN strictly
-const matchesVrn = (vrn: string | undefined, query: string) => {
-  if (!vrn || !query) return false;
-  const cleanVrn = vrn.toLowerCase().replace(/\s+/g, '');
+const matchesVrn = (vrn: any, query: string) => {
+  if (!vrn || !query || typeof query !== 'string') return false;
+  const vrnStr = typeof vrn === 'string' ? vrn : (typeof vrn === 'object' && vrn?.registrationNumber ? String(vrn.registrationNumber) : String(vrn));
+  const cleanVrn = vrnStr.toLowerCase().replace(/\s+/g, '');
   const cleanQ = query.toLowerCase().replace(/\s+/g, '');
-  return cleanVrn.includes(cleanQ) || vrn.toLowerCase().includes(query.toLowerCase().trim());
+  return cleanVrn.includes(cleanQ) || vrnStr.toLowerCase().includes(query.toLowerCase().trim());
 };
 
 // Search Helper: Matches Customer Name strictly
-const matchesCustomer = (name: string | undefined, query: string) => {
-  if (!name || !query) return false;
-  return name.toLowerCase().includes(query.toLowerCase().trim());
+const matchesCustomer = (name: any, query: string) => {
+  if (!name || !query || typeof query !== 'string') return false;
+  const nameStr = typeof name === 'string' ? name : (typeof name === 'object' ? `${name?.firstName || ''} ${name?.lastName || ''}`.trim() : String(name));
+  return nameStr.toLowerCase().includes(query.toLowerCase().trim());
 };
 
 const getFilterLabel = (status: string) => {
@@ -480,8 +482,10 @@ export default function BookedMotsScreen({ navigation }: any) {
   };
 
   const handleAdminCancelBooking = (item: any) => {
-    const alertId = item.id;
-    const reg = item.registrationNumber || 'Vehicle';
+    const alertId = item.id || item._id;
+    const reg = (typeof item.registrationNumber === 'string' && item.registrationNumber.trim())
+      ? item.registrationNumber
+      : (typeof item.vrn === 'string' && item.vrn.trim() ? item.vrn : 'Vehicle');
     const dateStr = formatBookingDate(item.date);
     const slotStr = isMotBooking(item) ? getMotSlotDisplay(item) : 'Workshop Drop-off';
 
@@ -683,7 +687,7 @@ export default function BookedMotsScreen({ navigation }: any) {
             </Text>
           </View>
         ) : (
-          sortedBookings.map((item) => {
+          sortedBookings.map((item, index) => {
             const isPending = item.status === 'Pending';
             const isApproved = item.status === 'Approved';
             const isRejected = item.status === 'Rejected' || item.status === 'Acknowledged';
@@ -727,28 +731,62 @@ export default function BookedMotsScreen({ navigation }: any) {
               statusIcon = 'help-circle-outline';
             }
 
-            const customer = customers.find(c => 
-              String(c.id).toLowerCase() === String(item.customerId).toLowerCase() ||
-              String(c._id).toLowerCase() === String(item.customerId).toLowerCase()
-            );
-            const custName = item.customerName || (customer ? `${customer.firstName} ${customer.lastName}` : 'Customer');
-            const custPhone = item.customerMobile || customer?.mobile || '';
-            const cleanMake = item.makeModel?.split(' (Slot:')[0]?.split(' at ')[0]?.split(' - Slot:')[0]?.split(' - MOT Slot:')[0]?.split(' - Workshop Drop-off')[0]?.trim() || item.makeModel || 'Vehicle';
-            const isMot = isMotBooking(item);
+            const anyItem = item as any;
+            const customer = anyItem.customerId
+              ? customers.find(c =>
+                  (c.id && String(c.id).toLowerCase() === String(anyItem.customerId).toLowerCase()) ||
+                  (c._id && String(c._id).toLowerCase() === String(anyItem.customerId).toLowerCase())
+                )
+              : null;
+            const custName = typeof anyItem.customerName === 'string' && anyItem.customerName.trim()
+              ? anyItem.customerName.trim()
+              : (customer ? `${customer.firstName || ''} ${customer.lastName || ''}`.trim() : '') || 'Customer';
+            const custPhone = typeof anyItem.customerMobile === 'string' && anyItem.customerMobile.trim()
+              ? anyItem.customerMobile.trim()
+              : (typeof customer?.mobile === 'string' ? customer.mobile.trim() : '');
 
-            const servicesList: any[] = Array.isArray(item.services) ? item.services : [];
+            let cleanMake = 'Vehicle';
+            if (typeof anyItem.makeModel === 'string' && anyItem.makeModel.trim()) {
+              cleanMake = anyItem.makeModel
+                .split(' (Slot:')[0]
+                .split(' at ')[0]
+                .split(' - Slot:')[0]
+                .split(' - MOT Slot:')[0]
+                .split(' - Workshop Drop-off')[0]
+                .trim() || 'Vehicle';
+            } else if (typeof anyItem.makeModel === 'object' && anyItem.makeModel) {
+              cleanMake = `${anyItem.makeModel.make || ''} ${anyItem.makeModel.model || ''}`.trim() || 'Vehicle';
+            } else if (typeof anyItem.vehicle === 'object' && anyItem.vehicle) {
+              cleanMake = `${anyItem.vehicle.make || ''} ${anyItem.vehicle.model || ''}`.trim() || 'Vehicle';
+            }
+
+            const vrnText = typeof anyItem.registrationNumber === 'string' && anyItem.registrationNumber.trim()
+              ? anyItem.registrationNumber.toUpperCase()
+              : (typeof anyItem.vrn === 'string' && anyItem.vrn.trim() ? anyItem.vrn.toUpperCase() : 'VRN');
+
+            const isMot = isMotBooking(anyItem);
+
+            const servicesList: any[] = Array.isArray(anyItem.services) ? anyItem.services : [];
             const otherServices = servicesList.filter((s: any) => {
               const name = (typeof s === 'string' ? s : s?.name || '').toUpperCase();
-              const cat = (typeof s === 'object' ? s?.category || '' : '').toUpperCase();
+              const cat = (typeof s === 'object' && s?.category ? s.category : '').toUpperCase();
               return !name.includes('MOT') && cat !== 'MOT';
             });
             const otherServicesNames = otherServices.map((s: any) => typeof s === 'string' ? s : s?.name || '').filter(Boolean).join(', ') ||
-              (item.makeModel?.includes('& Service:') ? item.makeModel.split('& Service:')[1]?.trim() : '');
+              (typeof anyItem.makeModel === 'string' && anyItem.makeModel.includes('& Service:') ? anyItem.makeModel.split('& Service:')[1]?.trim() : '');
             const hasBothMotAndService = isMot && (otherServices.length > 0 || Boolean(otherServicesNames));
+
+            const serviceNameText = typeof anyItem.serviceName === 'string' && anyItem.serviceName.trim()
+              ? anyItem.serviceName
+              : (isMot ? 'MOT' : 'Service');
+            const rawPrice = anyItem.price !== undefined && anyItem.price !== null ? Number(anyItem.price) : null;
+            const priceDisplay = rawPrice !== null && !isNaN(rawPrice) && rawPrice > 0 ? ` • £${rawPrice.toFixed(0)}` : '';
+            const bookingId = String(anyItem.id || anyItem._id || '');
+            const bookingKey = bookingId || `${vrnText}_${anyItem.date}_${index}`;
 
             return (
               <View
-                key={item.id}
+                key={bookingKey}
                 style={[
                   styles.bookingCard,
                   {
@@ -762,7 +800,7 @@ export default function BookedMotsScreen({ navigation }: any) {
                 <View style={styles.bookingCardHeader}>
                   <View style={styles.vehicleHeaderLeft}>
                     <View style={styles.plate}>
-                      <Text style={styles.plateText}>{item.registrationNumber || 'VRN'}</Text>
+                      <Text style={styles.plateText}>{vrnText}</Text>
                     </View>
                     <Text style={[styles.vehicleModelText, { color: theme.colors.text }]} numberOfLines={1}>
                       {cleanMake}
@@ -791,8 +829,7 @@ export default function BookedMotsScreen({ navigation }: any) {
 
                   <View style={[styles.serviceTagBadge, { backgroundColor: isMot ? '#8B5CF612' : '#0284C712', borderColor: isMot ? '#8B5CF630' : '#0284C730' }]}>
                     <Text style={[styles.serviceTagText, { color: isMot ? '#8B5CF6' : '#0284C7' }]} numberOfLines={1}>
-                      {item.serviceName || (isMot ? 'MOT' : 'Service')}
-                      {item.price ? ` • £${Number(item.price).toFixed(0)}` : ''}
+                      {serviceNameText}{priceDisplay}
                     </Text>
                   </View>
                 </View>
@@ -880,7 +917,7 @@ export default function BookedMotsScreen({ navigation }: any) {
                 {isPending && (
                   <View style={styles.cardActionsRow}>
                     <TouchableOpacity
-                      onPress={() => openRejectModal(item.id)}
+                      onPress={() => openRejectModal(bookingId)}
                       disabled={loadingAction !== null}
                       style={[styles.cardActionBtn, styles.cardRejectBtn, { borderColor: '#EF444450' }]}
                       activeOpacity={0.7}
@@ -901,16 +938,16 @@ export default function BookedMotsScreen({ navigation }: any) {
                             mobile: custPhone || '',
                           },
                           vehicle: {
-                            registrationNumber: item.registrationNumber,
+                            registrationNumber: vrnText,
                             make: cleanMake.split(' ')[0] || 'Vehicle',
                             model: cleanMake.split(' ').slice(1).join(' ') || '',
                             customerId: item.customerId,
                           },
-                          serviceName: item.serviceName,
+                          serviceName: serviceNameText,
                           bookedDate: item.date,
                           slotTime: item.slotTime,
                           isReschedule: true,
-                          bookingId: item.id || item._id,
+                          bookingId: bookingId,
                         });
                       }}
                       disabled={loadingAction !== null}
@@ -922,12 +959,12 @@ export default function BookedMotsScreen({ navigation }: any) {
                     </TouchableOpacity>
 
                     <TouchableOpacity
-                      onPress={() => handleConfirm(item.id)}
+                      onPress={() => handleConfirm(bookingId)}
                       disabled={loadingAction !== null}
                       style={[styles.cardActionBtn, styles.cardConfirmBtn, { backgroundColor: theme.colors.secondary }]}
                       activeOpacity={0.7}
                     >
-                      {loadingAction === item.id ? (
+                      {loadingAction === bookingId ? (
                         <ActivityIndicator color="#FFFFFF" size="small" />
                       ) : (
                         <>
@@ -953,16 +990,16 @@ export default function BookedMotsScreen({ navigation }: any) {
                             mobile: custPhone || '',
                           },
                           vehicle: {
-                            registrationNumber: item.registrationNumber,
+                            registrationNumber: vrnText,
                             make: cleanMake.split(' ')[0] || 'Vehicle',
                             model: cleanMake.split(' ').slice(1).join(' ') || '',
                             customerId: item.customerId,
                           },
-                          serviceName: item.serviceName,
+                          serviceName: serviceNameText,
                           bookedDate: item.date,
                           slotTime: item.slotTime,
                           isReschedule: true,
-                          bookingId: item.id || item._id,
+                          bookingId: bookingId,
                         });
                       }}
                       disabled={loadingAction !== null}
@@ -979,7 +1016,7 @@ export default function BookedMotsScreen({ navigation }: any) {
                       style={styles.cardCancelBookingBtnCompact}
                       activeOpacity={0.7}
                     >
-                      {loadingAction === `cancel_${item.id}` ? (
+                      {loadingAction === `cancel_${bookingId}` ? (
                         <ActivityIndicator color="#FFFFFF" size="small" />
                       ) : (
                         <>
@@ -1827,14 +1864,15 @@ const styles = StyleSheet.create({
     alignItems: 'center',
     justifyContent: 'space-between',
     gap: 6,
-    marginBottom: 4,
+    marginBottom: 5,
+    flexWrap: 'wrap',
   },
   dateTimeWrap: {
     flexDirection: 'row',
     alignItems: 'center',
     gap: 4,
-    flex: 1,
-    flexWrap: 'nowrap',
+    flexWrap: 'wrap',
+    flexShrink: 1,
   },
   compactDateText: {
     fontSize: 11,
@@ -1864,17 +1902,20 @@ const styles = StyleSheet.create({
     alignItems: 'center',
     justifyContent: 'space-between',
     gap: 6,
+    flexWrap: 'wrap',
+    marginTop: 2,
   },
   customerMetaBox: {
     flexDirection: 'row',
     alignItems: 'center',
     gap: 4,
-    flex: 1,
+    flexShrink: 1,
+    flexWrap: 'wrap',
   },
   customerMetaName: {
     fontSize: 11.5,
     fontFamily: fonts.medium,
-    maxWidth: 130,
+    flexShrink: 1,
   },
   phoneChipCompact: {
     flexDirection: 'row',
@@ -1894,6 +1935,7 @@ const styles = StyleSheet.create({
     flexDirection: 'row',
     alignItems: 'center',
     gap: 4,
+    flexWrap: 'wrap',
     flexShrink: 0,
   },
   stationTag: {
@@ -1968,9 +2010,11 @@ const styles = StyleSheet.create({
     paddingTop: 5,
     borderTopWidth: 1,
     borderTopColor: '#E5E7EB20',
+    flexWrap: 'wrap',
   },
   cardActionBtn: {
     flex: 1,
+    minWidth: 80,
     flexDirection: 'row',
     alignItems: 'center',
     justifyContent: 'center',

@@ -16,10 +16,30 @@ import { formatAuditDateTime } from '../utils/dateUtils';
 
 export default function SuperAdminAuditsScreen({ navigation }: any) {
   const { theme } = useAppTheme();
-  const { audits, refreshData } = useAppValues();
+  const { user, audits, refreshData } = useAppValues();
   const [searchQuery, setSearchQuery] = useState('');
   const [selectedFilter, setSelectedFilter] = useState<'ALL' | 'GARAGE' | 'CUSTOMER' | 'BOOKING' | 'VEHICLE' | 'REMINDER'>('ALL');
   const [isRefreshing, setIsRefreshing] = useState(false);
+
+  if (user?.role === 'staff') {
+    return (
+      <View style={[styles.container, { backgroundColor: theme.colors.background, justifyContent: 'center', alignItems: 'center', padding: 24 }]}>
+        <MaterialCommunityIcons name="shield-lock-outline" size={56} color={theme.colors.error} style={{ marginBottom: 16 }} />
+        <Text style={{ fontSize: 18, fontFamily: fonts.bold, color: theme.colors.text, marginBottom: 8, textAlign: 'center' }}>
+          Access Restricted
+        </Text>
+        <Text style={{ fontSize: 13, fontFamily: fonts.regular, color: theme.colors.placeholder, textAlign: 'center', lineHeight: 20, marginBottom: 24 }}>
+          Official system audit logs and financial event histories can only be accessed by the Garage Owner or Platform Administrator.
+        </Text>
+        <TouchableOpacity
+          style={{ backgroundColor: theme.colors.primary, paddingHorizontal: 24, paddingVertical: 12, borderRadius: 8 }}
+          onPress={() => navigation.goBack()}
+        >
+          <Text style={{ color: '#FFFFFF', fontFamily: fonts.bold, fontSize: 14 }}>Return to Dashboard</Text>
+        </TouchableOpacity>
+      </View>
+    );
+  }
 
   useEffect(() => {
     const unsubscribe = navigation.addListener('focus', () => {

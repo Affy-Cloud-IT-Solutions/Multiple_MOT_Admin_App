@@ -95,6 +95,8 @@ export default function AdminDashboardScreen({ navigation }: any) {
   // Super Admin rejection feedback: either the whole application (redo every step and resubmit)
   // or individual documents (only those need a new copy)
   const isGarageUser = user?.role === 'garage_admin' || user?.role === 'staff';
+  const isGarageAdmin = user?.role === 'garage_admin';
+  const isStaff = user?.role === 'staff';
   const isApplicationRejected = currentGarage?.status === 'Rejected';
   const rejectedDocs = (currentGarage?.verificationDocuments || []).filter(d => d.status === 'Rejected');
   const redoSteps = currentGarage?.redoSteps || [];
@@ -216,7 +218,7 @@ export default function AdminDashboardScreen({ navigation }: any) {
               style={{ marginRight: 4 }}
             />
             <Text style={[styles.subtitle, { color: theme.colors.placeholder, marginTop: 0 }]} numberOfLines={1}>
-              {user?.name ? `Owner: ${user.name}` : 'Garage Overview & Operations'}
+              {user?.name ? (isStaff ? `Technician: ${user.name}` : `Owner: ${user.name}`) : 'Garage Overview & Operations'}
             </Text>
           </View>
         </View>
@@ -262,8 +264,8 @@ export default function AdminDashboardScreen({ navigation }: any) {
         </View>
       </View>
 
-      {/* Whole application rejected: redo every setup step, then resubmit */}
-      {isGarageUser && isApplicationRejected && (
+      {/* Whole application rejected: redo every setup step, then resubmit (Garage Admin only) */}
+      {isGarageAdmin && isApplicationRejected && (
         <View style={[styles.rejectCard, { backgroundColor: theme.colors.card, borderColor: theme.colors.error + '60' }]}>
           <View style={styles.rejectHeader}>
             <View style={[styles.rejectIconBox, { backgroundColor: theme.colors.error + '18' }]}>
@@ -341,8 +343,8 @@ export default function AdminDashboardScreen({ navigation }: any) {
         </View>
       )}
 
-      {/* Only some documents rejected: just those need a new copy */}
-      {isGarageUser && !isApplicationRejected && rejectedDocs.length > 0 && (
+      {/* Only some documents rejected: just those need a new copy (Garage Admin only) */}
+      {isGarageAdmin && !isApplicationRejected && rejectedDocs.length > 0 && (
         <View style={[styles.rejectCard, { backgroundColor: theme.colors.card, borderColor: theme.colors.error + '60' }]}>
           <View style={styles.rejectHeader}>
             <View style={[styles.rejectIconBox, { backgroundColor: theme.colors.error + '18' }]}>
@@ -381,8 +383,8 @@ export default function AdminDashboardScreen({ navigation }: any) {
         </View>
       )}
 
-      {/* Dynamic Getting Started Onboarding Card (Compact UI) */}
-      {user && (user.role === 'garage_admin' || user.role === 'staff') && shouldShowProfileCompletion && !isApplicationRejected && (
+      {/* Dynamic Getting Started Onboarding Card (Compact UI - Garage Admin only) */}
+      {user && isGarageAdmin && shouldShowProfileCompletion && !isApplicationRejected && (
         <View style={[styles.gettingStartedCard, { backgroundColor: theme.colors.card, borderColor: theme.colors.border }]}>
           {/* Header Row: Tag + Percent Badge */}
           <View style={styles.gettingStartedHeader}>
@@ -557,13 +559,15 @@ export default function AdminDashboardScreen({ navigation }: any) {
             label="Sold Vehicles" 
             color="#6B7280"
           />
-          <StatCard 
-            icon="clipboard-list-outline" 
-            value={audits.length} 
-            label="Total Audits" 
-            color="#EC4899"
-            onPress={() => navigation.navigate('SuperAdminAudits')}
-          />
+          {isGarageAdmin && (
+            <StatCard 
+              icon="clipboard-list-outline" 
+              value={audits.length} 
+              label="Total Audits" 
+              color="#EC4899"
+              onPress={() => navigation.navigate('SuperAdminAudits')}
+            />
+          )}
         </View>
       </View>
 
@@ -584,17 +588,31 @@ export default function AdminDashboardScreen({ navigation }: any) {
             <Text style={[styles.quickActionSubtitle, { color: theme.colors.placeholder }]}>Manage appointments</Text>
           </TouchableOpacity>
 
-          <TouchableOpacity
-            style={[styles.quickActionCard, { backgroundColor: theme.colors.card, borderColor: theme.colors.border }]}
-            onPress={() => navigation.navigate('AdminServices')}
-            activeOpacity={0.7}
-          >
-            <View style={[styles.quickActionIcon, { backgroundColor: '#8B5CF615' }]}>
-              <MaterialCommunityIcons name="tag-multiple-outline" size={22} color="#8B5CF6" />
-            </View>
-            <Text style={[styles.quickActionTitle, { color: theme.colors.text }]}>Services & Pricing</Text>
-            <Text style={[styles.quickActionSubtitle, { color: theme.colors.placeholder }]}>Configure garage rates</Text>
-          </TouchableOpacity>
+          {isGarageAdmin ? (
+            <TouchableOpacity
+              style={[styles.quickActionCard, { backgroundColor: theme.colors.card, borderColor: theme.colors.border }]}
+              onPress={() => navigation.navigate('AdminServices')}
+              activeOpacity={0.7}
+            >
+              <View style={[styles.quickActionIcon, { backgroundColor: '#8B5CF615' }]}>
+                <MaterialCommunityIcons name="tag-multiple-outline" size={22} color="#8B5CF6" />
+              </View>
+              <Text style={[styles.quickActionTitle, { color: theme.colors.text }]}>Services & Pricing</Text>
+              <Text style={[styles.quickActionSubtitle, { color: theme.colors.placeholder }]}>Configure garage rates</Text>
+            </TouchableOpacity>
+          ) : (
+            <TouchableOpacity
+              style={[styles.quickActionCard, { backgroundColor: theme.colors.card, borderColor: theme.colors.border }]}
+              onPress={() => navigation.navigate('AdminBookMot')}
+              activeOpacity={0.7}
+            >
+              <View style={[styles.quickActionIcon, { backgroundColor: '#8B5CF615' }]}>
+                <MaterialCommunityIcons name="clipboard-plus-outline" size={22} color="#8B5CF6" />
+              </View>
+              <Text style={[styles.quickActionTitle, { color: theme.colors.text }]}>Walk-in Booking</Text>
+              <Text style={[styles.quickActionSubtitle, { color: theme.colors.placeholder }]}>Book customer on spot</Text>
+            </TouchableOpacity>
+          )}
 
           <TouchableOpacity
             style={[styles.quickActionCard, { backgroundColor: theme.colors.card, borderColor: theme.colors.border }]}

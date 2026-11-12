@@ -594,10 +594,11 @@ export const DataProvider = ({ children }: { children: ReactNode }) => {
         setAlerts([]); // Super Admin has no personal garage action alerts
       } else if (role === 'staff' || role === 'garage_admin') {
         const activeGarageId = decoded?.garageId || user?.garageId;
+        const isGarageAdmin = role === 'garage_admin';
         const fetchPromises: Promise<Response>[] = [
           authFetch(`${BASE_URL}/customers`),
           authFetch(`${BASE_URL}/vehicles`),
-          authFetch(`${BASE_URL}/audit`),
+          isGarageAdmin ? authFetch(`${BASE_URL}/audit`) : Promise.resolve(new Response(JSON.stringify([]), { status: 200 })),
           authFetch(`${BASE_URL}/alerts`),
         ];
 

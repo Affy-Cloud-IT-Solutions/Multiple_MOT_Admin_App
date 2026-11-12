@@ -18,12 +18,40 @@ import { formatShortDate } from '../utils/dateUtils';
 
 export default function StaffListScreen({ navigation }: any) {
   const { theme } = useAppTheme();
-  const { fetchStaffList, deleteStaffAccount } = useAppValues();
+  const { user, fetchStaffList, deleteStaffAccount } = useAppValues();
   
   const [staffList, setStaffList] = useState<any[]>([]);
   const [loading, setLoading] = useState(true);
   const [refreshing, setRefreshing] = useState(false);
   const [deletingId, setDeletingId] = useState<string | null>(null);
+
+  if (user?.role === 'staff') {
+    return (
+      <SafeAreaView style={[styles.container, { backgroundColor: theme.colors.background }]}>
+        <View style={[styles.header, { backgroundColor: theme.colors.card, borderColor: theme.colors.border }]}>
+          <TouchableOpacity onPress={() => navigation.goBack()} style={styles.backBtn}>
+            <MaterialCommunityIcons name="arrow-left" size={22} color={theme.colors.text} />
+          </TouchableOpacity>
+          <Text style={[styles.navTitle, { color: theme.colors.text }]}>Staff Directory</Text>
+        </View>
+        <View style={{ flex: 1, alignItems: 'center', justifyContent: 'center', padding: 24 }}>
+          <MaterialCommunityIcons name="shield-lock-outline" size={56} color={theme.colors.error} style={{ marginBottom: 16 }} />
+          <Text style={{ fontSize: 18, fontFamily: fonts.bold, color: theme.colors.text, marginBottom: 8, textAlign: 'center' }}>
+            Access Restricted
+          </Text>
+          <Text style={{ fontSize: 13, fontFamily: fonts.regular, color: theme.colors.placeholder, textAlign: 'center', lineHeight: 20, marginBottom: 24 }}>
+            Staff accounts, permissions, and technician assignments can only be managed by the Garage Owner / Garage Admin.
+          </Text>
+          <TouchableOpacity
+            style={{ backgroundColor: theme.colors.primary, paddingHorizontal: 24, paddingVertical: 12, borderRadius: 8 }}
+            onPress={() => navigation.goBack()}
+          >
+            <Text style={{ color: '#FFFFFF', fontFamily: fonts.bold, fontSize: 14 }}>Return to Dashboard</Text>
+          </TouchableOpacity>
+        </View>
+      </SafeAreaView>
+    );
+  }
 
   const loadStaff = async () => {
     try {

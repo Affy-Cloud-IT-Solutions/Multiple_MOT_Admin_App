@@ -10,6 +10,7 @@ import AdminCustomersScreen from '../screens/AdminCustomersScreen';
 import AdminServicesScreen from '../screens/AdminServicesScreen';
 import AdminSlotsScreen from '../screens/AdminSlotsScreen';
 import AdminAlertsScreen from '../screens/AdminAlertsScreen';
+import BookedMotsScreen from '../screens/BookedMotsScreen';
 import ProfileScreen from '../screens/ProfileScreen';
 import { useAppTheme } from '../context/ThemeContext';
 import { useAppValues } from '../context/DataContext';
@@ -23,6 +24,7 @@ export default function MainTabNavigator() {
   const { user, pendingCustomServicesCount, fetchPendingCustomServices } = useAppValues();
 
   const isSuperAdmin = user?.role === 'admin';
+  const isStaff = user?.role === 'staff';
 
   // Periodically fetch pending custom services count for Super Admin badges
   useEffect(() => {
@@ -41,6 +43,8 @@ export default function MainTabNavigator() {
             iconName = 'view-dashboard-outline';
           } else if (route.name === 'Garages') {
             iconName = 'garage-variant';
+          } else if (route.name === 'Bookings') {
+            iconName = 'calendar-check-outline';
           } else if (route.name === 'Services') {
             iconName = 'car-wrench';
           } else if (route.name === 'SuperAdminCategories' || route.name === 'Categories') {
@@ -54,7 +58,7 @@ export default function MainTabNavigator() {
           } else if (route.name === 'Reminders') {
             iconName = 'bell-outline';
           } else if (route.name === 'Profile') {
-            iconName = 'cog-outline';
+            iconName = isStaff ? 'account-outline' : 'cog-outline';
           }
 
           return <MaterialCommunityIcons name={iconName} size={size} color={color} />;
@@ -127,8 +131,37 @@ export default function MainTabNavigator() {
             options={{ title: 'Settings', headerShown: false }} 
           />
         </>
+      ) : isStaff ? (
+        // Staff Experience: Daily Workshop Operations (Dashboard, Bookings/Calendar, Slots & Availability, Customers, Profile)
+        <>
+          <Tab.Screen 
+            name="Dashboard" 
+            component={AdminDashboardScreen} 
+            options={{ title: 'Dashboard', headerShown: false }} 
+          />
+          <Tab.Screen 
+            name="Bookings" 
+            component={BookedMotsScreen} 
+            options={{ title: 'Bookings', headerShown: false }} 
+          />
+          <Tab.Screen 
+            name="Slots" 
+            component={AdminSlotsScreen} 
+            options={{ title: 'Slots', headerShown: false }} 
+          />
+          <Tab.Screen 
+            name="Customers" 
+            component={AdminCustomersScreen} 
+            options={{ title: 'Customers', headerShown: false }} 
+          />
+          <Tab.Screen 
+            name="Profile" 
+            component={ProfileScreen} 
+            options={{ title: 'Profile', headerShown: false }} 
+          />
+        </>
       ) : (
-        // Garage Admin & Staff Experience: Services & Pricing, Bookings, Customers, Slots, Profile
+        // Garage Admin Experience: Full Business & Workshop Management (Dashboard, Services & Pricing, Customers, Slots & Bays, Settings)
         <>
           <Tab.Screen 
             name="Dashboard" 
@@ -150,15 +183,6 @@ export default function MainTabNavigator() {
             component={AdminSlotsScreen} 
             options={{ title: 'Slots', headerShown: false }} 
           />
-          {/* <Tab.Screen 
-            name="Reminders" 
-            component={AdminAlertsScreen} 
-            options={{ 
-              title: 'Reminders', 
-              headerShown: false,
-              tabBarBadge: pendingAlertsCount > 0 ? pendingAlertsCount : undefined,
-            }} 
-          /> */}
           <Tab.Screen 
             name="Profile" 
             component={ProfileScreen} 

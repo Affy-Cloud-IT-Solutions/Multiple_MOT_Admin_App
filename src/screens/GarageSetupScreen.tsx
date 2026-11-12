@@ -300,6 +300,37 @@ export default function GarageSetupScreen({ route, navigation }: any) {
   const [catalogSearch, setCatalogSearch] = useState('');
   const [catalogActiveCategory, setCatalogActiveCategory] = useState('All');
 
+  // Staff members are strictly blocked from editing garage profile, pin & DVSA documents
+  if (user?.role === 'staff') {
+    return (
+      <View style={[styles.container, { backgroundColor: theme.colors.background }]}>
+        <View style={[styles.header, { backgroundColor: theme.colors.card, borderColor: theme.colors.border }]}>
+          <TouchableOpacity onPress={() => navigation.goBack()} style={styles.backButton}>
+            <MaterialCommunityIcons name="arrow-left" size={24} color={theme.colors.text} />
+          </TouchableOpacity>
+          <View style={styles.headerTitleWrap}>
+            <Text style={[styles.headerTitle, { color: theme.colors.text }]}>Garage Setup</Text>
+          </View>
+        </View>
+        <View style={{ flex: 1, alignItems: 'center', justifyContent: 'center', padding: 24 }}>
+          <MaterialCommunityIcons name="shield-lock-outline" size={56} color={theme.colors.error} style={{ marginBottom: 16 }} />
+          <Text style={{ fontSize: 18, fontFamily: fonts.bold, color: theme.colors.text, marginBottom: 8, textAlign: 'center' }}>
+            Access Restricted
+          </Text>
+          <Text style={{ fontSize: 13, fontFamily: fonts.regular, color: theme.colors.placeholder, textAlign: 'center', lineHeight: 20, marginBottom: 24 }}>
+            Garage profile, map pin coordinates, and DVSA legal compliance documents can only be configured by the Garage Owner / Garage Admin.
+          </Text>
+          <TouchableOpacity
+            style={{ backgroundColor: theme.colors.primary, paddingHorizontal: 24, paddingVertical: 12, borderRadius: 8 }}
+            onPress={() => navigation.goBack()}
+          >
+            <Text style={{ color: '#FFFFFF', fontFamily: fonts.bold, fontSize: 14 }}>Return to Dashboard</Text>
+          </TouchableOpacity>
+        </View>
+      </View>
+    );
+  }
+
   // Tab 3: Documents & Identification
   const [vtsNumber, setVtsNumber] = useState('');
   const [motAuthorisedExaminerNumber, setMotAuthorisedExaminerNumber] = useState('');

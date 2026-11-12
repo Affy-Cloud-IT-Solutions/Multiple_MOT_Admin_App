@@ -433,8 +433,8 @@ export default function ProfileScreen({ navigation }: any) {
         </Section>
       )}
 
-      {/* Garage Legal Verification Card */}
-      {isGarageStaffOrAdmin && currentGarage && (
+      {/* Garage Legal Verification Card (Garage Admin only - hidden for Staff) */}
+      {user?.role === 'garage_admin' && currentGarage && (
         <View
           style={[
             styles.verificationCard,
@@ -529,8 +529,8 @@ export default function ProfileScreen({ navigation }: any) {
         </View>
       )}
 
-      {/* Garage Operations & Tools Hub (For Garage Admin and Staff only; excluded for Super Admin) */}
-      {user && (user.role === 'garage_admin' || user.role === 'staff') && (
+      {/* Garage Operations & Tools Hub (For Garage Admin only; staff cannot alter documents, pricing, audits or staff) */}
+      {user && user.role === 'garage_admin' && (
         <Section title="Garage Operations & Tools" theme={theme}>
           <MenuRow
             icon="file-certificate-outline"
@@ -554,16 +554,6 @@ export default function ProfileScreen({ navigation }: any) {
             onPress={() => navigation.navigate('AdminServices')}
             theme={theme}
           />
-          {/* MOT Reminders Hub hidden from the mobile admin app for now
-          <MenuRow
-            icon="bell-ring"
-            iconColor="#D97706"
-            title="MOT Reminders Hub"
-            subtitle="View scheduled MOT renewal notifications & campaigns"
-            onPress={() => navigation.navigate('AdminReminders')}
-            theme={theme}
-          />
-          */}
           <MenuRow
             icon="clipboard-text-clock"
             iconColor="#7C3AED"
@@ -571,19 +561,39 @@ export default function ProfileScreen({ navigation }: any) {
             subtitle="Review platform activity, logs & security events"
             onPress={() => navigation.navigate('SuperAdminAudits')}
             theme={theme}
-            isLast={user.role !== 'garage_admin'}
           />
-          {user.role === 'garage_admin' && (
-            <MenuRow
-              icon="account-group"
-              iconColor="#059669"
-              title="Staff Directory"
-              subtitle="View all authorized garage technicians"
-              onPress={() => navigation.navigate('StaffList')}
-              theme={theme}
-              isLast
-            />
-          )}
+          <MenuRow
+            icon="account-group"
+            iconColor="#059669"
+            title="Staff Directory"
+            subtitle="View all authorized garage technicians"
+            onPress={() => navigation.navigate('StaffList')}
+            theme={theme}
+            isLast
+          />
+        </Section>
+      )}
+
+      {/* Staff Technician Operations Hub (Daily workshop execution only) */}
+      {user?.role === 'staff' && (
+        <Section title="Technician Workspace" theme={theme}>
+          <MenuRow
+            icon="calendar-clock"
+            iconColor="#0284C7"
+            title="Daily MOT & Service Schedule"
+            subtitle="View booked calendar, drop-offs & update job status"
+            onPress={() => navigation.navigate('BookedMots')}
+            theme={theme}
+          />
+          <MenuRow
+            icon="account-group-outline"
+            iconColor="#8B5CF6"
+            title="Customers & Vehicles Directory"
+            subtitle="Look up customer vehicle details for current jobs"
+            onPress={() => navigation.navigate('Customers')}
+            theme={theme}
+            isLast
+          />
         </Section>
       )}
 

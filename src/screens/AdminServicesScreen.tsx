@@ -69,6 +69,8 @@ export default function AdminServicesScreen({ navigation }: any) {
   } = useAppValues();
 
   const isSuperAdmin = user?.role === 'admin';
+  const isGarageAdmin = user?.role === 'garage_admin' || user?.role === 'admin';
+  const isStaff = user?.role === 'staff';
 
   // Dynamic Categories from Super Admin master collection
   const availableCategories = useMemo(() => {
@@ -239,6 +241,10 @@ export default function AdminServicesScreen({ navigation }: any) {
 
   // Save selected catalog services to garage
   const handleSaveCatalog = async () => {
+    if (!isGarageAdmin) {
+      Alert.alert('Permission Denied', 'Only the Garage Owner / Admin can configure service catalog and rates.');
+      return;
+    }
     const targetGId = selectedGarageId || user?.garageId || (garages[0]?._id || garages[0]?.id);
     if (!targetGId) {
       Alert.alert('Error', 'Garage ID missing. Please select or verify your garage.');
@@ -275,6 +281,10 @@ export default function AdminServicesScreen({ navigation }: any) {
 
   // Open Modal for Custom Service Add
   const handleOpenAddCustom = () => {
+    if (!isGarageAdmin) {
+      Alert.alert('Permission Denied', 'Only the Garage Owner / Admin can add new custom services.');
+      return;
+    }
     setFormName('');
     setFormCategory('Others');
     setFormPrice('45.00');
@@ -286,6 +296,10 @@ export default function AdminServicesScreen({ navigation }: any) {
 
   // Save Custom Service
   const handleSaveService = async () => {
+    if (!isGarageAdmin) {
+      Alert.alert('Permission Denied', 'Only the Garage Owner / Admin can add custom services.');
+      return;
+    }
     const targetGId = selectedGarageId || user?.garageId || (garages[0]?._id || garages[0]?.id);
     if (!targetGId) {
       Alert.alert('Error', 'Garage ID missing. Please select or verify your garage.');
@@ -337,6 +351,10 @@ export default function AdminServicesScreen({ navigation }: any) {
 
   // Toggle Active Switch directly from list
   const handleToggleActive = async (service: ServiceItem, newVal: boolean) => {
+    if (!isGarageAdmin) {
+      Alert.alert('Permission Denied', 'Only the Garage Owner / Admin can enable or pause services.');
+      return;
+    }
     const targetGId = selectedGarageId || user?.garageId;
     const serviceId = service._id || service.id;
     if (!targetGId || !serviceId) return;
@@ -364,6 +382,10 @@ export default function AdminServicesScreen({ navigation }: any) {
 
   // Delete Service
   const handleDeleteService = (service: ServiceItem) => {
+    if (!isGarageAdmin) {
+      Alert.alert('Permission Denied', 'Only the Garage Owner / Admin can remove services.');
+      return;
+    }
     const targetGId = selectedGarageId || user?.garageId;
     const serviceId = service._id || service.id;
     if (!targetGId || !serviceId) return;
@@ -483,25 +505,35 @@ export default function AdminServicesScreen({ navigation }: any) {
               </TouchableOpacity>
             )}
 
-            {/* Select from Platform Catalog */}
-            <TouchableOpacity
-              style={[styles.smallAddBtn, { backgroundColor: theme.colors.primary }]}
-              onPress={handleOpenCatalogModal}
-              activeOpacity={0.8}
-            >
-              <MaterialCommunityIcons name="playlist-plus" size={15} color="#FFFFFF" />
-              <Text style={styles.smallAddBtnText}>From Catalog</Text>
-            </TouchableOpacity>
+            {/* Select from Platform Catalog (Garage Admin only) */}
+            {isGarageAdmin && (
+              <TouchableOpacity
+                style={[styles.smallAddBtn, { backgroundColor: theme.colors.primary }]}
+                onPress={handleOpenCatalogModal}
+                activeOpacity={0.8}
+              >
+                <MaterialCommunityIcons name="playlist-plus" size={15} color="#FFFFFF" />
+                <Text style={styles.smallAddBtnText}>From Catalog</Text>
+              </TouchableOpacity>
+            )}
 
-            {/* Add Custom Service */}
-            <TouchableOpacity
-              style={[styles.smallAddBtn, { backgroundColor: isDarkMode ? '#1E293B' : '#F1F5F9', borderWidth: 1, borderColor: theme.colors.border }]}
-              onPress={handleOpenAddCustom}
-              activeOpacity={0.8}
-            >
-              <MaterialCommunityIcons name="plus" size={15} color={theme.colors.text} />
-              <Text style={[styles.smallAddBtnText, { color: theme.colors.text }]}>Custom</Text>
-            </TouchableOpacity>
+            {/* Add Custom Service (Garage Admin only) */}
+            {isGarageAdmin && (
+              <TouchableOpacity
+                style={[styles.smallAddBtn, { backgroundColor: isDarkMode ? '#1E293B' : '#F1F5F9', borderWidth: 1, borderColor: theme.colors.border }]}
+                onPress={handleOpenAddCustom}
+                activeOpacity={0.8}
+              >
+                <MaterialCommunityIcons name="plus" size={15} color={theme.colors.text} />
+                <Text style={[styles.smallAddBtnText, { color: theme.colors.text }]}>Custom</Text>
+              </TouchableOpacity>
+            )}
+
+            {isStaff && (
+              <View style={{ backgroundColor: theme.colors.card, borderColor: theme.colors.border, borderWidth: 1, paddingHorizontal: 8, paddingVertical: 4, borderRadius: 6 }}>
+                <Text style={{ fontSize: 11, fontFamily: fonts.semiBold, color: theme.colors.placeholder }}>Rates View-Only</Text>
+              </View>
+            )}
           </View>
         </View>
 
@@ -647,26 +679,35 @@ export default function AdminServicesScreen({ navigation }: any) {
                       </View>
                     </View>
 
-                    {/* Right Side: Checkbox/Switch + Delete Button */}
-                    <View style={styles.cardRightControls}>
-                      <Switch
-                        value={isActive}
-                        disabled={isCustom && status === 'Pending'}
-                        onValueChange={(val) => handleToggleActive(service, val)}
-                        trackColor={{ false: '#CBD5E1', true: '#10B981' }}
-                        thumbColor="#FFFFFF"
-                        style={{ transform: [{ scaleX: 0.8 }, { scaleY: 0.8 }] }}
-                      />
+                    {/* Right Side: Checkbox/Switch + Delete Button (Garage Admin only) */}
+                    {isGarageAdmin ? (
+                      <View style={styles.cardRightControls}>
+                        <Switch
+                          value={isActive}
+                          disabled={isCustom && status === 'Pending'}
+                          onValueChange={(val) => handleToggleActive(service, val)}
+                          trackColor={{ false: '#CBD5E1', true: '#10B981' }}
+                          thumbColor="#FFFFFF"
+                          style={{ transform: [{ scaleX: 0.8 }, { scaleY: 0.8 }] }}
+                        />
 
-                      <TouchableOpacity
-                        style={styles.deleteBtn}
-                        onPress={() => handleDeleteService(service)}
-                        activeOpacity={0.7}
-                        hitSlop={{ top: 8, bottom: 8, left: 8, right: 8 }}
-                      >
-                        <MaterialCommunityIcons name="trash-can-outline" size={19} color="#EF4444" />
-                      </TouchableOpacity>
-                    </View>
+                        <TouchableOpacity
+                          style={styles.deleteBtn}
+                          onPress={() => handleDeleteService(service)}
+                          activeOpacity={0.7}
+                          hitSlop={{ top: 8, bottom: 8, left: 8, right: 8 }}
+                        >
+                          <MaterialCommunityIcons name="trash-can-outline" size={19} color="#EF4444" />
+                        </TouchableOpacity>
+                      </View>
+                    ) : (
+                      <View style={[styles.statusPill, { backgroundColor: isActive ? '#10B98115' : '#6B728015' }]}>
+                        <View style={[styles.statusDot, { backgroundColor: isActive ? '#10B981' : '#6B7280' }]} />
+                        <Text style={[styles.statusPillText, { color: isActive ? '#10B981' : '#6B7280' }]}>
+                          {isActive ? 'Offered' : 'Paused'}
+                        </Text>
+                      </View>
+                    )}
                   </View>
 
                   {/* Info Row: Price, Duration, Status Pill */}
