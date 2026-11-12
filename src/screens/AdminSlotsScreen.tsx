@@ -946,10 +946,10 @@ export default function AdminSlotsScreen({ navigation, route }: any) {
 
                     {/* Status Pill */}
                     <View style={[styles.bookingStatusPill, {
-                      backgroundColor: b.status === 'Completed' ? '#10B98118' : b.status === 'Approved' ? '#0284C718' : '#F59E0B18',
+                      backgroundColor: b.status === 'Completed' ? '#10B98118' : (b.status === 'In Progress' || b.status === 'InProgress') ? '#8B5CF618' : b.status === 'Approved' ? '#0284C718' : '#F59E0B18',
                     }]}>
                       <Text style={{
-                        color: b.status === 'Completed' ? '#10B981' : b.status === 'Approved' ? '#0284C7' : '#F59E0B',
+                        color: b.status === 'Completed' ? '#10B981' : (b.status === 'In Progress' || b.status === 'InProgress') ? '#8B5CF6' : b.status === 'Approved' ? '#0284C7' : '#F59E0B',
                         fontSize: 9.5,
                         fontFamily: fonts.bold
                       }}>
@@ -961,15 +961,15 @@ export default function AdminSlotsScreen({ navigation, route }: any) {
                   {/* Customer Details */}
                   <View style={styles.customerRow}>
                     <MaterialCommunityIcons
-                      name={b.status === 'Completed' ? 'check-decagram' : b.status === 'Approved' ? 'account-check' : 'account-clock-outline'}
+                      name={b.status === 'Completed' ? 'check-decagram' : (b.status === 'In Progress' || b.status === 'InProgress') ? 'car-wrench' : b.status === 'Approved' ? 'account-check' : 'account-clock-outline'}
                       size={13}
-                      color={b.status === 'Completed' ? '#10B981' : b.status === 'Approved' ? theme.colors.text : '#F59E0B'}
+                      color={b.status === 'Completed' ? '#10B981' : (b.status === 'In Progress' || b.status === 'InProgress') ? '#8B5CF6' : b.status === 'Approved' ? theme.colors.text : '#F59E0B'}
                     />
                     <Text
                       style={[
                         styles.customerNameText,
                         {
-                          color: b.status === 'Completed' ? '#10B981' : b.status === 'Approved' ? theme.colors.text : '#F59E0B',
+                          color: b.status === 'Completed' ? '#10B981' : (b.status === 'In Progress' || b.status === 'InProgress') ? '#8B5CF6' : b.status === 'Approved' ? theme.colors.text : '#F59E0B',
                           fontFamily: fonts.semiBold,
                         },
                       ]}
@@ -1519,11 +1519,11 @@ export default function AdminSlotsScreen({ navigation, route }: any) {
                 {/* Status Pill */}
                 <View style={[
                   styles.statusPillSmall, 
-                  { backgroundColor: b.status === 'Completed' ? '#10B98120' : b.status === 'Approved' ? '#0284C720' : '#F59E0B20' }
+                  { backgroundColor: b.status === 'Completed' ? '#10B98120' : (b.status === 'In Progress' || b.status === 'InProgress') ? '#8B5CF620' : b.status === 'Approved' ? '#0284C720' : '#F59E0B20' }
                 ]}>
                   <Text style={[
                     styles.statusPillSmallText, 
-                    { color: b.status === 'Completed' ? '#10B981' : b.status === 'Approved' ? '#0284C7' : '#F59E0B' }
+                    { color: b.status === 'Completed' ? '#10B981' : (b.status === 'In Progress' || b.status === 'InProgress') ? '#8B5CF6' : b.status === 'Approved' ? '#0284C7' : '#F59E0B' }
                   ]}>
                     {b.status || 'Pending'}
                   </Text>
@@ -1540,15 +1540,15 @@ export default function AdminSlotsScreen({ navigation, route }: any) {
               {/* Customer Details */}
               <View style={styles.customerRow}>
                 <MaterialCommunityIcons
-                  name={b.status === 'Approved' ? 'account-check' : 'account-clock-outline'}
+                  name={b.status === 'Completed' ? 'check-decagram' : (b.status === 'In Progress' || b.status === 'InProgress') ? 'car-wrench' : b.status === 'Approved' ? 'account-check' : 'account-clock-outline'}
                   size={16}
-                  color={b.status === 'Approved' ? theme.colors.text : '#F59E0B'}
+                  color={b.status === 'Completed' ? '#10B981' : (b.status === 'In Progress' || b.status === 'InProgress') ? '#8B5CF6' : b.status === 'Approved' ? theme.colors.text : '#F59E0B'}
                 />
                 <Text
                   style={[
                     styles.customerNameText,
                     {
-                      color: b.status === 'Approved' ? theme.colors.text : '#F59E0B',
+                      color: b.status === 'Completed' ? '#10B981' : (b.status === 'In Progress' || b.status === 'InProgress') ? '#8B5CF6' : b.status === 'Approved' ? theme.colors.text : '#F59E0B',
                       fontFamily: fonts.semiBold,
                     },
                   ]}

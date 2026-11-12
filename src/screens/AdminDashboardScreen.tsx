@@ -715,6 +715,9 @@ export default function AdminDashboardScreen({ navigation }: any) {
             if (rawStatus === 'completed') {
               statusColor = '#10B981'; // Green
               statusBg = '#10B98118';
+            } else if (rawStatus === 'in progress' || rawStatus === 'inprogress') {
+              statusColor = '#8B5CF6'; // Purple
+              statusBg = '#8B5CF618';
             } else if (rawStatus === 'approved') {
               statusColor = '#0284C7'; // Blue/Cyan
               statusBg = '#0284C718';

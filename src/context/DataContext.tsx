@@ -45,7 +45,12 @@ export interface AlertNotification {
   registrationNumber: string;
   makeModel: string;
   date: string;
-  status: 'Pending' | 'Approved' | 'Acknowledged' | 'Rejected' | 'Completed' | 'Cancelled';
+  status: 'Pending' | 'Approved' | 'Acknowledged' | 'In Progress' | 'InProgress' | 'Completed' | 'Rejected' | 'Cancelled';
+  serviceStartedAt?: string;
+  serviceStartedBy?: string;
+  serviceCompletedAt?: string;
+  serviceCompletedBy?: string;
+  serviceNotes?: string;
   rejectionReason?: string;
   garageId?: string;
   serviceName?: string;
@@ -203,6 +208,8 @@ interface DataContextType {
   approveAlert: (alertId: string) => Promise<void>;
   acknowledgeAlert: (alertId: string) => Promise<void>;
   rejectAlert: (alertId: string, reason: string) => Promise<void>;
+  startServiceBooking: (alertId: string) => Promise<void>;
+  completeServiceBooking: (alertId: string, notes?: string) => Promise<void>;
   addAudit: (activity: string, details: string) => Promise<void>;
   createStaffAccount: (name: string, email: string, password: string) => Promise<void>;
   fetchStaffList: () => Promise<any[]>;
@@ -973,6 +980,45 @@ export const DataProvider = ({ children }: { children: ReactNode }) => {
     }
   };
 
+  const startServiceBooking = async (alertId: string): Promise<void> => {
+    try {
+      const response = await authFetch(`${BASE_URL}/alerts/${alertId}/start-service`, {
+        method: 'PUT',
+        headers: { 
+          'Content-Type': 'application/json',
+        },
+      });
+      if (!response.ok) {
+        const data = await parseJsonResponse(response);
+        throw new Error(data.error || data.message || 'Failed to start service');
+      }
+      await refreshData();
+    } catch (error) {
+      console.error('[DATA CONTEXT] startServiceBooking error:', error);
+      throw error;
+    }
+  };
+
+  const completeServiceBooking = async (alertId: string, notes?: string): Promise<void> => {
+    try {
+      const response = await authFetch(`${BASE_URL}/alerts/${alertId}/complete-service`, {
+        method: 'PUT',
+        headers: { 
+          'Content-Type': 'application/json',
+        },
+        body: JSON.stringify({ notes }),
+      });
+      if (!response.ok) {
+        const data = await parseJsonResponse(response);
+        throw new Error(data.error || data.message || 'Failed to complete service');
+      }
+      await refreshData();
+    } catch (error) {
+      console.error('[DATA CONTEXT] completeServiceBooking error:', error);
+      throw error;
+    }
+  };
+
   const lookupVehicle = async (vrn: string): Promise<any> => {
     let timeoutId: any = null;
     try {
@@ -1668,6 +1714,8 @@ export const DataProvider = ({ children }: { children: ReactNode }) => {
         approveAlert,
         acknowledgeAlert,
         rejectAlert,
+        startServiceBooking,
+        completeServiceBooking,
         addAudit,
         createStaffAccount,
         fetchStaffList,

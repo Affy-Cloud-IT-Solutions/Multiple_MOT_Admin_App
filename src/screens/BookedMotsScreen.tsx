@@ -255,11 +255,11 @@ const monthNames = [
 
 export default function BookedMotsScreen({ navigation }: any) {
   const { theme } = useAppTheme();
-  const { alerts, customers, approveAlert, acknowledgeAlert, rejectAlert, cancelBooking, refreshData } = useAppValues();
+  const { alerts, customers, approveAlert, acknowledgeAlert, rejectAlert, cancelBooking, startServiceBooking, completeServiceBooking, refreshData } = useAppValues();
   const [refreshing, setRefreshing] = useState(false);
   const [loadingAction, setLoadingAction] = useState<string | null>(null);
   const [searchQuery, setSearchQuery] = useState('');
-  const [statusFilter, setStatusFilter] = useState<'ALL' | 'PENDING' | 'APPROVED' | 'REJECTED' | 'CANCELLED'>('ALL');
+  const [statusFilter, setStatusFilter] = useState<'ALL' | 'PENDING' | 'APPROVED' | 'IN_PROGRESS' | 'COMPLETED' | 'REJECTED' | 'CANCELLED'>('ALL');
   const [dateFilter, setDateFilter] = useState<DateFilterType>('ALL');
   const [selectedCustomDate, setSelectedCustomDate] = useState<string | null>(null);
   const [filterBottomSheetVisible, setFilterBottomSheetVisible] = useState(false);
@@ -278,11 +278,19 @@ export default function BookedMotsScreen({ navigation }: any) {
   const [selectedAlertId, setSelectedAlertId] = useState<string | null>(null);
   const [rejectionReason, setRejectionReason] = useState('');
 
+  // Complete Service modal states
+  const [completeModalVisible, setCompleteModalVisible] = useState(false);
+  const [selectedCompleteItem, setSelectedCompleteItem] = useState<any>(null);
+  const [completeNotes, setCompleteNotes] = useState('');
+  const [submittingComplete, setSubmittingComplete] = useState(false);
+
   // Filter alerts of type BOOKED
   const bookedMots = useMemo(() => alerts.filter((a) => a.type === 'BOOKED'), [alerts]);
 
   const pendingCount = useMemo(() => bookedMots.filter(a => a.status === 'Pending').length, [bookedMots]);
-  const approvedCount = useMemo(() => bookedMots.filter(a => a.status === 'Approved' || a.status === 'Completed').length, [bookedMots]);
+  const approvedCount = useMemo(() => bookedMots.filter(a => a.status === 'Approved').length, [bookedMots]);
+  const inProgressCount = useMemo(() => bookedMots.filter(a => a.status === 'In Progress' || a.status === 'InProgress').length, [bookedMots]);
+  const completedCount = useMemo(() => bookedMots.filter(a => a.status === 'Completed').length, [bookedMots]);
   const rejectedCount = useMemo(() => bookedMots.filter(a => a.status === 'Rejected' || a.status === 'Acknowledged').length, [bookedMots]);
   const cancelledCount = useMemo(() => bookedMots.filter(a => a.status === 'Cancelled').length, [bookedMots]);
 
@@ -370,10 +378,24 @@ export default function BookedMotsScreen({ navigation }: any) {
     },
     {
       key: 'APPROVED' as const,
-      label: 'Approved',
+      label: 'Confirmed',
       icon: 'check-circle-outline',
-      color: '#10B981',
+      color: '#0284C7',
       count: approvedCount,
+    },
+    {
+      key: 'IN_PROGRESS' as const,
+      label: 'In Progress',
+      icon: 'progress-wrench',
+      color: '#8B5CF6',
+      count: inProgressCount,
+    },
+    {
+      key: 'COMPLETED' as const,
+      label: 'Completed',
+      icon: 'check-decagram',
+      color: '#10B981',
+      count: completedCount,
     },
     {
       key: 'REJECTED' as const,
@@ -396,7 +418,9 @@ export default function BookedMotsScreen({ navigation }: any) {
     return bookedMots.filter((item) => {
       // 1. Status filter
       if (statusFilter === 'PENDING' && item.status !== 'Pending') return false;
-      if (statusFilter === 'APPROVED' && (item.status !== 'Approved' && item.status !== 'Completed')) return false;
+      if (statusFilter === 'APPROVED' && item.status !== 'Approved') return false;
+      if (statusFilter === 'IN_PROGRESS' && item.status !== 'In Progress' && item.status !== 'InProgress') return false;
+      if (statusFilter === 'COMPLETED' && item.status !== 'Completed') return false;
       if (statusFilter === 'REJECTED' && (item.status !== 'Rejected' && item.status !== 'Acknowledged')) return false;
       if (statusFilter === 'CANCELLED' && item.status !== 'Cancelled') return false;
 
@@ -456,6 +480,55 @@ export default function BookedMotsScreen({ navigation }: any) {
       Alert.alert('Error', error?.message || 'Could not approve booking.');
     } finally {
       setLoadingAction(null);
+    }
+  };
+
+  const handleStartService = (alertId: string, regText: string) => {
+    Alert.alert(
+      'Start Service',
+      `Move vehicle ${regText} into the workshop ramp and start service?\n\nThe customer will be notified in real-time that service is underway.`,
+      [
+        { text: 'Cancel', style: 'cancel' },
+        {
+          text: 'Start Service',
+          onPress: async () => {
+            setLoadingAction(`start_${alertId}`);
+            try {
+              await startServiceBooking(alertId);
+              Alert.alert('Service Started', `Vehicle ${regText} is now In Progress in the workshop.`);
+            } catch (error: any) {
+              Alert.alert('Error', error?.message || 'Could not start service.');
+            } finally {
+              setLoadingAction(null);
+            }
+          }
+        }
+      ]
+    );
+  };
+
+  const openCompleteModal = (item: any) => {
+    setSelectedCompleteItem(item);
+    setCompleteNotes('');
+    setCompleteModalVisible(true);
+  };
+
+  const submitCompleteService = async () => {
+    if (!selectedCompleteItem) return;
+    const bookingId = selectedCompleteItem.id || selectedCompleteItem._id;
+    const reg = (typeof selectedCompleteItem.registrationNumber === 'string' && selectedCompleteItem.registrationNumber.trim())
+      ? selectedCompleteItem.registrationNumber
+      : (typeof selectedCompleteItem.vrn === 'string' ? selectedCompleteItem.vrn : 'Vehicle');
+    setSubmittingComplete(true);
+    try {
+      await completeServiceBooking(bookingId, completeNotes);
+      setCompleteModalVisible(false);
+      setSelectedCompleteItem(null);
+      Alert.alert('Service Completed', `Service on ${reg} has been completed! Customer has been notified that the vehicle is ready for pickup.`);
+    } catch (error: any) {
+      Alert.alert('Error', error?.message || 'Could not complete service.');
+    } finally {
+      setSubmittingComplete(false);
     }
   };
 
@@ -690,6 +763,7 @@ export default function BookedMotsScreen({ navigation }: any) {
           sortedBookings.map((item, index) => {
             const isPending = item.status === 'Pending';
             const isApproved = item.status === 'Approved';
+            const isInProgress = item.status === 'In Progress' || item.status === 'InProgress';
             const isRejected = item.status === 'Rejected' || item.status === 'Acknowledged';
             const isCompleted = item.status === 'Completed';
             const isCancelled = item.status === 'Cancelled';
@@ -704,6 +778,11 @@ export default function BookedMotsScreen({ navigation }: any) {
               statusColor = '#10B981';
               statusBg = '#10B98115';
               statusIcon = 'check-decagram';
+            } else if (isInProgress) {
+              statusText = 'In Progress';
+              statusColor = '#8B5CF6';
+              statusBg = '#8B5CF615';
+              statusIcon = 'car-wrench';
             } else if (isPending) {
               statusText = 'Pending';
               statusColor = '#F59E0B';
@@ -891,7 +970,29 @@ export default function BookedMotsScreen({ navigation }: any) {
                   </View>
                 )}
 
-                {/* 5. Rejection Notice Banner */}
+                {/* 5. In-Progress Workshop Banner */}
+                {isInProgress && (
+                  <View style={[styles.compactAlertBanner, { backgroundColor: '#8B5CF612', borderColor: '#8B5CF635', marginTop: 5 }]}>
+                    <MaterialCommunityIcons name="car-wrench" size={13} color="#8B5CF6" />
+                    <Text style={[styles.compactAlertText, { color: theme.colors.text }]} numberOfLines={1}>
+                      <Text style={{ fontFamily: fonts.bold, color: '#8B5CF6' }}>In Workshop: </Text>
+                      Active on ramp{item.serviceStartedBy ? ` (started by ${item.serviceStartedBy})` : ''}
+                    </Text>
+                  </View>
+                )}
+
+                {/* 6. Completed Service Banner */}
+                {isCompleted && (
+                  <View style={[styles.compactAlertBanner, { backgroundColor: '#10B98110', borderColor: '#10B98130', marginTop: 5 }]}>
+                    <MaterialCommunityIcons name="check-decagram" size={13} color="#10B981" />
+                    <Text style={[styles.compactAlertText, { color: theme.colors.text }]} numberOfLines={2}>
+                      <Text style={{ fontFamily: fonts.bold, color: '#10B981' }}>Completed: </Text>
+                      {item.serviceNotes ? item.serviceNotes : 'Service finished & ready for customer collection.'}
+                    </Text>
+                  </View>
+                )}
+
+                {/* 7. Rejection Notice Banner */}
                 {isRejected && item.rejectionReason ? (
                   <View style={styles.compactAlertBanner}>
                     <MaterialCommunityIcons name="alert-circle-outline" size={12} color="#EF4444" />
@@ -902,7 +1003,7 @@ export default function BookedMotsScreen({ navigation }: any) {
                   </View>
                 ) : null}
 
-                {/* 6. Cancellation Notice Banner */}
+                {/* 8. Cancellation Notice Banner */}
                 {isCancelled ? (
                   <View style={[styles.compactAlertBanner, { backgroundColor: '#DC262610', borderColor: '#DC262625' }]}>
                     <MaterialCommunityIcons name="calendar-remove" size={12} color="#DC2626" />
@@ -913,7 +1014,7 @@ export default function BookedMotsScreen({ navigation }: any) {
                   </View>
                 ) : null}
 
-                {/* 7. Action Buttons (Pending or Confirmed) */}
+                {/* 9. Action Buttons (Pending) */}
                 {isPending && (
                   <View style={styles.cardActionsRow}>
                     <TouchableOpacity
@@ -976,8 +1077,88 @@ export default function BookedMotsScreen({ navigation }: any) {
                   </View>
                 )}
 
+                {/* 10. Action Buttons (Confirmed / Approved -> Start Service) */}
                 {isApproved && (
                   <View style={[styles.cardActionsRow, { justifyContent: 'flex-end', marginTop: 4 }]}>
+                    <TouchableOpacity
+                      onPress={() => handleStartService(bookingId, vrnText)}
+                      disabled={loadingAction !== null}
+                      style={[styles.cardActionBtnCompact, { backgroundColor: '#8B5CF6', borderColor: '#8B5CF6', marginRight: 6 }]}
+                      activeOpacity={0.7}
+                    >
+                      {loadingAction === `start_${bookingId}` ? (
+                        <ActivityIndicator color="#FFFFFF" size="small" />
+                      ) : (
+                        <>
+                          <MaterialCommunityIcons name="play-circle-outline" size={13} color="#FFFFFF" style={{ marginRight: 3 }} />
+                          <Text style={{ fontSize: 11, fontFamily: fonts.bold, color: '#FFFFFF' }}>Start Service</Text>
+                        </>
+                      )}
+                    </TouchableOpacity>
+
+                    <TouchableOpacity
+                      onPress={() => {
+                        navigation.navigate('AdminBookMot', {
+                          customer: customer || {
+                            id: item.customerId,
+                            _id: item.customerId,
+                            firstName: custName.split(' ')[0] || 'Customer',
+                            lastName: custName.split(' ').slice(1).join(' ') || '',
+                            email: item.customerEmail || '',
+                            mobile: custPhone || '',
+                          },
+                          vehicle: {
+                            registrationNumber: vrnText,
+                            make: cleanMake.split(' ')[0] || 'Vehicle',
+                            model: cleanMake.split(' ').slice(1).join(' ') || '',
+                            customerId: item.customerId,
+                          },
+                          serviceName: serviceNameText,
+                          bookedDate: item.date,
+                          slotTime: item.slotTime,
+                          isReschedule: true,
+                          bookingId: bookingId,
+                        });
+                      }}
+                      disabled={loadingAction !== null}
+                      style={[styles.cardActionBtnCompact, { borderColor: theme.colors.secondary + '60', backgroundColor: theme.colors.secondary + '12', marginRight: 6 }]}
+                      activeOpacity={0.7}
+                    >
+                      <MaterialCommunityIcons name="calendar-clock" size={12} color={theme.colors.secondary} style={{ marginRight: 3 }} />
+                      <Text style={{ fontSize: 11, fontFamily: fonts.bold, color: theme.colors.secondary }}>Reschedule</Text>
+                    </TouchableOpacity>
+
+                    <TouchableOpacity
+                      onPress={() => handleAdminCancelBooking(item)}
+                      disabled={loadingAction !== null}
+                      style={styles.cardCancelBookingBtnCompact}
+                      activeOpacity={0.7}
+                    >
+                      {loadingAction === `cancel_${bookingId}` ? (
+                        <ActivityIndicator color="#FFFFFF" size="small" />
+                      ) : (
+                        <>
+                          <MaterialCommunityIcons name="calendar-remove" size={11} color="#FFFFFF" style={{ marginRight: 3 }} />
+                          <Text style={styles.cardCancelBookingTextCompact}>Cancel</Text>
+                        </>
+                      )}
+                    </TouchableOpacity>
+                  </View>
+                )}
+
+                {/* 11. Action Buttons (In Progress -> Complete Service) */}
+                {isInProgress && (
+                  <View style={[styles.cardActionsRow, { justifyContent: 'flex-end', marginTop: 4 }]}>
+                    <TouchableOpacity
+                      onPress={() => openCompleteModal(item)}
+                      disabled={loadingAction !== null}
+                      style={[styles.cardActionBtnCompact, { backgroundColor: '#10B981', borderColor: '#10B981', marginRight: 6 }]}
+                      activeOpacity={0.7}
+                    >
+                      <MaterialCommunityIcons name="check-circle-outline" size={13} color="#FFFFFF" style={{ marginRight: 3 }} />
+                      <Text style={{ fontSize: 11, fontFamily: fonts.bold, color: '#FFFFFF' }}>Complete Service</Text>
+                    </TouchableOpacity>
+
                     <TouchableOpacity
                       onPress={() => {
                         navigation.navigate('AdminBookMot', {
@@ -1098,6 +1279,87 @@ export default function BookedMotsScreen({ navigation }: any) {
                 style={[styles.modalBtn, styles.modalConfirmBtn, { backgroundColor: '#EF4444' }]}
               >
                 <Text style={[styles.modalBtnText, { color: '#FFFFFF' }]}>Confirm Reject</Text>
+              </TouchableOpacity>
+            </View>
+          </View>
+        </View>
+      </Modal>
+
+      {/* Complete Service Modal */}
+      <Modal
+        animationType="fade"
+        transparent={true}
+        visible={completeModalVisible}
+        onRequestClose={() => setCompleteModalVisible(false)}
+      >
+        <View style={styles.modalOverlay}>
+          <View style={[styles.modalContent, { backgroundColor: theme.colors.card, borderColor: theme.colors.border }]}>
+            <View style={styles.modalHeader}>
+              <View style={[styles.modalIconWrapper, { backgroundColor: '#10B98115' }]}>
+                <MaterialCommunityIcons name="check-decagram" size={24} color="#10B981" />
+              </View>
+              <View style={{ flex: 1, marginLeft: 10 }}>
+                <Text style={[styles.modalTitle, { color: theme.colors.text }]}>Complete Service</Text>
+                <Text style={[styles.modalSubtitle, { color: theme.colors.placeholder }]}>
+                  {selectedCompleteItem?.registrationNumber || 'Vehicle'} • {selectedCompleteItem?.serviceName || 'Service'}
+                </Text>
+              </View>
+            </View>
+
+            <Text style={{ fontSize: 12, color: theme.colors.placeholder, marginTop: 4, marginBottom: 8 }}>
+              Mark this vehicle as inspected & finished. The customer will receive an alert that their vehicle is ready for pickup.
+            </Text>
+
+            {/* Quick Note Presets */}
+            <Text style={[styles.presetTitle, { color: theme.colors.placeholder }]}>Quick service notes:</Text>
+            <View style={styles.presetChips}>
+              {['MOT & Service Passed', 'All Checks Completed', 'Air & Oil Filter Replaced', 'Brakes Checked - Good', 'Ready for Collection'].map((preset) => (
+                <TouchableOpacity
+                  key={preset}
+                  onPress={() => setCompleteNotes(preset)}
+                  style={[
+                    styles.presetChip,
+                    { 
+                      backgroundColor: completeNotes === preset ? '#10B98120' : theme.colors.background,
+                      borderColor: completeNotes === preset ? '#10B981' : theme.colors.border,
+                    }
+                  ]}
+                >
+                  <Text style={[styles.presetChipText, { color: completeNotes === preset ? '#10B981' : theme.colors.text }]}>
+                    {preset}
+                  </Text>
+                </TouchableOpacity>
+              ))}
+            </View>
+            
+            <TextInput
+              style={[styles.modalInput, { color: theme.colors.text, borderColor: theme.colors.border, backgroundColor: theme.colors.background }]}
+              placeholder="Or enter mechanic notes / advisories..."
+              placeholderTextColor={theme.colors.placeholder}
+              value={completeNotes}
+              onChangeText={setCompleteNotes}
+              multiline
+              numberOfLines={2}
+            />
+
+            <View style={styles.modalActions}>
+              <TouchableOpacity
+                onPress={() => setCompleteModalVisible(false)}
+                style={[styles.modalBtn, { backgroundColor: theme.colors.background, borderColor: theme.colors.border, borderWidth: 1 }]}
+                disabled={submittingComplete}
+              >
+                <Text style={[styles.modalBtnText, { color: theme.colors.text }]}>Cancel</Text>
+              </TouchableOpacity>
+              <TouchableOpacity
+                onPress={submitCompleteService}
+                style={[styles.modalBtn, { backgroundColor: '#10B981' }]}
+                disabled={submittingComplete}
+              >
+                {submittingComplete ? (
+                  <ActivityIndicator color="#FFFFFF" size="small" />
+                ) : (
+                  <Text style={[styles.modalBtnText, { color: '#FFFFFF' }]}>Confirm Complete</Text>
+                )}
               </TouchableOpacity>
             </View>
           </View>
