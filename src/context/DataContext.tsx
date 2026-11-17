@@ -66,6 +66,9 @@ export interface AlertNotification {
   stationName?: string;
   rescheduled?: boolean;
   cancellationReason?: string;
+  invoiceId?: string;
+  hasInvoice?: boolean;
+  invoiceTotal?: number;
   cancelledBy?: string;
   cancelledAt?: string;
   createdAt?: string;
@@ -167,6 +170,117 @@ export interface ServiceCategory {
   isDefault?: boolean;
 }
 
+export interface InventoryHistoryItem {
+  _id?: string;
+  action: 'CREATED' | 'RESTOCK' | 'USED_IN_JOB' | 'AUDIT_ADJUSTMENT' | 'MANUAL_EDIT' | 'DAMAGE_WASTE';
+  quantityChange: number;
+  quantityAfter: number;
+  reason?: string;
+  performedByName?: string;
+  createdAt: string;
+}
+
+export interface DynamicInventoryCategory {
+  _id: string;
+  id?: string;
+  garageId?: string;
+  name: string;
+  subCategories: string[];
+  description?: string;
+  isActive?: boolean;
+}
+
+export interface InventoryItem {
+  _id: string;
+  id?: string;
+  garageId: string;
+  name: string;
+  sku?: string;
+  partNumber?: string;
+  category: string;
+  subCategory?: string;
+  description?: string;
+  brand?: string;
+  unit: string;
+  status: 'Active' | 'Inactive' | 'Out of Stock';
+  quantity: number;
+  minStockThreshold?: number;
+  costPrice?: number;
+  sellingPrice: number;
+  isActive?: boolean;
+  stockStatus?: 'In Stock' | 'Low Stock' | 'Out of Stock' | 'Active' | 'Inactive';
+  lastRestockedAt?: string;
+  history?: InventoryHistoryItem[];
+  createdAt?: string;
+  updatedAt?: string;
+}
+
+export interface InventoryCategoryStat {
+  _id: string;
+  itemCount: number;
+  totalQuantity: number;
+  totalValue: number;
+}
+
+export interface InvoiceLineItem {
+  _id?: string;
+  itemType: 'SERVICE' | 'PART' | 'LABOUR' | 'OTHER';
+  inventoryItemId?: string;
+  partNumber?: string;
+  description: string;
+  quantity: number;
+  unit?: string;
+  unitPrice: number;
+  totalPrice: number;
+  stockDeducted?: boolean;
+  deductedQuantity?: number;
+}
+
+export interface Invoice {
+  _id: string;
+  invoiceNumber: string;
+  bookingId: string;
+  garageId: any;
+  customerId?: string;
+  customerName: string;
+  customerEmail?: string;
+  customerMobile?: string;
+  customerAddress?: string;
+  registrationNumber: string;
+  makeModel?: string;
+  items: InvoiceLineItem[];
+  subtotal: number;
+  vatRate: number;
+  vatAmount: number;
+  discountAmount?: number;
+  grandTotal: number;
+  status: 'Draft' | 'Issued' | 'Paid' | 'Cancelled';
+  paymentStatus: 'Pending' | 'Paid' | 'Partially Paid';
+  paymentMethod: 'Card' | 'Cash' | 'Bank Transfer' | 'Online' | 'Pending';
+  notes?: string;
+  issuedAt?: string;
+  paidAt?: string;
+  createdByName?: string;
+  createdAt?: string;
+  updatedAt?: string;
+}
+
+export interface InventoryStats {
+  totalItems: number;
+  activeCount: number;
+  inactiveCount: number;
+  outOfStockCount: number;
+  stockValue: number;
+  totalStockUnits?: number;
+  totalCostValue?: number;
+  totalRetailValue?: number;
+  potentialProfit?: number;
+  lowStockCount?: number;
+  inStockCount?: number;
+  categories?: InventoryCategoryStat[];
+  recentAdjustments?: any[];
+}
+
 interface DataContextType {
   customers: Customer[];
   vehicles: Vehicle[];
@@ -198,6 +312,7 @@ interface DataContextType {
   refreshSession: () => Promise<RefreshOutcome>;
   authFetch: (url: string, options?: RequestInit) => Promise<Response>;
   logout: () => Promise<void>;
+  isLoggingOut: boolean;
   user: UserProfile | null;
   setUser: (user: UserProfile | null) => void;
   refreshData: (activeToken?: string | null) => Promise<void>;
@@ -235,16 +350,37 @@ interface DataContextType {
   isProfileMandatory: boolean;
   getPlatformSettings: () => Promise<{ requireFullProfileForVisibility: boolean }>;
   updatePlatformSettings: (requireFullProfileForVisibility: boolean) => Promise<{ requireFullProfileForVisibility: boolean }>;
+  inventoryItems: InventoryItem[];
+  inventoryStats: InventoryStats | null;
+  loadingInventory: boolean;
+  fetchInventory: (filters?: { search?: string; category?: string; status?: string }) => Promise<InventoryItem[]>;
+  fetchInventoryStats: () => Promise<InventoryStats | null>;
+  addInventoryItem: (item: Partial<InventoryItem>) => Promise<InventoryItem>;
+  updateInventoryItem: (id: string, updates: Partial<InventoryItem>) => Promise<InventoryItem>;
+  adjustInventoryStock: (id: string, delta: number, action?: string, reason?: string) => Promise<InventoryItem>;
+  deleteInventoryItem: (id: string) => Promise<void>;
+  fetchInventoryCategories: () => Promise<string[]>;
+  dynamicCategories: DynamicInventoryCategory[];
+  fetchDynamicCategories: () => Promise<DynamicInventoryCategory[]>;
+  createDynamicCategory: (name: string, subCategories?: string[], description?: string) => Promise<DynamicInventoryCategory>;
+  updateDynamicCategory: (id: string, updates: { name?: string; subCategories?: string[]; description?: string }) => Promise<DynamicInventoryCategory>;
+  deleteDynamicCategory: (id: string) => Promise<void>;
+  addSubCategoryToCategory: (categoryId: string, subCategory: string) => Promise<DynamicInventoryCategory>;
+  removeSubCategoryFromCategory: (categoryId: string, subCategory: string) => Promise<DynamicInventoryCategory>;
+  seedDefaultInventory: () => Promise<any>;
+  fetchBookingInvoice: (bookingId: string) => Promise<{ invoice: Invoice | null; provisional?: any }>;
+  saveBookingInvoice: (bookingId: string, invoicePayload: any) => Promise<{ invoice: Invoice; alert?: any }>;
+  updateInvoicePayment: (invoiceId: string, paymentData: { paymentStatus: string; paymentMethod?: string; notes?: string }) => Promise<Invoice>;
 }
 
 const DataContext = createContext<DataContextType | undefined>(undefined);
 
 // Local backend configuration:
 // Wi-Fi IP (for physical mobile device & emulator on same network)
-export const LOCAL_IP = '192.168.1.45';
-// export const BASE_URL = `http://${LOCAL_IP}:5000/api`;
+export const LOCAL_IP = '192.168.1.15';
+export const BASE_URL = `http://${LOCAL_IP}:5000/api`;
 // export const BASE_URL = 'http://10.0.2.2:5000/api'; // Android Emulator alias
-export const BASE_URL = 'https://api.ondoorcarservice.com/api'; // Production server
+// export const BASE_URL = 'https://api.ondoorcarservice.com/api'; // Production server
 // export const BASE_URL = 'http://localhost:5000/api';
 
 const parseJsonResponse = async (response: Response): Promise<any> => {
@@ -308,9 +444,14 @@ export const DataProvider = ({ children }: { children: ReactNode }) => {
   const [audits, setAudits] = useState<AuditLog[]>([]);
   const [garages, setGarages] = useState<Garage[]>([]);
   const [currentGarage, setCurrentGarage] = useState<Garage | null>(null);
+  const [inventoryItems, setInventoryItems] = useState<InventoryItem[]>([]);
+  const [dynamicCategories, setDynamicCategories] = useState<DynamicInventoryCategory[]>([]);
+  const [inventoryStats, setInventoryStats] = useState<InventoryStats | null>(null);
+  const [loadingInventory, setLoadingInventory] = useState<boolean>(false);
   const [isProfileMandatory, setIsProfileMandatory] = useState<boolean>(false);
   const [serviceCategories, setServiceCategories] = useState<ServiceCategory[]>([]);
   const [pendingCustomServicesCount, setPendingCustomServicesCount] = useState<number>(0);
+  const [isLoggingOut, setIsLoggingOut] = useState<boolean>(false);
   const [token, setTokenState] = useState<string | null>(null);
   const [refreshToken, setRefreshTokenState] = useState<string | null>(null);
   const [user, setUserState] = useState<UserProfile | null>(null);
@@ -537,19 +678,27 @@ export const DataProvider = ({ children }: { children: ReactNode }) => {
   }, [refreshSession, handleSessionExpired]);
 
   const logout = useCallback(async () => {
+    setIsLoggingOut(true);
     try {
       const activeRefreshToken = refreshTokenRef.current || await AsyncStorage.getItem('user_refresh_token');
       if (activeRefreshToken) {
+        const controller = new AbortController();
+        const timer = setTimeout(() => controller.abort(), 3500);
         await fetch(`${BASE_URL}/auth/logout`, {
           method: 'POST',
           headers: { 'Content-Type': 'application/json' },
-          body: JSON.stringify({ refreshToken: activeRefreshToken })
+          body: JSON.stringify({ refreshToken: activeRefreshToken }),
+          signal: controller.signal,
         }).catch(err => console.warn('Logout request warning:', err));
+        clearTimeout(timer);
       }
+    } catch (e) {
+      console.warn('Logout error:', e);
     } finally {
       setTokens(null, null);
       setUser(null);
       resetToLogin();
+      setIsLoggingOut(false);
     }
   }, [refreshToken, setTokens, setUser]);
 
@@ -611,6 +760,8 @@ export const DataProvider = ({ children }: { children: ReactNode }) => {
 
         if (activeGarageId) {
           fetchPromises.push(authFetch(`${BASE_URL}/garages/${activeGarageId}`));
+          fetchPromises.push(authFetch(`${BASE_URL}/inventory/stats`));
+          fetchPromises.push(authFetch(`${BASE_URL}/inventory`));
         }
 
         const results = await Promise.all(fetchPromises);
@@ -619,6 +770,8 @@ export const DataProvider = ({ children }: { children: ReactNode }) => {
         const auditsRes = results[2];
         const alertsRes = results[3];
         const garageRes = results[4];
+        const inventoryStatsRes = results[5];
+        const inventoryRes = results[6];
 
         if (customersRes && customersRes.ok) {
           const customersData = await customersRes.json();
@@ -642,6 +795,14 @@ export const DataProvider = ({ children }: { children: ReactNode }) => {
         if (garageRes && garageRes.ok) {
           const garageData = await garageRes.json();
           setCurrentGarage(garageData);
+        }
+        if (inventoryStatsRes && inventoryStatsRes.ok) {
+          const statsData = await inventoryStatsRes.json();
+          setInventoryStats(statsData.stats);
+        }
+        if (inventoryRes && inventoryRes.ok) {
+          const invData = await inventoryRes.json();
+          setInventoryItems(invData.items || []);
         }
       } else {
         // Customer: only fetch their own customer profile (which includes vehicles) and their alerts
@@ -1672,6 +1833,354 @@ export const DataProvider = ({ children }: { children: ReactNode }) => {
     return { requireFullProfileForVisibility };
   }, [authFetch]);
 
+  // Inventory Management API Calls
+  const fetchInventory = useCallback(async (filters?: { search?: string; category?: string; status?: string }): Promise<InventoryItem[]> => {
+    try {
+      setLoadingInventory(true);
+      const queryParams = new URLSearchParams();
+      if (filters?.search) queryParams.append('search', filters.search);
+      if (filters?.category && filters.category !== 'ALL') queryParams.append('category', filters.category);
+      if (filters?.status && filters.status !== 'all') queryParams.append('status', filters.status);
+
+      const qs = queryParams.toString();
+      const url = `${BASE_URL}/inventory${qs ? `?${qs}` : ''}`;
+      const res = await authFetch(url);
+      const data = await parseJsonResponse(res);
+      if (!res.ok) {
+        throw new Error(data.error || 'Failed to fetch inventory');
+      }
+      const items = Array.isArray(data.data) ? data.data : [];
+      setInventoryItems(items);
+      return items;
+    } catch (err) {
+      console.error('[DATA CONTEXT] fetchInventory error:', err);
+      throw err;
+    } finally {
+      setLoadingInventory(false);
+    }
+  }, [authFetch]);
+
+  const fetchInventoryStats = useCallback(async (): Promise<InventoryStats | null> => {
+    try {
+      const res = await authFetch(`${BASE_URL}/inventory/stats`);
+      const data = await parseJsonResponse(res);
+      if (!res.ok) {
+        throw new Error(data.error || 'Failed to fetch inventory stats');
+      }
+      const stats = data.stats || null;
+      setInventoryStats(stats);
+      return stats;
+    } catch (err) {
+      console.error('[DATA CONTEXT] fetchInventoryStats error:', err);
+      return null;
+    }
+  }, [authFetch]);
+
+  const addInventoryItem = useCallback(async (itemData: Partial<InventoryItem>): Promise<InventoryItem> => {
+    try {
+      const res = await authFetch(`${BASE_URL}/inventory`, {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify(itemData),
+      });
+      const data = await parseJsonResponse(res);
+      if (!res.ok) {
+        throw new Error(data.error || 'Failed to add inventory item');
+      }
+      const newItem = data.data;
+      setInventoryItems((prev) => [newItem, ...prev]);
+      fetchInventoryStats().catch(() => {});
+      return newItem;
+    } catch (err) {
+      console.error('[DATA CONTEXT] addInventoryItem error:', err);
+      throw err;
+    }
+  }, [authFetch, fetchInventoryStats]);
+
+  const updateInventoryItem = useCallback(async (id: string, updates: Partial<InventoryItem>): Promise<InventoryItem> => {
+    try {
+      const res = await authFetch(`${BASE_URL}/inventory/${id}`, {
+        method: 'PUT',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify(updates),
+      });
+      const data = await parseJsonResponse(res);
+      if (!res.ok) {
+        throw new Error(data.error || 'Failed to update inventory item');
+      }
+      const updated = data.data;
+      setInventoryItems((prev) => prev.map((item) => (item._id === id || item.id === id ? updated : item)));
+      fetchInventoryStats().catch(() => {});
+      return updated;
+    } catch (err) {
+      console.error('[DATA CONTEXT] updateInventoryItem error:', err);
+      throw err;
+    }
+  }, [authFetch, fetchInventoryStats]);
+
+  const adjustInventoryStock = useCallback(async (id: string, delta: number, action = 'RESTOCK', reason = ''): Promise<InventoryItem> => {
+    try {
+      const res = await authFetch(`${BASE_URL}/inventory/${id}/adjust`, {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({ delta, action, reason }),
+      });
+      const data = await parseJsonResponse(res);
+      if (!res.ok) {
+        throw new Error(data.error || 'Failed to adjust stock');
+      }
+      const updated = data.data;
+      setInventoryItems((prev) => prev.map((item) => (item._id === id || item.id === id ? updated : item)));
+      fetchInventoryStats().catch(() => {});
+      return updated;
+    } catch (err) {
+      console.error('[DATA CONTEXT] adjustInventoryStock error:', err);
+      throw err;
+    }
+  }, [authFetch, fetchInventoryStats]);
+
+  const deleteInventoryItem = useCallback(async (id: string): Promise<void> => {
+    try {
+      const res = await authFetch(`${BASE_URL}/inventory/${id}`, {
+        method: 'DELETE',
+      });
+      const data = await parseJsonResponse(res);
+      if (!res.ok) {
+        throw new Error(data.error || 'Failed to delete inventory item');
+      }
+      setInventoryItems((prev) => prev.filter((item) => item._id !== id && item.id !== id));
+      fetchInventoryStats().catch(() => {});
+    } catch (err) {
+      console.error('[DATA CONTEXT] deleteInventoryItem error:', err);
+      throw err;
+    }
+  }, [authFetch, fetchInventoryStats]);
+
+  const fetchInventoryCategories = useCallback(async (): Promise<string[]> => {
+    try {
+      const res = await authFetch(`${BASE_URL}/inventory/categories`);
+      const data = await parseJsonResponse(res);
+      if (res.ok) {
+        if (Array.isArray(data.categories)) {
+          setDynamicCategories(data.categories);
+        }
+        if (Array.isArray(data.allCategories)) {
+          return data.allCategories;
+        }
+      }
+      return [];
+    } catch (err) {
+      console.error('[DATA CONTEXT] fetchInventoryCategories error:', err);
+      return [];
+    }
+  }, [authFetch]);
+
+  const fetchDynamicCategories = useCallback(async (): Promise<DynamicInventoryCategory[]> => {
+    try {
+      const res = await authFetch(`${BASE_URL}/inventory/categories`);
+      const data = await parseJsonResponse(res);
+      if (res.ok && Array.isArray(data.categories)) {
+        setDynamicCategories(data.categories);
+        return data.categories;
+      }
+      return [];
+    } catch (err) {
+      console.error('[DATA CONTEXT] fetchDynamicCategories error:', err);
+      return [];
+    }
+  }, [authFetch]);
+
+  const createDynamicCategory = useCallback(
+    async (name: string, subCategories: string[] = [], description = ''): Promise<DynamicInventoryCategory> => {
+      try {
+        const res = await authFetch(`${BASE_URL}/inventory/categories`, {
+          method: 'POST',
+          headers: { 'Content-Type': 'application/json' },
+          body: JSON.stringify({ name, subCategories, description }),
+        });
+        const data = await parseJsonResponse(res);
+        if (!res.ok) {
+          throw new Error(data.error || 'Failed to create category');
+        }
+        const newCat = data.category;
+        setDynamicCategories((prev) => {
+          const filtered = prev.filter((c) => c._id !== newCat._id);
+          return [...filtered, newCat].sort((a, b) => a.name.localeCompare(b.name));
+        });
+        return newCat;
+      } catch (err) {
+        console.error('[DATA CONTEXT] createDynamicCategory error:', err);
+        throw err;
+      }
+    },
+    [authFetch]
+  );
+
+  const updateDynamicCategory = useCallback(
+    async (id: string, updates: { name?: string; subCategories?: string[]; description?: string }): Promise<DynamicInventoryCategory> => {
+      try {
+        const res = await authFetch(`${BASE_URL}/inventory/categories/${id}`, {
+          method: 'PUT',
+          headers: { 'Content-Type': 'application/json' },
+          body: JSON.stringify(updates),
+        });
+        const data = await parseJsonResponse(res);
+        if (!res.ok) {
+          throw new Error(data.error || 'Failed to update category');
+        }
+        const updatedCat = data.category;
+        setDynamicCategories((prev) => prev.map((c) => (c._id === id ? updatedCat : c)));
+        return updatedCat;
+      } catch (err) {
+        console.error('[DATA CONTEXT] updateDynamicCategory error:', err);
+        throw err;
+      }
+    },
+    [authFetch]
+  );
+
+  const deleteDynamicCategory = useCallback(
+    async (id: string): Promise<void> => {
+      try {
+        const res = await authFetch(`${BASE_URL}/inventory/categories/${id}`, {
+          method: 'DELETE',
+        });
+        const data = await parseJsonResponse(res);
+        if (!res.ok) {
+          throw new Error(data.error || 'Failed to delete category');
+        }
+        setDynamicCategories((prev) => prev.filter((c) => c._id !== id));
+      } catch (err) {
+        console.error('[DATA CONTEXT] deleteDynamicCategory error:', err);
+        throw err;
+      }
+    },
+    [authFetch]
+  );
+
+  const addSubCategoryToCategory = useCallback(
+    async (categoryId: string, subCategory: string): Promise<DynamicInventoryCategory> => {
+      try {
+        const res = await authFetch(`${BASE_URL}/inventory/categories/${categoryId}/subcategories`, {
+          method: 'POST',
+          headers: { 'Content-Type': 'application/json' },
+          body: JSON.stringify({ subCategory }),
+        });
+        const data = await parseJsonResponse(res);
+        if (!res.ok) {
+          throw new Error(data.error || 'Failed to add sub-category');
+        }
+        const updatedCat = data.category;
+        setDynamicCategories((prev) => prev.map((c) => (c._id === categoryId ? updatedCat : c)));
+        return updatedCat;
+      } catch (err) {
+        console.error('[DATA CONTEXT] addSubCategoryToCategory error:', err);
+        throw err;
+      }
+    },
+    [authFetch]
+  );
+
+  const removeSubCategoryFromCategory = useCallback(
+    async (categoryId: string, subCategory: string): Promise<DynamicInventoryCategory> => {
+      try {
+        const res = await authFetch(
+          `${BASE_URL}/inventory/categories/${categoryId}/subcategories/${encodeURIComponent(subCategory)}`,
+          {
+            method: 'DELETE',
+          }
+        );
+        const data = await parseJsonResponse(res);
+        if (!res.ok) {
+          throw new Error(data.error || 'Failed to remove sub-category');
+        }
+        const updatedCat = data.category;
+        setDynamicCategories((prev) => prev.map((c) => (c._id === categoryId ? updatedCat : c)));
+        return updatedCat;
+      } catch (err) {
+        console.error('[DATA CONTEXT] removeSubCategoryFromCategory error:', err);
+        throw err;
+      }
+    },
+    [authFetch]
+  );
+
+  const seedDefaultInventory = useCallback(async (): Promise<any> => {
+    try {
+      const res = await authFetch(`${BASE_URL}/inventory/seed-defaults`, {
+        method: 'POST',
+      });
+      const data = await parseJsonResponse(res);
+      if (!res.ok) {
+        throw new Error(data.error || 'Failed to seed starter inventory');
+      }
+      await Promise.all([
+        fetchInventory(),
+        fetchInventoryStats(),
+      ]);
+      return data;
+    } catch (err) {
+      console.error('[DATA CONTEXT] seedDefaultInventory error:', err);
+      throw err;
+    }
+  }, [authFetch, fetchInventory, fetchInventoryStats]);
+
+  const fetchBookingInvoice = useCallback(async (bookingId: string): Promise<{ invoice: Invoice | null; provisional?: any }> => {
+    try {
+      const res = await authFetch(`${BASE_URL}/invoices/booking/${bookingId}`);
+      const data = await parseJsonResponse(res);
+      if (!res.ok) {
+        throw new Error(data.error || 'Failed to fetch invoice');
+      }
+      return data;
+    } catch (err) {
+      console.error('[DATA CONTEXT] fetchBookingInvoice error:', err);
+      throw err;
+    }
+  }, [authFetch]);
+
+  const saveBookingInvoice = useCallback(async (bookingId: string, invoicePayload: any): Promise<{ invoice: Invoice; alert?: any }> => {
+    try {
+      const res = await authFetch(`${BASE_URL}/invoices/booking/${bookingId}`, {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify(invoicePayload),
+      });
+      const data = await parseJsonResponse(res);
+      if (!res.ok) {
+        throw new Error(data.error || 'Failed to save invoice');
+      }
+      // Refresh inventory items, stats, and alerts after parts stock deduction
+      Promise.all([
+        refreshData(),
+        fetchInventory(),
+        fetchInventoryStats(),
+      ]).catch(e => console.warn('[DATA CONTEXT] Post invoice save refresh error:', e));
+      return data;
+    } catch (err) {
+      console.error('[DATA CONTEXT] saveBookingInvoice error:', err);
+      throw err;
+    }
+  }, [authFetch, refreshData, fetchInventory, fetchInventoryStats]);
+
+  const updateInvoicePayment = useCallback(async (invoiceId: string, paymentData: { paymentStatus: string; paymentMethod?: string; notes?: string }): Promise<Invoice> => {
+    try {
+      const res = await authFetch(`${BASE_URL}/invoices/${invoiceId}/payment`, {
+        method: 'PATCH',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify(paymentData),
+      });
+      const data = await parseJsonResponse(res);
+      if (!res.ok) {
+        throw new Error(data.error || 'Failed to update payment');
+      }
+      return data.invoice;
+    } catch (err) {
+      console.error('[DATA CONTEXT] updateInvoicePayment error:', err);
+      throw err;
+    }
+  }, [authFetch]);
+
   return (
     <DataContext.Provider
       value={{
@@ -1704,6 +2213,7 @@ export const DataProvider = ({ children }: { children: ReactNode }) => {
         refreshSession,
         authFetch,
         logout,
+        isLoggingOut,
         user,
         setUser,
         refreshData,
@@ -1741,6 +2251,27 @@ export const DataProvider = ({ children }: { children: ReactNode }) => {
         isProfileMandatory,
         getPlatformSettings,
         updatePlatformSettings,
+        inventoryItems,
+        inventoryStats,
+        loadingInventory,
+        fetchInventory,
+        fetchInventoryStats,
+        addInventoryItem,
+        updateInventoryItem,
+        adjustInventoryStock,
+        deleteInventoryItem,
+        fetchInventoryCategories,
+        dynamicCategories,
+        fetchDynamicCategories,
+        createDynamicCategory,
+        updateDynamicCategory,
+        deleteDynamicCategory,
+        addSubCategoryToCategory,
+        removeSubCategoryFromCategory,
+        seedDefaultInventory,
+        fetchBookingInvoice,
+        saveBookingInvoice,
+        updateInvoicePayment,
       }}
     >
       {children}

@@ -4,9 +4,12 @@ import { SafeAreaProvider } from 'react-native-safe-area-context';
 import { NavigationContainer } from '@react-navigation/native';
 import { ThemeProvider, useAppTheme } from './src/context/ThemeContext';
 import { DataProvider } from './src/context/DataContext';
+import { DrawerProvider } from './src/context/DrawerContext';
 import RootNavigator from './src/navigation/RootNavigator';
 import './src/utils/AlertManager'; // Register global Alert override
 import CustomAlertModal from './src/components/CustomAlertModal';
+import GarageSidebarDrawer from './src/components/GarageSidebarDrawer';
+import SignOutLoadingModal from './src/components/SignOutLoadingModal';
 import Toast from 'react-native-toast-message';
 import { navigationRef } from './src/navigation/NavigationService';
 
@@ -19,8 +22,12 @@ function AppContent() {
         barStyle={isDarkMode ? 'light-content' : 'dark-content'}
         backgroundColor={theme.colors.card}
       />
-      <RootNavigator />
+      <DrawerProvider>
+        <RootNavigator />
+        <GarageSidebarDrawer />
+      </DrawerProvider>
       <CustomAlertModal />
+      <SignOutLoadingModal />
       <Toast />
     </NavigationContainer>
   );

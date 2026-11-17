@@ -20,6 +20,8 @@ import { fonts } from '../theme/theme';
 import { useAppValues, AlertNotification } from '../context/DataContext';
 import { SafeAreaView } from 'react-native-safe-area-context';
 import { formatDateWithWeekday, formatShortDate } from '../utils/dateUtils';
+import HeaderMenuButton from '../components/HeaderMenuButton';
+import JobSheetInvoiceModal from '../components/JobSheetInvoiceModal';
 
 const { width } = Dimensions.get('window');
 
@@ -255,7 +257,7 @@ const monthNames = [
 
 export default function BookedMotsScreen({ navigation }: any) {
   const { theme } = useAppTheme();
-  const { alerts, customers, approveAlert, acknowledgeAlert, rejectAlert, cancelBooking, startServiceBooking, completeServiceBooking, refreshData } = useAppValues();
+  const { alerts, customers, approveAlert, acknowledgeAlert, rejectAlert, cancelBooking, startServiceBooking, refreshData } = useAppValues();
   const [refreshing, setRefreshing] = useState(false);
   const [loadingAction, setLoadingAction] = useState<string | null>(null);
   const [searchQuery, setSearchQuery] = useState('');
@@ -278,11 +280,14 @@ export default function BookedMotsScreen({ navigation }: any) {
   const [selectedAlertId, setSelectedAlertId] = useState<string | null>(null);
   const [rejectionReason, setRejectionReason] = useState('');
 
-  // Complete Service modal states
-  const [completeModalVisible, setCompleteModalVisible] = useState(false);
-  const [selectedCompleteItem, setSelectedCompleteItem] = useState<any>(null);
-  const [completeNotes, setCompleteNotes] = useState('');
-  const [submittingComplete, setSubmittingComplete] = useState(false);
+  // Job sheet & invoice modal state
+  const [jobSheetVisible, setJobSheetVisible] = useState(false);
+  const [selectedJobSheetItem, setSelectedJobSheetItem] = useState<any>(null);
+
+  const openJobSheet = (item: any) => {
+    setSelectedJobSheetItem(item);
+    setJobSheetVisible(true);
+  };
 
   // Filter alerts of type BOOKED
   const bookedMots = useMemo(() => alerts.filter((a) => a.type === 'BOOKED'), [alerts]);
@@ -483,14 +488,28 @@ export default function BookedMotsScreen({ navigation }: any) {
     }
   };
 
-  const handleStartService = (alertId: string, regText: string) => {
+  const handleStartService = (alertId: string, regText: string, item?: any) => {
     Alert.alert(
       'Start Service',
       `Move vehicle ${regText} into the workshop ramp and start service?\n\nThe customer will be notified in real-time that service is underway.`,
       [
         { text: 'Cancel', style: 'cancel' },
         {
-          text: 'Start Service',
+          text: 'Start & Open Job Sheet',
+          onPress: async () => {
+            setLoadingAction(`start_${alertId}`);
+            try {
+              await startServiceBooking(alertId);
+              if (item) openJobSheet(item);
+            } catch (error: any) {
+              Alert.alert('Error', error?.message || 'Could not start service.');
+            } finally {
+              setLoadingAction(null);
+            }
+          }
+        },
+        {
+          text: 'Start Only',
           onPress: async () => {
             setLoadingAction(`start_${alertId}`);
             try {
@@ -505,31 +524,6 @@ export default function BookedMotsScreen({ navigation }: any) {
         }
       ]
     );
-  };
-
-  const openCompleteModal = (item: any) => {
-    setSelectedCompleteItem(item);
-    setCompleteNotes('');
-    setCompleteModalVisible(true);
-  };
-
-  const submitCompleteService = async () => {
-    if (!selectedCompleteItem) return;
-    const bookingId = selectedCompleteItem.id || selectedCompleteItem._id;
-    const reg = (typeof selectedCompleteItem.registrationNumber === 'string' && selectedCompleteItem.registrationNumber.trim())
-      ? selectedCompleteItem.registrationNumber
-      : (typeof selectedCompleteItem.vrn === 'string' ? selectedCompleteItem.vrn : 'Vehicle');
-    setSubmittingComplete(true);
-    try {
-      await completeServiceBooking(bookingId, completeNotes);
-      setCompleteModalVisible(false);
-      setSelectedCompleteItem(null);
-      Alert.alert('Service Completed', `Service on ${reg} has been completed! Customer has been notified that the vehicle is ready for pickup.`);
-    } catch (error: any) {
-      Alert.alert('Error', error?.message || 'Could not complete service.');
-    } finally {
-      setSubmittingComplete(false);
-    }
   };
 
   const openRejectModal = (alertId: string) => {
@@ -596,13 +590,7 @@ export default function BookedMotsScreen({ navigation }: any) {
     <SafeAreaView style={[styles.container, { backgroundColor: theme.colors.background }]} edges={['top']}>
       {/* Navbar Header */}
       <View style={[styles.navbar, { backgroundColor: theme.colors.card, borderColor: theme.colors.border }]}>
-        <TouchableOpacity 
-          onPress={() => navigation.navigate('Main', { screen: 'Dashboard' })} 
-          style={styles.backBtn}
-          activeOpacity={0.7}
-        >
-          <MaterialCommunityIcons name="arrow-left" size={22} color={theme.colors.text} />
-        </TouchableOpacity> 
+        <HeaderMenuButton style={{ marginRight: 8 }} />
         <View style={styles.navTitleContainer}>
           <Text style={[styles.navTitle, { color: theme.colors.text }]}>Booked Appointments</Text>
           <Text style={[styles.navSubtitle, { color: theme.colors.placeholder }]}>
@@ -1081,7 +1069,7 @@ export default function BookedMotsScreen({ navigation }: any) {
                 {isApproved && (
                   <View style={[styles.cardActionsRow, { justifyContent: 'flex-end', marginTop: 4 }]}>
                     <TouchableOpacity
-                      onPress={() => handleStartService(bookingId, vrnText)}
+                      onPress={() => handleStartService(bookingId, vrnText, item)}
                       disabled={loadingAction !== null}
                       style={[styles.cardActionBtnCompact, { backgroundColor: '#8B5CF6', borderColor: '#8B5CF6', marginRight: 6 }]}
                       activeOpacity={0.7}
@@ -1094,6 +1082,15 @@ export default function BookedMotsScreen({ navigation }: any) {
                           <Text style={{ fontSize: 11, fontFamily: fonts.bold, color: '#FFFFFF' }}>Start Service</Text>
                         </>
                       )}
+                    </TouchableOpacity>
+
+                    <TouchableOpacity
+                      onPress={() => openJobSheet(item)}
+                      style={[styles.cardActionBtnCompact, { backgroundColor: '#10B981', borderColor: '#10B981', marginRight: 6 }]}
+                      activeOpacity={0.7}
+                    >
+                      <MaterialCommunityIcons name="file-document-edit-outline" size={13} color="#FFFFFF" style={{ marginRight: 3 }} />
+                      <Text style={{ fontSize: 11, fontFamily: fonts.bold, color: '#FFFFFF' }}>Job Sheet & Parts</Text>
                     </TouchableOpacity>
 
                     <TouchableOpacity
@@ -1146,17 +1143,17 @@ export default function BookedMotsScreen({ navigation }: any) {
                   </View>
                 )}
 
-                {/* 11. Action Buttons (In Progress -> Complete Service) */}
+                {/* 11. Action Buttons (In Progress -> Resume Service) */}
                 {isInProgress && (
                   <View style={[styles.cardActionsRow, { justifyContent: 'flex-end', marginTop: 4 }]}>
                     <TouchableOpacity
-                      onPress={() => openCompleteModal(item)}
+                      onPress={() => openJobSheet(item)}
                       disabled={loadingAction !== null}
                       style={[styles.cardActionBtnCompact, { backgroundColor: '#10B981', borderColor: '#10B981', marginRight: 6 }]}
                       activeOpacity={0.7}
                     >
-                      <MaterialCommunityIcons name="check-circle-outline" size={13} color="#FFFFFF" style={{ marginRight: 3 }} />
-                      <Text style={{ fontSize: 11, fontFamily: fonts.bold, color: '#FFFFFF' }}>Complete Service</Text>
+                      <MaterialCommunityIcons name="play-circle-outline" size={13} color="#FFFFFF" style={{ marginRight: 3 }} />
+                      <Text style={{ fontSize: 11, fontFamily: fonts.bold, color: '#FFFFFF' }}>Resume Service</Text>
                     </TouchableOpacity>
 
                     <TouchableOpacity
@@ -1205,6 +1202,22 @@ export default function BookedMotsScreen({ navigation }: any) {
                           <Text style={styles.cardCancelBookingTextCompact}>Cancel</Text>
                         </>
                       )}
+                    </TouchableOpacity>
+                  </View>
+                )}
+
+                {/* 12. Action Buttons (Completed -> View/Edit Invoice) */}
+                {isCompleted && (
+                  <View style={[styles.cardActionsRow, { justifyContent: 'flex-end', marginTop: 4 }]}>
+                    <TouchableOpacity
+                      onPress={() => openJobSheet(item)}
+                      style={[styles.cardActionBtnCompact, { backgroundColor: '#059669', borderColor: '#059669', marginRight: 6 }]}
+                      activeOpacity={0.7}
+                    >
+                      <MaterialCommunityIcons name="receipt" size={13} color="#FFFFFF" style={{ marginRight: 3 }} />
+                      <Text style={{ fontSize: 11, fontFamily: fonts.bold, color: '#FFFFFF' }}>
+                        {item.invoiceTotal ? `🧾 Receipt Slip (£${Number(item.invoiceTotal).toFixed(2)})` : '🧾 Receipt & Invoice'}
+                      </Text>
                     </TouchableOpacity>
                   </View>
                 )}
@@ -1285,86 +1298,18 @@ export default function BookedMotsScreen({ navigation }: any) {
         </View>
       </Modal>
 
-      {/* Complete Service Modal */}
-      <Modal
-        animationType="fade"
-        transparent={true}
-        visible={completeModalVisible}
-        onRequestClose={() => setCompleteModalVisible(false)}
-      >
-        <View style={styles.modalOverlay}>
-          <View style={[styles.modalContent, { backgroundColor: theme.colors.card, borderColor: theme.colors.border }]}>
-            <View style={styles.modalHeader}>
-              <View style={[styles.modalIconWrapper, { backgroundColor: '#10B98115' }]}>
-                <MaterialCommunityIcons name="check-decagram" size={24} color="#10B981" />
-              </View>
-              <View style={{ flex: 1, marginLeft: 10 }}>
-                <Text style={[styles.modalTitle, { color: theme.colors.text }]}>Complete Service</Text>
-                <Text style={[styles.modalSubtitle, { color: theme.colors.placeholder }]}>
-                  {selectedCompleteItem?.registrationNumber || 'Vehicle'} • {selectedCompleteItem?.serviceName || 'Service'}
-                </Text>
-              </View>
-            </View>
-
-            <Text style={{ fontSize: 12, color: theme.colors.placeholder, marginTop: 4, marginBottom: 8 }}>
-              Mark this vehicle as inspected & finished. The customer will receive an alert that their vehicle is ready for pickup.
-            </Text>
-
-            {/* Quick Note Presets */}
-            <Text style={[styles.presetTitle, { color: theme.colors.placeholder }]}>Quick service notes:</Text>
-            <View style={styles.presetChips}>
-              {['MOT & Service Passed', 'All Checks Completed', 'Air & Oil Filter Replaced', 'Brakes Checked - Good', 'Ready for Collection'].map((preset) => (
-                <TouchableOpacity
-                  key={preset}
-                  onPress={() => setCompleteNotes(preset)}
-                  style={[
-                    styles.presetChip,
-                    { 
-                      backgroundColor: completeNotes === preset ? '#10B98120' : theme.colors.background,
-                      borderColor: completeNotes === preset ? '#10B981' : theme.colors.border,
-                    }
-                  ]}
-                >
-                  <Text style={[styles.presetChipText, { color: completeNotes === preset ? '#10B981' : theme.colors.text }]}>
-                    {preset}
-                  </Text>
-                </TouchableOpacity>
-              ))}
-            </View>
-            
-            <TextInput
-              style={[styles.modalInput, { color: theme.colors.text, borderColor: theme.colors.border, backgroundColor: theme.colors.background }]}
-              placeholder="Or enter mechanic notes / advisories..."
-              placeholderTextColor={theme.colors.placeholder}
-              value={completeNotes}
-              onChangeText={setCompleteNotes}
-              multiline
-              numberOfLines={2}
-            />
-
-            <View style={styles.modalActions}>
-              <TouchableOpacity
-                onPress={() => setCompleteModalVisible(false)}
-                style={[styles.modalBtn, { backgroundColor: theme.colors.background, borderColor: theme.colors.border, borderWidth: 1 }]}
-                disabled={submittingComplete}
-              >
-                <Text style={[styles.modalBtnText, { color: theme.colors.text }]}>Cancel</Text>
-              </TouchableOpacity>
-              <TouchableOpacity
-                onPress={submitCompleteService}
-                style={[styles.modalBtn, { backgroundColor: '#10B981' }]}
-                disabled={submittingComplete}
-              >
-                {submittingComplete ? (
-                  <ActivityIndicator color="#FFFFFF" size="small" />
-                ) : (
-                  <Text style={[styles.modalBtnText, { color: '#FFFFFF' }]}>Confirm Complete</Text>
-                )}
-              </TouchableOpacity>
-            </View>
-          </View>
-        </View>
-      </Modal>
+      {/* Workshop Job Sheet & Invoice Modal */}
+      <JobSheetInvoiceModal
+        visible={jobSheetVisible}
+        booking={selectedJobSheetItem}
+        onClose={() => {
+          setJobSheetVisible(false);
+          setSelectedJobSheetItem(null);
+        }}
+        onSuccess={() => {
+          refreshData();
+        }}
+      />
 
       {/* Filter Bottom Sheet Modal */}
       <Modal

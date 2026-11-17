@@ -28,6 +28,7 @@ import {
   validateMotExpiryDate,
 } from '../utils/validationUtils';
 import { formatShortDate, formatShortDayMonth } from '../utils/dateUtils';
+import HeaderMenuButton from '../components/HeaderMenuButton';
 
 if (Platform.OS === 'android' && UIManager.setLayoutAnimationEnabledExperimental) {
   UIManager.setLayoutAnimationEnabledExperimental(true);
@@ -391,6 +392,7 @@ export default function AdminCustomersScreen({ navigation }: any) {
       {/* Header */}
       <View style={styles.header}>
         <View style={styles.searchRow}>
+          <HeaderMenuButton style={{ marginRight: 8 }} />
           <View style={[styles.searchBar, { backgroundColor: theme.colors.card, borderColor: theme.colors.border }]}>
             <MaterialCommunityIcons name="magnify" size={20} color={theme.colors.placeholder} />
             <TextInput

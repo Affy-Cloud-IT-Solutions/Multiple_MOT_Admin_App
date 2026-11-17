@@ -38,7 +38,6 @@ export default function LoginScreen({ navigation }: any) {
 
   useEffect(() => {
     const checkPersistedSession = async () => {
-      setLoading(true);
       try {
         const storedToken = await AsyncStorage.getItem('user_token');
         const storedRefreshToken = await AsyncStorage.getItem('user_refresh_token');
@@ -79,8 +78,6 @@ export default function LoginScreen({ navigation }: any) {
         }
       } catch (err) {
         console.error('Error reading persisted session:', err);
-      } finally {
-        setLoading(false);
       }
     };
     checkPersistedSession();

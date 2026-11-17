@@ -149,11 +149,12 @@ export default function CustomAlertModal() {
           ) : null}
 
           {/* Buttons Layout */}
-          <View style={[styles.buttonContainer, buttons && buttons.length > 2 && { flexDirection: 'column' }]}>
+          <View style={[styles.buttonContainer, (buttons && buttons.length > 2) && styles.buttonContainerVertical]}>
             {buttons && buttons.length > 0 ? (
               buttons.map((btn, index) => {
                 const isDestructive = btn.style === 'destructive';
                 const isCancel = btn.style === 'cancel';
+                const isMulti = buttons.length > 2;
                 
                 let btnColor = theme.colors.primary;
                 let btnBg = theme.colors.primary + '12';
@@ -167,7 +168,7 @@ export default function CustomAlertModal() {
                   btnColor = theme.colors.placeholder;
                   btnBg = 'transparent';
                   isOutline = true;
-                } else if (index === buttons.length - 1) {
+                } else if (index === buttons.length - 1 || (isMulti && index === 1)) {
                   btnColor = headerColor;
                   btnBg = headerColor;
                   isOutline = false;
@@ -178,13 +179,14 @@ export default function CustomAlertModal() {
                     key={index}
                     style={[
                       styles.button,
+                      isMulti && styles.buttonVertical,
                       isOutline ? { borderColor: theme.colors.border, borderWidth: 1 } : { backgroundColor: btnBg },
-                      buttons.length > 2 && { width: '100%', marginBottom: 8 }
                     ]}
                     onPress={() => {
                       handleClose();
                       if (btn.onPress) btn.onPress();
                     }}
+                    activeOpacity={0.7}
                   >
                     <Text
                       style={[
@@ -202,6 +204,7 @@ export default function CustomAlertModal() {
               <TouchableOpacity
                 style={[styles.button, { backgroundColor: headerColor }]}
                 onPress={handleClose}
+                activeOpacity={0.7}
               >
                 <Text style={[styles.buttonText, { color: '#FFFFFF' }]}>OK</Text>
               </TouchableOpacity>
@@ -267,13 +270,23 @@ const styles = StyleSheet.create({
     width: '100%',
     gap: 8,
   },
+  buttonContainerVertical: {
+    flexDirection: 'column',
+    alignItems: 'stretch',
+    gap: 10,
+  },
   button: {
     flex: 1,
-    height: 42,
-    borderRadius: 10,
+    height: 44,
+    borderRadius: 12,
     justifyContent: 'center',
     alignItems: 'center',
     paddingHorizontal: 16,
+  },
+  buttonVertical: {
+    flex: 0,
+    width: '100%',
+    height: 44,
   },
   buttonText: {
     fontFamily: fonts.bold,

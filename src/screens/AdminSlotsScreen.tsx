@@ -18,6 +18,7 @@ import { useAppTheme } from '../context/ThemeContext';
 import { useAppValues, BASE_URL } from '../context/DataContext';
 import { fonts } from '../theme/theme';
 import { formatShortDate } from '../utils/dateUtils';
+import HeaderMenuButton from '../components/HeaderMenuButton';
 
 interface Station {
   id?: string;
@@ -656,37 +657,40 @@ export default function AdminSlotsScreen({ navigation, route }: any) {
     >
       {/* Top Header Controls */}
       <View style={styles.header}>
-        {/* Station Count Chip */}
-        <View style={[
-          styles.stationCountChip,
-          {
-            backgroundColor: approvedStationsCount > 0
-              ? theme.colors.primary + '15'
-              : pendingStations.length > 0
-              ? '#F59E0B15'
-              : theme.colors.primary + '15',
-            borderColor: approvedStationsCount > 0
-              ? theme.colors.primary + '35'
-              : pendingStations.length > 0
-              ? '#F59E0B40'
-              : theme.colors.primary + '35',
-          }
-        ]}>
-          <MaterialCommunityIcons
-            name={approvedStationsCount > 0 ? 'garage' : pendingStations.length > 0 ? 'clock-alert-outline' : 'garage'}
-            size={16}
-            color={approvedStationsCount > 0 ? theme.colors.primary : pendingStations.length > 0 ? '#F59E0B' : theme.colors.primary}
-          />
-          <Text style={[
-            styles.stationCountChipText,
-            { color: approvedStationsCount > 0 ? theme.colors.primary : pendingStations.length > 0 ? '#F59E0B' : theme.colors.primary }
+        <View style={{ flexDirection: 'row', alignItems: 'center', flex: 1, marginRight: 8 }}>
+          <HeaderMenuButton style={{ marginRight: 8 }} />
+          {/* Station Count Chip */}
+          <View style={[
+            styles.stationCountChip,
+            {
+              backgroundColor: approvedStationsCount > 0
+                ? theme.colors.primary + '15'
+                : pendingStations.length > 0
+                ? '#F59E0B15'
+                : theme.colors.primary + '15',
+              borderColor: approvedStationsCount > 0
+                ? theme.colors.primary + '35'
+                : pendingStations.length > 0
+                ? '#F59E0B40'
+                : theme.colors.primary + '35',
+            }
           ]}>
-            {approvedStationsCount > 0
-              ? `${approvedStationsCount} ${approvedStationsCount === 1 ? 'MOT Bay' : 'MOT Bays'} Active${pendingStations.length > 0 ? ` • ${pendingStations.length} Pending` : ''}`
-              : pendingStations.length > 0
-              ? `${pendingStations.length} ${pendingStations.length === 1 ? 'Bay' : 'Bays'} Pending Approval`
-              : '0 MOT Bays Active'}
-          </Text>
+            <MaterialCommunityIcons
+              name={approvedStationsCount > 0 ? 'garage' : pendingStations.length > 0 ? 'clock-alert-outline' : 'garage'}
+              size={16}
+              color={approvedStationsCount > 0 ? theme.colors.primary : pendingStations.length > 0 ? '#F59E0B' : theme.colors.primary}
+            />
+            <Text style={[
+              styles.stationCountChipText,
+              { color: approvedStationsCount > 0 ? theme.colors.primary : pendingStations.length > 0 ? '#F59E0B' : theme.colors.primary }
+            ]}>
+              {approvedStationsCount > 0
+                ? `${approvedStationsCount} ${approvedStationsCount === 1 ? 'MOT Bay' : 'MOT Bays'} Active${pendingStations.length > 0 ? ` • ${pendingStations.length} Pending` : ''}`
+                : pendingStations.length > 0
+                ? `${pendingStations.length} ${pendingStations.length === 1 ? 'Bay' : 'Bays'} Pending Approval`
+                : '0 MOT Bays Active'}
+            </Text>
+          </View>
         </View>
 
         {/* Add MOT Station Button (garage_admin only) */}

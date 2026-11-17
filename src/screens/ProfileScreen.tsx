@@ -16,6 +16,7 @@ import MaterialCommunityIcons from 'react-native-vector-icons/MaterialCommunityI
 import { useAppTheme } from '../context/ThemeContext';
 import { useAppValues } from '../context/DataContext';
 import { fonts } from '../theme/theme';
+import HeaderMenuButton from '../components/HeaderMenuButton';
 import { resolveImageUrl } from '../utils/imageUtils';
 import {
   validateFirstName,
@@ -35,6 +36,7 @@ export default function ProfileScreen({ navigation }: any) {
     setToken,
     setUser,
     logout,
+    isLoggingOut,
     customers = [],
     vehicles = [],
     alerts = [],
@@ -247,6 +249,14 @@ export default function ProfileScreen({ navigation }: any) {
       style={[styles.container, { backgroundColor: theme.colors.background }]}
       showsVerticalScrollIndicator={false}
     >
+      {/* Top Header bar with drawer menu for garage admin and staff */}
+      {user?.role !== 'admin' && (
+        <View style={{ flexDirection: 'row', alignItems: 'center', paddingHorizontal: 20, paddingTop: 16, paddingBottom: 6 }}>
+          <HeaderMenuButton style={{ marginRight: 10 }} />
+          <Text style={{ fontSize: 20, fontFamily: fonts.bold, color: theme.colors.text }}>Settings & Profile</Text>
+        </View>
+      )}
+
       {/* Profile Header */}
       <View
         style={[
@@ -756,7 +766,7 @@ export default function ProfileScreen({ navigation }: any) {
       {/* Logout Button */}
       <TouchableOpacity
         onPress={user ? handleLogout : () => navigation.navigate('Login')}
-        disabled={loggingOut}
+        disabled={loggingOut || isLoggingOut}
         style={[
           styles.actionButtonContainer,
           {
@@ -764,11 +774,11 @@ export default function ProfileScreen({ navigation }: any) {
             backgroundColor: user
               ? theme.colors.error + '0A'
               : theme.colors.primary + '0A',
-            opacity: loggingOut ? 0.7 : 1,
+            opacity: (loggingOut || isLoggingOut) ? 0.7 : 1,
           },
         ]}
       >
-        {loggingOut ? (
+        {(loggingOut || isLoggingOut) ? (
           <ActivityIndicator
             color={user ? theme.colors.error : theme.colors.primary}
             size="small"

@@ -16,6 +16,7 @@ import AdminServicesScreen from '../screens/AdminServicesScreen';
 import AdminCustomersScreen from '../screens/AdminCustomersScreen';
 import GarageSetupScreen from '../screens/GarageSetupScreen';
 import SuperAdminCategoriesScreen from '../screens/SuperAdminCategoriesScreen';
+import AdminInventoryScreen from '../screens/AdminInventoryScreen';
 import MainTabNavigator from './MainTabNavigator';
 import { useAppTheme } from '../context/ThemeContext';
 import { fonts } from '../theme/theme';
@@ -122,6 +123,11 @@ export default function RootNavigator() {
       <Stack.Screen
         name="SuperAdminCategories"
         component={SuperAdminCategoriesScreen}
+        options={{ headerShown: false }}
+      />
+      <Stack.Screen
+        name="Inventory"
+        component={AdminInventoryScreen}
         options={{ headerShown: false }}
       />
     </Stack.Navigator>

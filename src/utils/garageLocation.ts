@@ -100,19 +100,78 @@ async function fetchJson(url: string, headers: Record<string, string> = {}): Pro
 }
 
 async function reverseGeocode(latitude: number, longitude: number): Promise<Omit<DetectedGarageLocation, 'latitude' | 'longitude'>> {
-  // 1. Google - best UK street-level results
+  // 1. Google - best street-level & building-level results worldwide
   const google = await fetchJson(
-    `https://maps.googleapis.com/maps/api/geocode/json?latlng=${latitude},${longitude}&key=${GOOGLE_MAPS_API_KEY}&region=uk`
+    `https://maps.googleapis.com/maps/api/geocode/json?latlng=${latitude},${longitude}&key=${GOOGLE_MAPS_API_KEY}`
   );
   const result = google?.status === 'OK' ? google.results?.[0] : null;
   if (result) {
     const part = (type: string) =>
       (result.address_components || []).find((c: any) => (c.types || []).includes(type))?.long_name || '';
-    const street = [part('premise'), part('street_number'), part('route')].filter(Boolean).join(' ');
+
+    const subpremise = part('subpremise');
+    const premise = part('premise');
+    const streetNumber = part('street_number');
+    const route = part('route');
+    const neighborhood = part('neighborhood');
+    const sublocality2 = part('sublocality_level_2');
+    const sublocality1 = part('sublocality_level_1');
+    const sublocality = part('sublocality');
+    const postalTown = part('postal_town');
+    const locality = part('locality');
+    const adminArea2 = part('administrative_area_level_2');
+    const adminArea1 = part('administrative_area_level_1');
+    const postalCode = part('postal_code');
+
+    // Build the full street/area line matching customer app's rich detail:
+    // e.g. "B-56, Housing Board Colony, Sector B" or "Unit 4, 12 High Street, Camden"
+    const streetSegments: string[] = [];
+
+    // Building / Flat / House number / Premise
+    const buildingPiece = [subpremise, premise !== subpremise ? premise : '', streetNumber].filter(Boolean).join(', ');
+    if (buildingPiece) streetSegments.push(buildingPiece);
+
+    // Street / road
+    if (route && !streetSegments.some(s => s.toLowerCase().includes(route.toLowerCase()))) {
+      streetSegments.push(route);
+    }
+
+    // Neighborhood / Housing Board / Estate
+    if (neighborhood && !streetSegments.some(s => s.toLowerCase().includes(neighborhood.toLowerCase()))) {
+      streetSegments.push(neighborhood);
+    }
+
+    // Sector / Sublocality (Level 2, Level 1, Sublocality)
+    const sublocalities = [sublocality2, sublocality1, sublocality].filter(Boolean);
+    for (const sub of sublocalities) {
+      if (sub && !streetSegments.some(s => s.toLowerCase().includes(sub.toLowerCase()))) {
+        streetSegments.push(sub);
+      }
+    }
+
+    const city = postalTown || locality || adminArea2 || adminArea1 || sublocality || 'London';
+
+    // If formatted_address has even richer details (e.g. "B-56, Housing Board Colony, Sector B, City..."),
+    // extract everything prior to the city/state/postcode/country:
+    let fullStreet = streetSegments.join(', ');
+    if (result.formatted_address) {
+      const parts = result.formatted_address.split(',').map((s: string) => s.trim());
+      const cityLower = city.toLowerCase();
+      const cityIdx = parts.findIndex((p: string) => p.toLowerCase() === cityLower || p.toLowerCase().includes(cityLower));
+      if (cityIdx > 0) {
+        const fromFormatted = parts.slice(0, cityIdx).join(', ');
+        if (fromFormatted && fromFormatted.length >= fullStreet.length) {
+          fullStreet = fromFormatted;
+        }
+      } else if (!fullStreet) {
+        fullStreet = parts.slice(0, Math.max(1, parts.length - 2)).join(', ');
+      }
+    }
+
     return {
-      address: street || part('neighborhood') || part('sublocality') || '',
-      city: part('postal_town') || part('locality') || part('administrative_area_level_2') || '',
-      postcode: part('postal_code'),
+      address: fullStreet || result.formatted_address || '',
+      city,
+      postcode: postalCode || '',
     };
   }
 
@@ -128,8 +187,25 @@ async function reverseGeocode(latitude: number, longitude: number): Promise<Omit
     const pc = await fetchJson(`https://api.postcodes.io/postcodes?lon=${longitude}&lat=${latitude}&limit=1`);
     postcode = pc?.result?.[0]?.postcode || '';
   }
+
+  const osmParts: string[] = [];
+  const bldg = [addr.house_number || addr.building, addr.house_name].filter(Boolean).join(' ');
+  if (bldg) osmParts.push(bldg);
+  const rd = addr.road || addr.pedestrian || addr.street || addr.industrial || addr.commercial;
+  if (rd && !osmParts.some(s => s.toLowerCase().includes(rd.toLowerCase()))) osmParts.push(rd);
+  const nh = addr.neighbourhood || addr.residential || addr.housing_estate;
+  if (nh && !osmParts.some(s => s.toLowerCase().includes(nh.toLowerCase()))) osmParts.push(nh);
+  const sub = addr.suburb || addr.subdivision || addr.quarter;
+  if (sub && !osmParts.some(s => s.toLowerCase().includes(sub.toLowerCase()))) osmParts.push(sub);
+
+  let osmStreet = osmParts.join(', ');
+  if (!osmStreet && osm?.display_name) {
+    const dp = osm.display_name.split(',').map((s: string) => s.trim());
+    osmStreet = dp.slice(0, Math.min(3, dp.length)).join(', ');
+  }
+
   return {
-    address: [addr.house_number, addr.road || addr.pedestrian || addr.street].filter(Boolean).join(' ') || addr.suburb || '',
+    address: osmStreet || addr.suburb || '',
     city: addr.city || addr.town || addr.village || addr.county || '',
     postcode,
   };
@@ -254,14 +330,33 @@ export async function fetchGooglePlaceDetails(placeId: string): Promise<GoogleGa
           // Build unit and street line
           const unitPart = [subpremise, premise].filter(Boolean).join(', ');
           const streetLine = [streetNumber, route].filter(Boolean).join(' ');
-          const streetPart = [unitPart, streetLine].filter(Boolean).join(', ');
+          const parts: string[] = [];
+          if (unitPart) parts.push(unitPart);
+          if (streetLine) parts.push(streetLine);
+          if (neighborhood && !parts.some(p => p.toLowerCase().includes(neighborhood.toLowerCase()))) {
+            parts.push(neighborhood);
+          }
+          if (sublocality && !parts.some(p => p.toLowerCase().includes(sublocality.toLowerCase()))) {
+            parts.push(sublocality);
+          }
 
-          let finalAddress = streetPart;
+          let finalAddress = parts.join(', ');
           if (!finalAddress) {
             finalAddress = neighborhood || sublocality || item.name || (item.formatted_address ? item.formatted_address.split(',')[0] : '');
           }
 
           const finalCity = postalTown || locality || adminArea2 || sublocality || 'London';
+
+          if (item.formatted_address) {
+            const fParts = item.formatted_address.split(',').map((s: string) => s.trim());
+            const cityIdx = fParts.findIndex((p: string) => p.toLowerCase() === finalCity.toLowerCase() || p.toLowerCase().includes(finalCity.toLowerCase()));
+            if (cityIdx > 0) {
+              const fromFormatted = fParts.slice(0, cityIdx).join(', ');
+              if (fromFormatted && fromFormatted.length >= finalAddress.length) {
+                finalAddress = fromFormatted;
+              }
+            }
+          }
 
           return {
             address: finalAddress,

@@ -28,7 +28,7 @@ if (Platform.OS === 'android' && UIManager.setLayoutAnimationEnabledExperimental
 
 export default function CustomerPortalScreen({ route, navigation }: any) {
   const { isDarkMode, theme, toggleTheme } = useAppTheme();
-  const { customers, vehicles, alerts, addAlert, addVehicle, addAudit, updateVehicleStatus, refreshData, setToken, setUser, token, authFetch } = useAppValues();
+  const { customers, vehicles, alerts, addAlert, addVehicle, addAudit, updateVehicleStatus, refreshData, setToken, setUser, token, authFetch, logout, isLoggingOut } = useAppValues();
 
   // Find active customer
   const customerId = route?.params?.customerId || 'c1';
@@ -851,19 +851,32 @@ export default function CustomerPortalScreen({ route, navigation }: any) {
                     {
                       text: 'Sign Out',
                       style: 'destructive',
-                      onPress: () => {
-                        setToken(null);
-                        setUser(null);
-                        navigation.replace('Login');
+                      onPress: async () => {
+                        await logout();
                       },
                     },
                   ]
                 );
               }}
-              style={[styles.profileLogoutBtn, { backgroundColor: theme.colors.error, borderWidth: 1, borderColor: theme.colors.error }]}
+              disabled={isLoggingOut}
+              style={[
+                styles.profileLogoutBtn,
+                {
+                  backgroundColor: theme.colors.error,
+                  borderWidth: 1,
+                  borderColor: theme.colors.error,
+                  opacity: isLoggingOut ? 0.7 : 1,
+                },
+              ]}
             >
-              <MaterialCommunityIcons name="logout" size={18} color={"#fff"} style={{ marginRight: 6 }} />
-              <Text style={{ color: "#fff", fontFamily: fonts.bold, fontSize: 14 }}>Sign Out</Text>
+              {isLoggingOut ? (
+                <ActivityIndicator size="small" color="#fff" />
+              ) : (
+                <>
+                  <MaterialCommunityIcons name="logout" size={18} color={"#fff"} style={{ marginRight: 6 }} />
+                  <Text style={{ color: "#fff", fontFamily: fonts.bold, fontSize: 14 }}>Sign Out</Text>
+                </>
+              )}
             </TouchableOpacity>
           </ScrollView>
         )}

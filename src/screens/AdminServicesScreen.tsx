@@ -19,6 +19,7 @@ import { SafeAreaView } from 'react-native-safe-area-context';
 import { useAppTheme } from '../context/ThemeContext';
 import { useAppValues, ServiceCatalogGroup } from '../context/DataContext';
 import { fonts } from '../theme/theme';
+import HeaderMenuButton from '../components/HeaderMenuButton';
 
 const { width, height } = Dimensions.get('window');
 
@@ -480,6 +481,7 @@ export default function AdminServicesScreen({ navigation }: any) {
       <View style={{ flex: 1 }}>
         {/* Top Navbar: Back + Title + Action Buttons */}
         <View style={[styles.navbar, { backgroundColor: theme.colors.card, borderColor: theme.colors.border }]}>
+          <HeaderMenuButton style={{ marginRight: 8 }} />
           {navigation.canGoBack && navigation.canGoBack() ? (
             <TouchableOpacity onPress={() => navigation.goBack()} style={styles.backBtn} activeOpacity={0.7}>
               <MaterialCommunityIcons name="arrow-left" size={22} color={theme.colors.text} />

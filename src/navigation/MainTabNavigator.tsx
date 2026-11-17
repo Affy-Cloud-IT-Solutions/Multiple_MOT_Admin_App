@@ -10,6 +10,7 @@ import AdminCustomersScreen from '../screens/AdminCustomersScreen';
 import AdminServicesScreen from '../screens/AdminServicesScreen';
 import AdminSlotsScreen from '../screens/AdminSlotsScreen';
 import AdminAlertsScreen from '../screens/AdminAlertsScreen';
+import AdminInventoryScreen from '../screens/AdminInventoryScreen';
 import BookedMotsScreen from '../screens/BookedMotsScreen';
 import ProfileScreen from '../screens/ProfileScreen';
 import { useAppTheme } from '../context/ThemeContext';
@@ -53,6 +54,8 @@ export default function MainTabNavigator() {
             iconName = 'clipboard-text-clock-outline';
           } else if (route.name === 'Customers') {
             iconName = 'account-group-outline';
+          } else if (route.name === 'Inventory') {
+            iconName = 'package-variant-closed';
           } else if (route.name === 'Slots') {
             iconName = 'calendar-clock-outline';
           } else if (route.name === 'Reminders') {
@@ -65,7 +68,7 @@ export default function MainTabNavigator() {
         },
         tabBarActiveTintColor: theme.colors.secondary,
         tabBarInactiveTintColor: theme.colors.placeholder,
-        tabBarStyle: {
+        tabBarStyle: isSuperAdmin ? {
           backgroundColor: theme.colors.card,
           borderTopColor: theme.colors.border,
           elevation: 8,
@@ -73,6 +76,9 @@ export default function MainTabNavigator() {
           height: 60,
           paddingBottom: 8,
           paddingTop: 8,
+        } : {
+          display: 'none',
+          height: 0,
         },
         tabBarLabelStyle: {
           fontFamily: fonts.semiBold,
@@ -155,6 +161,11 @@ export default function MainTabNavigator() {
             options={{ title: 'Customers', headerShown: false }} 
           />
           <Tab.Screen 
+            name="Inventory" 
+            component={AdminInventoryScreen} 
+            options={{ title: 'Inventory', headerShown: false }} 
+          />
+          <Tab.Screen 
             name="Profile" 
             component={ProfileScreen} 
             options={{ title: 'Profile', headerShown: false }} 
@@ -169,6 +180,11 @@ export default function MainTabNavigator() {
             options={{ title: 'Dashboard', headerShown: false }} 
           />
           <Tab.Screen 
+            name="Bookings" 
+            component={BookedMotsScreen} 
+            options={{ title: 'Bookings', headerShown: false }} 
+          />
+          <Tab.Screen 
             name="Services" 
             component={AdminServicesScreen} 
             options={{ title: 'Services', headerShown: false }} 
@@ -177,6 +193,11 @@ export default function MainTabNavigator() {
             name="Customers" 
             component={AdminCustomersScreen} 
             options={{ title: 'Customers', headerShown: false }} 
+          />
+          <Tab.Screen 
+            name="Inventory" 
+            component={AdminInventoryScreen} 
+            options={{ title: 'Inventory', headerShown: false }} 
           />
           <Tab.Screen 
             name="Slots" 

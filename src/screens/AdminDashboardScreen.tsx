@@ -6,6 +6,7 @@ import { useAppTheme } from '../context/ThemeContext';
 import { useAppValues } from '../context/DataContext';
 import { fonts } from '../theme/theme';
 import { formatBookingDate } from '../utils/dateUtils';
+import HeaderMenuButton from '../components/HeaderMenuButton';
 
 const { width } = Dimensions.get('window');
 
@@ -13,7 +14,19 @@ const { width } = Dimensions.get('window');
 
 export default function AdminDashboardScreen({ navigation }: any) {
   const { theme } = useAppTheme();
-  const { user, currentGarage, customers, vehicles, alerts, audits, refreshData, isProfileMandatory: contextIsProfileMandatory } = useAppValues();
+  const {
+    user,
+    currentGarage,
+    customers,
+    vehicles,
+    alerts,
+    audits,
+    refreshData,
+    isProfileMandatory: contextIsProfileMandatory,
+    inventoryStats,
+    inventoryItems,
+    fetchInventoryStats,
+  } = useAppValues();
   const [isRefreshing, setIsRefreshing] = useState(false);
   const [checklistCollapsed, setChecklistCollapsed] = useState(false);
   const [checklistHidden, setChecklistHidden] = useState(false);
@@ -155,17 +168,35 @@ export default function AdminDashboardScreen({ navigation }: any) {
   React.useEffect(() => {
     const unsubscribe = navigation.addListener('focus', () => {
       refreshData();
+      fetchInventoryStats?.();
     });
     return unsubscribe;
-  }, [navigation]);
+  }, [navigation, refreshData, fetchInventoryStats]);
 
   const activeVehicles = vehicles.filter((v) => v.status === 'Active');
   const totalCustomersCount = customers.length;
   const activeVehiclesCount = activeVehicles.length;
-  const soldVehiclesCount = vehicles.filter((v) => v.status === 'Sold').length;
   const bookedMots = alerts.filter(a => a.type === 'BOOKED');
   // Only show customer-facing alerts to garage admin; ignore internal garage registration approval alerts
   const pendingAlerts = alerts.filter(a => a.status === 'Pending' && a.type !== 'GARAGE_REGISTRATION');
+
+  const stockValueNum = React.useMemo(() => {
+    if (inventoryStats && typeof inventoryStats.stockValue === 'number') {
+      return inventoryStats.stockValue;
+    }
+    return (inventoryItems || []).reduce((sum, item) => {
+      const qty = Number(item.quantity) || 0;
+      const price = Number(item.sellingPrice) || 0;
+      return sum + (qty * price);
+    }, 0);
+  }, [inventoryStats, inventoryItems]);
+
+  const stockValueFormatted = React.useMemo(() => {
+    return stockValueNum.toLocaleString('en-GB', {
+      minimumFractionDigits: 2,
+      maximumFractionDigits: 2,
+    });
+  }, [stockValueNum]);
 
   // StatCard component
   const StatCard = ({ icon, value, label, color, subtitle, onPress }: any) => (
@@ -206,6 +237,7 @@ export default function AdminDashboardScreen({ navigation }: any) {
     >
       {/* Header */}
       <View style={styles.header}>
+        <HeaderMenuButton style={{ marginRight: 10 }} />
         <View style={{ flex: 1, marginRight: 12 }}>
           <Text style={[styles.title, { color: theme.colors.text }]} numberOfLines={1}>
             {currentGarage?.name || 'Dashboard'}
@@ -408,7 +440,7 @@ export default function AdminDashboardScreen({ navigation }: any) {
               ]}>
                 {isProfileMandatory 
                   ? "MANDATORY PROFILE SETUP" 
-                  : (currentGarage?.status === 'Pending' ? "APPLICATION UNDER REVIEW" : "COMPLETE YOUR PROFILE TO GET VERIFIED")}
+                  : (currentGarage?.status === 'Pending' ? "Application under review" : "Complete your profile to get verified")}
               </Text>
             </View>
             <View style={styles.headerRightActions}>
@@ -543,31 +575,13 @@ export default function AdminDashboardScreen({ navigation }: any) {
             onPress={() => navigation.navigate('BookedMots')}
           />
           <StatCard 
-            icon="bell-ring-outline" 
-            value={pendingAlerts.length} 
-            label="Action Alerts" 
-            color="#F59E0B"
-            subtitle={pendingAlerts.length > 0 ? "Needs Review" : "All Caught Up"}
-            onPress={() => navigation.navigate('AdminAlerts')}
+            icon="package-variant-closed" 
+            value={`£${stockValueFormatted}`} 
+            label="Stock Value" 
+            color="#10B981"
+            subtitle="View Inventory"
+            onPress={() => navigation.navigate('Inventory')}
           />
-        </View>
-
-        <View style={styles.statsRow}>
-          <StatCard 
-            icon="car-off" 
-            value={soldVehiclesCount} 
-            label="Sold Vehicles" 
-            color="#6B7280"
-          />
-          {isGarageAdmin && (
-            <StatCard 
-              icon="clipboard-list-outline" 
-              value={audits.length} 
-              label="Total Audits" 
-              color="#EC4899"
-              onPress={() => navigation.navigate('SuperAdminAudits')}
-            />
-          )}
         </View>
       </View>
 
