@@ -47,7 +47,8 @@ export default function JobSheetInvoiceModal({ visible, booking, onClose, onSucc
   const [items, setItems] = useState<InvoiceLineItem[]>([]);
   const [notes, setNotes] = useState<string>('');
   const [vatRate, setVatRate] = useState<number>(20);
-  const [discountAmount, setDiscountAmount] = useState<number>(0);
+  const [discountType, setDiscountType] = useState<'FLAT' | 'PERCENT'>('FLAT');
+  const [discountInputValue, setDiscountInputValue] = useState<string>('0');
   const [paymentStatus, setPaymentStatus] = useState<'Pending' | 'Paid'>('Pending');
   const [paymentMethod, setPaymentMethod] = useState<'Cash'>('Cash');
   const [invoiceStatus, setInvoiceStatus] = useState<'Draft' | 'Issued' | 'Paid' | 'Cancelled'>('Issued');
@@ -88,7 +89,16 @@ export default function JobSheetInvoiceModal({ visible, booking, onClose, onSucc
         setItems(Array.isArray(inv.items) ? inv.items : []);
         setNotes(inv.notes || booking?.serviceNotes || '');
         setVatRate(inv.vatRate ?? 20);
-        setDiscountAmount(inv.discountAmount || 0);
+        if (inv.discountType === 'PERCENT') {
+          setDiscountType('PERCENT');
+          setDiscountInputValue(String(inv.discountValue ?? 0));
+        } else if (Number(inv.discountAmount) > 0) {
+          setDiscountType('FLAT');
+          setDiscountInputValue(String(inv.discountValue ?? inv.discountAmount));
+        } else {
+          setDiscountType('FLAT');
+          setDiscountInputValue('0');
+        }
         setPaymentStatus(inv.paymentStatus === 'Paid' ? 'Paid' : 'Pending');
         setPaymentMethod('Cash');
         setInvoiceStatus(inv.status || 'Issued');
@@ -100,7 +110,8 @@ export default function JobSheetInvoiceModal({ visible, booking, onClose, onSucc
         setItems(prov.items || []);
         setNotes(booking?.serviceNotes || '');
         setVatRate(prov.vatRate ?? 20);
-        setDiscountAmount(0);
+        setDiscountType('FLAT');
+        setDiscountInputValue('0');
         setPaymentStatus('Pending');
         setPaymentMethod('Cash');
         setInvoiceStatus('Draft');
@@ -108,6 +119,8 @@ export default function JobSheetInvoiceModal({ visible, booking, onClose, onSucc
     } catch (err: any) {
       console.error('[JobSheetInvoiceModal] loadInvoice error:', err);
       Alert.alert('Notice', 'Could not fetch existing invoice. Initializing new job sheet.');
+      setDiscountType('FLAT');
+      setDiscountInputValue('0');
       // Fallback: initialize from booking services
       const fallbackItems: InvoiceLineItem[] = [];
       if (Array.isArray(booking?.services) && booking.services.length > 0) {
@@ -152,6 +165,36 @@ export default function JobSheetInvoiceModal({ visible, booking, onClose, onSucc
   const subtotal = useMemo(() => {
     return items.reduce((acc, it) => acc + (Number(it.totalPrice) || 0), 0);
   }, [items]);
+
+  // Validation for discount: Percentage cannot exceed 100%, Flat cannot exceed subtotal
+  const discountValidation = useMemo(() => {
+    const rawVal = discountInputValue.trim();
+    if (!rawVal || rawVal === '0') return null;
+    const num = parseFloat(rawVal);
+    if (isNaN(num)) return 'Please enter a valid numeric discount';
+    if (num < 0) return 'Discount cannot be negative';
+    if (discountType === 'PERCENT' && num > 100) {
+      return 'Percentage discount cannot exceed 100%';
+    }
+    if (discountType === 'FLAT' && num > subtotal) {
+      return `Flat discount cannot exceed total amount (£${subtotal.toFixed(2)})`;
+    }
+    return null;
+  }, [discountInputValue, discountType, subtotal]);
+
+  // Derived discount amount in GBP
+  const discountAmount = useMemo(() => {
+    const rawVal = discountInputValue.trim();
+    if (!rawVal || rawVal === '0') return 0;
+    const num = parseFloat(rawVal);
+    if (isNaN(num) || num <= 0 || discountValidation !== null) return 0;
+    if (discountType === 'PERCENT') {
+      const calculated = (subtotal * num) / 100;
+      return Math.min(subtotal, Math.round(calculated * 100) / 100);
+    }
+    // FLAT
+    return Math.min(subtotal, Math.round(num * 100) / 100);
+  }, [discountInputValue, discountType, subtotal, discountValidation]);
 
   const vatAmount = useMemo(() => {
     const taxable = Math.max(0, subtotal - discountAmount);
@@ -281,12 +324,19 @@ export default function JobSheetInvoiceModal({ visible, booking, onClose, onSucc
       return;
     }
 
+    if (discountValidation) {
+      Alert.alert('Invalid Discount', discountValidation);
+      return;
+    }
+
     setSaving(true);
     try {
       const payload = {
         items,
         notes,
         vatRate,
+        discountType,
+        discountValue: parseFloat(discountInputValue) || 0,
         discountAmount,
         paymentStatus,
         paymentMethod: 'Cash',
@@ -382,7 +432,9 @@ export default function JobSheetInvoiceModal({ visible, booking, onClose, onSucc
         ...items.map(it => `${it.description} x${it.quantity} - £${Number(it.totalPrice || 0).toFixed(2)}`),
         `--------------------------------`,
         `Subtotal (Excl. VAT): £${subtotal.toFixed(2)}`,
-        ...(discountAmount > 0 ? [`Discount: -£${discountAmount.toFixed(2)}`] : []),
+        ...(discountAmount > 0
+          ? [`Discount (${discountType === 'PERCENT' ? `${discountInputValue}% OFF` : 'FLAT OFF'}): -£${discountAmount.toFixed(2)}`]
+          : []),
         `UK VAT (${vatRate}%): £${vatAmount.toFixed(2)}`,
         `GRAND TOTAL: £${grandTotal.toFixed(2)}`,
         `--------------------------------`,
@@ -655,7 +707,9 @@ export default function JobSheetInvoiceModal({ visible, booking, onClose, onSucc
                   </View>
                   {discountAmount > 0 ? (
                     <View style={styles.receiptTotalsRow}>
-                      <Text style={[styles.receiptTotalsKey, { color: '#DC2626' }]}>Discount:</Text>
+                      <Text style={[styles.receiptTotalsKey, { color: '#DC2626' }]}>
+                        Discount {discountType === 'PERCENT' ? `(${discountInputValue}% OFF)` : '(FLAT)'}:
+                      </Text>
                       <Text style={[styles.receiptTotalsVal, { color: '#DC2626' }]}>-£{discountAmount.toFixed(2)}</Text>
                     </View>
                   ) : null}
@@ -925,6 +979,130 @@ export default function JobSheetInvoiceModal({ visible, booking, onClose, onSucc
                 })
               )}
 
+              {/* Discount Section */}
+              <View style={[styles.settingsCard, { backgroundColor: theme.colors.background, borderColor: theme.colors.border }]}>
+                <View style={{ flexDirection: 'row', alignItems: 'center', justifyContent: 'space-between', marginBottom: 8 }}>
+                  <View style={{ flexDirection: 'row', alignItems: 'center' }}>
+                    <MaterialCommunityIcons name="tag-outline" size={17} color={theme.colors.primary} style={{ marginRight: 6 }} />
+                    <Text style={[styles.summaryCardTitle, { color: theme.colors.text, marginBottom: 0 }]}>
+                      Discount
+                    </Text>
+                  </View>
+                  {discountAmount > 0 && !discountValidation ? (
+                    <View style={{ backgroundColor: '#10B98118', paddingHorizontal: 8, paddingVertical: 3, borderRadius: 12 }}>
+                      <Text style={{ fontSize: 11, fontFamily: fonts.bold, color: '#10B981' }}>
+                        -£{discountAmount.toFixed(2)} Applied
+                      </Text>
+                    </View>
+                  ) : null}
+                </View>
+
+                {/* Unified Input with Switcher Embedded Inside */}
+                <View
+                  style={[
+                    styles.discountInputBox,
+                    {
+                      backgroundColor: theme.colors.card,
+                      borderColor: discountValidation ? '#EF4444' : theme.colors.border,
+                    }
+                  ]}
+                >
+                  <Text style={[styles.discountCurrencyPrefix, { color: discountValidation ? '#EF4444' : theme.colors.placeholder }]}>
+                    {discountType === 'FLAT' ? '£' : '%'}
+                  </Text>
+                  <TextInput
+                    style={[styles.discountInputField, { color: theme.colors.text }]}
+                    keyboardType="decimal-pad"
+                    placeholder={discountType === 'FLAT' ? '0.00' : '0'}
+                    placeholderTextColor={theme.colors.placeholder}
+                    value={discountInputValue}
+                    onChangeText={(val) => {
+                      const sanitized = val.replace(/[^0-9.]/g, '');
+                      const parts = sanitized.split('.');
+                      if (parts.length > 2) return;
+                      setDiscountInputValue(sanitized);
+                    }}
+                  />
+                  {discountInputValue !== '' && discountInputValue !== '0' && (
+                    <TouchableOpacity
+                      onPress={() => setDiscountInputValue('0')}
+                      style={styles.discountClearBtn}
+                      hitSlop={{ top: 8, bottom: 8, left: 8, right: 8 }}
+                    >
+                      <MaterialCommunityIcons name="close-circle" size={17} color={theme.colors.placeholder} />
+                    </TouchableOpacity>
+                  )}
+
+                  {/* Switcher inside the input */}
+                  <View style={[styles.embeddedSwitcher, { backgroundColor: theme.colors.background, borderColor: theme.colors.border }]}>
+                    <TouchableOpacity
+                      onPress={() => setDiscountType('FLAT')}
+                      style={[
+                        styles.embeddedSwitchBtn,
+                        discountType === 'FLAT' && [styles.embeddedSwitchBtnActive, { backgroundColor: theme.colors.primary }]
+                      ]}
+                      activeOpacity={0.7}
+                    >
+                      <MaterialCommunityIcons
+                        name="currency-gbp"
+                        size={12}
+                        color={discountType === 'FLAT' ? '#FFFFFF' : theme.colors.placeholder}
+                        style={{ marginRight: 2 }}
+                      />
+                      <Text
+                        style={[
+                          styles.embeddedSwitchText,
+                          { color: discountType === 'FLAT' ? '#FFFFFF' : theme.colors.placeholder }
+                        ]}
+                      >
+                        FLAT
+                      </Text>
+                    </TouchableOpacity>
+
+                    <TouchableOpacity
+                      onPress={() => setDiscountType('PERCENT')}
+                      style={[
+                        styles.embeddedSwitchBtn,
+                        discountType === 'PERCENT' && [styles.embeddedSwitchBtnActive, { backgroundColor: theme.colors.primary }]
+                      ]}
+                      activeOpacity={0.7}
+                    >
+                      <MaterialCommunityIcons
+                        name="percent"
+                        size={11}
+                        color={discountType === 'PERCENT' ? '#FFFFFF' : theme.colors.placeholder}
+                        style={{ marginRight: 2 }}
+                      />
+                      <Text
+                        style={[
+                          styles.embeddedSwitchText,
+                          { color: discountType === 'PERCENT' ? '#FFFFFF' : theme.colors.placeholder }
+                        ]}
+                      >
+                        % OFF
+                      </Text>
+                    </TouchableOpacity>
+                  </View>
+                </View>
+
+                {/* Validation and Feedback row */}
+                {discountValidation ? (
+                  <View style={styles.validationErrorRow}>
+                    <MaterialCommunityIcons name="alert-circle" size={14} color="#EF4444" style={{ marginRight: 4 }} />
+                    <Text style={styles.validationErrorText}>{discountValidation}</Text>
+                  </View>
+                ) : discountAmount > 0 ? (
+                  <View style={styles.appliedSuccessRow}>
+                    <MaterialCommunityIcons name="check-circle" size={14} color="#10B981" style={{ marginRight: 4 }} />
+                    <Text style={styles.appliedSuccessText}>
+                      {discountType === 'PERCENT'
+                        ? `${discountInputValue}% applied — Savings: £${discountAmount.toFixed(2)}`
+                        : `£${discountAmount.toFixed(2)} flat discount applied`}
+                    </Text>
+                  </View>
+                ) : null}
+              </View>
+
               {/* Financial Summary Card */}
               <View style={[styles.summaryCard, { backgroundColor: theme.colors.background, borderColor: theme.colors.border }]}>
                 <Text style={[styles.summaryCardTitle, { color: theme.colors.text }]}>Financial Breakdown</Text>
@@ -933,6 +1111,17 @@ export default function JobSheetInvoiceModal({ visible, booking, onClose, onSucc
                   <Text style={[styles.summaryLabel, { color: theme.colors.placeholder }]}>Subtotal (Excl. VAT):</Text>
                   <Text style={[styles.summaryVal, { color: theme.colors.text }]}>£{subtotal.toFixed(2)}</Text>
                 </View>
+
+                {discountAmount > 0 ? (
+                  <View style={styles.summaryRow}>
+                    <Text style={[styles.summaryLabel, { color: '#DC2626' }]}>
+                      Discount {discountType === 'PERCENT' ? `(${discountInputValue}% OFF)` : '(FLAT OFF)'}:
+                    </Text>
+                    <Text style={[styles.summaryVal, { color: '#DC2626', fontFamily: fonts.bold }]}>
+                      -£{discountAmount.toFixed(2)}
+                    </Text>
+                  </View>
+                ) : null}
 
                 <View style={styles.summaryRow}>
                   <View style={{ flexDirection: 'row', alignItems: 'center' }}>
@@ -1448,7 +1637,9 @@ export default function JobSheetInvoiceModal({ visible, booking, onClose, onSucc
                   </View>
                   {discountAmount > 0 ? (
                     <View style={styles.receiptTotalsRow}>
-                      <Text style={[styles.receiptTotalsKey, { color: '#DC2626' }]}>Discount:</Text>
+                      <Text style={[styles.receiptTotalsKey, { color: '#DC2626' }]}>
+                        Discount {discountType === 'PERCENT' ? `(${discountInputValue}% OFF)` : '(FLAT)'}:
+                      </Text>
                       <Text style={[styles.receiptTotalsVal, { color: '#DC2626' }]}>-£{discountAmount.toFixed(2)}</Text>
                     </View>
                   ) : null}
@@ -1860,6 +2051,74 @@ const styles = StyleSheet.create({
     borderWidth: 1,
     padding: 12,
     marginBottom: 16,
+  },
+  discountInputBox: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    borderWidth: 1.5,
+    borderRadius: 9,
+    height: 44,
+    paddingLeft: 10,
+    paddingRight: 4,
+    paddingVertical: 2,
+  },
+  discountCurrencyPrefix: {
+    fontSize: 16,
+    fontFamily: fonts.bold,
+    marginRight: 4,
+  },
+  discountInputField: {
+    flex: 1,
+    height: '100%',
+    fontSize: 15,
+    fontFamily: fonts.semiBold,
+    paddingVertical: 0,
+  },
+  discountClearBtn: {
+    padding: 4,
+    marginRight: 4,
+  },
+  embeddedSwitcher: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    borderRadius: 7,
+    borderWidth: 1,
+    padding: 2,
+    gap: 2,
+  },
+  embeddedSwitchBtn: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    paddingHorizontal: 8,
+    paddingVertical: 5,
+    borderRadius: 5,
+  },
+  embeddedSwitchBtnActive: {
+    // Active styling applied inline with theme
+  },
+  embeddedSwitchText: {
+    fontSize: 11,
+    fontFamily: fonts.bold,
+  },
+  validationErrorRow: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    marginTop: 6,
+  },
+  validationErrorText: {
+    color: '#EF4444',
+    fontSize: 11,
+    fontFamily: fonts.semiBold,
+  },
+  appliedSuccessRow: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    marginTop: 6,
+  },
+  appliedSuccessText: {
+    color: '#10B981',
+    fontSize: 11,
+    fontFamily: fonts.semiBold,
   },
   inputSubLabel: {
     fontSize: 11,

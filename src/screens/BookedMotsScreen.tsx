@@ -495,26 +495,14 @@ export default function BookedMotsScreen({ navigation }: any) {
       [
         { text: 'Cancel', style: 'cancel' },
         {
-          text: 'Start & Open Job Sheet',
+          text: 'Start',
           onPress: async () => {
             setLoadingAction(`start_${alertId}`);
             try {
               await startServiceBooking(alertId);
-              if (item) openJobSheet(item);
-            } catch (error: any) {
-              Alert.alert('Error', error?.message || 'Could not start service.');
-            } finally {
-              setLoadingAction(null);
-            }
-          }
-        },
-        {
-          text: 'Start Only',
-          onPress: async () => {
-            setLoadingAction(`start_${alertId}`);
-            try {
-              await startServiceBooking(alertId);
-              Alert.alert('Service Started', `Vehicle ${regText} is now In Progress in the workshop.`);
+              if (item) {
+                openJobSheet({ ...item, status: 'In Progress' });
+              }
             } catch (error: any) {
               Alert.alert('Error', error?.message || 'Could not start service.');
             } finally {

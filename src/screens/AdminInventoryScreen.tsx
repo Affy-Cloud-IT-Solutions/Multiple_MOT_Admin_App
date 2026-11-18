@@ -78,7 +78,6 @@ export default function AdminInventoryScreen({ navigation }: any) {
     addInventoryItem,
     updateInventoryItem,
     adjustInventoryStock,
-    deleteInventoryItem,
   } = useAppValues();
 
   // Search & Filter State
@@ -473,27 +472,52 @@ export default function AdminInventoryScreen({ navigation }: any) {
     }
   };
 
-  // Delete Item
-  const handleDeleteItem = (item: InventoryItem) => {
-    Alert.alert(
-      'Remove Inventory Item',
-      `Are you sure you want to remove "${item.name}"? It will be archived from active stock.`,
-      [
-        { text: 'Cancel', style: 'cancel' },
-        {
-          text: 'Remove',
-          style: 'destructive',
-          onPress: async () => {
-            try {
-              await deleteInventoryItem(item._id || (item as any).id);
-              loadData();
-            } catch (err: any) {
-              Alert.alert('Error', err.message || 'Could not delete item.');
-            }
+  // Toggle Item Active / Inactive Status (No Delete option - preserves audit history)
+  const handleToggleStatus = (item: InventoryItem) => {
+    const itemId = item._id || (item as any).id;
+    if (!itemId) return;
+    const isCurrentlyInactive = item.status === 'Inactive';
+
+    if (isCurrentlyInactive) {
+      Alert.alert(
+        'Activate Part',
+        `Re-activate "${item.name}"? It will become active and available in the workshop job sheet catalog.`,
+        [
+          { text: 'Cancel', style: 'cancel' },
+          {
+            text: 'Activate',
+            onPress: async () => {
+              try {
+                await updateInventoryItem(itemId, { status: 'Active' });
+                loadData();
+              } catch (err: any) {
+                Alert.alert('Error', err.message || 'Could not activate item.');
+              }
+            },
           },
-        },
-      ]
-    );
+        ]
+      );
+    } else {
+      Alert.alert(
+        'Mark as Inactive',
+        `Mark "${item.name}" as Inactive?\n\nThis removes it from active workshop selection while permanently preserving its audit history, past invoices, and stock tracking records.`,
+        [
+          { text: 'Cancel', style: 'cancel' },
+          {
+            text: 'Mark Inactive',
+            style: 'default',
+            onPress: async () => {
+              try {
+                await updateInventoryItem(itemId, { status: 'Inactive' });
+                loadData();
+              } catch (err: any) {
+                Alert.alert('Error', err.message || 'Could not update item status.');
+              }
+            },
+          },
+        ]
+      );
+    }
   };
 
   return (
@@ -1021,11 +1045,22 @@ export default function AdminInventoryScreen({ navigation }: any) {
                         <MaterialCommunityIcons name="pencil-outline" size={14} color={theme.colors.text} />
                       </TouchableOpacity>
 
+                      {/* Quick Toggle Inactive / Active status */}
                       <TouchableOpacity
-                        style={[styles.quickQtyBtn, { borderColor: theme.colors.border }]}
-                        onPress={() => handleDeleteItem(item)}
+                        style={[
+                          styles.quickQtyBtn,
+                          {
+                            borderColor: isInactive ? '#10B98150' : theme.colors.border,
+                            backgroundColor: isInactive ? '#10B98115' : 'transparent',
+                          }
+                        ]}
+                        onPress={() => handleToggleStatus(item)}
                       >
-                        <MaterialCommunityIcons name="trash-can-outline" size={14} color="#EF4444" />
+                        <MaterialCommunityIcons
+                          name={isInactive ? 'play-circle-outline' : 'pause-circle-outline'}
+                          size={14}
+                          color={isInactive ? '#10B981' : theme.colors.placeholder}
+                        />
                       </TouchableOpacity>
                     </View>
                   </View>

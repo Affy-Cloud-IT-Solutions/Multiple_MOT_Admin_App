@@ -252,6 +252,8 @@ export interface Invoice {
   subtotal: number;
   vatRate: number;
   vatAmount: number;
+  discountType?: 'FLAT' | 'PERCENT';
+  discountValue?: number;
   discountAmount?: number;
   grandTotal: number;
   status: 'Draft' | 'Issued' | 'Paid' | 'Cancelled';
@@ -378,9 +380,9 @@ const DataContext = createContext<DataContextType | undefined>(undefined);
 // Local backend configuration:
 // Wi-Fi IP (for physical mobile device & emulator on same network)
 export const LOCAL_IP = '192.168.1.15';
-export const BASE_URL = `http://${LOCAL_IP}:5000/api`;
+// export const BASE_URL = `http://${LOCAL_IP}:5000/api`;
 // export const BASE_URL = 'http://10.0.2.2:5000/api'; // Android Emulator alias
-// export const BASE_URL = 'https://api.ondoorcarservice.com/api'; // Production server
+export const BASE_URL = 'https://api.ondoorcarservice.com/api'; // Production server
 // export const BASE_URL = 'http://localhost:5000/api';
 
 const parseJsonResponse = async (response: Response): Promise<any> => {
