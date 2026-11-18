@@ -1065,17 +1065,17 @@ export default function AdminInventoryScreen({ navigation }: any) {
                     </View>
                   </View>
 
-                  {/* Financial Row: Selling Price, Purchase Price, Stock Value (No Profit!) */}
+                  {/* Financial Row: Selling Price (MRP), Purchase Price (MSP), Stock Value (No Profit!) */}
                   <View style={[styles.financialRow, { backgroundColor: theme.colors.background + '60' }]}>
                     <View style={styles.financialCol}>
-                      <Text style={[styles.finLabel, { color: theme.colors.placeholder }]}>Selling Price</Text>
+                      <Text style={[styles.finLabel, { color: theme.colors.placeholder }]}>Selling Price (MRP)</Text>
                       <Text style={[styles.finVal, { color: theme.colors.primary }]}>
                         £{(item.sellingPrice || 0).toFixed(2)}
                       </Text>
                     </View>
 
                     <View style={styles.financialCol}>
-                      <Text style={[styles.finLabel, { color: theme.colors.placeholder }]}>Purchase Price</Text>
+                      <Text style={[styles.finLabel, { color: theme.colors.placeholder }]}>Purchase Price (MSP)</Text>
                       <Text style={[styles.finVal, { color: theme.colors.placeholder }]}>
                         {item.costPrice !== undefined && item.costPrice > 0
                           ? `£${Number(item.costPrice).toFixed(2)}`
@@ -1417,10 +1417,10 @@ export default function AdminInventoryScreen({ navigation }: any) {
                 onChangeText={setFormQuantity}
               />
 
-              {/* Field 10 & 11: Purchase Price (Optional) & Selling Price * */}
+              {/* Field 10 & 11: Purchase Price (MSP) & Selling Price (MRP) * */}
               <View style={styles.formRow}>
                 <View style={{ flex: 1, marginRight: 8 }}>
-                  <Text style={[styles.inputLabel, { color: theme.colors.text }]}>Purchase Price (£) (Optional)</Text>
+                  <Text style={[styles.inputLabel, { color: theme.colors.text }]}>Purchase Price (MSP) (£) (Optional)</Text>
                   <TextInput
                     style={[styles.input, { backgroundColor: theme.colors.background, borderColor: theme.colors.border, color: theme.colors.text }]}
                     keyboardType="decimal-pad"
@@ -1431,7 +1431,7 @@ export default function AdminInventoryScreen({ navigation }: any) {
                   />
                 </View>
                 <View style={{ flex: 1 }}>
-                  <Text style={[styles.inputLabel, { color: theme.colors.text }]}>Selling Price (£) *</Text>
+                  <Text style={[styles.inputLabel, { color: theme.colors.text }]}>Selling Price (MRP) (£) *</Text>
                   <TextInput
                     style={[styles.input, { backgroundColor: theme.colors.background, borderColor: theme.colors.border, color: theme.colors.text }]}
                     keyboardType="decimal-pad"
