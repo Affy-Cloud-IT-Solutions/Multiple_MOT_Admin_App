@@ -1073,15 +1073,6 @@ export default function BookedMotsScreen({ navigation }: any) {
                     </TouchableOpacity>
 
                     <TouchableOpacity
-                      onPress={() => openJobSheet(item)}
-                      style={[styles.cardActionBtnCompact, { backgroundColor: '#10B981', borderColor: '#10B981', marginRight: 6 }]}
-                      activeOpacity={0.7}
-                    >
-                      <MaterialCommunityIcons name="file-document-edit-outline" size={13} color="#FFFFFF" style={{ marginRight: 3 }} />
-                      <Text style={{ fontSize: 11, fontFamily: fonts.bold, color: '#FFFFFF' }}>Job Sheet & Parts</Text>
-                    </TouchableOpacity>
-
-                    <TouchableOpacity
                       onPress={() => {
                         navigation.navigate('AdminBookMot', {
                           customer: customer || {

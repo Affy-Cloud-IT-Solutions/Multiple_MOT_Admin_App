@@ -190,6 +190,15 @@ export interface DynamicInventoryCategory {
   isActive?: boolean;
 }
 
+export interface DynamicInventoryUnit {
+  _id: string;
+  id?: string;
+  garageId?: string;
+  name: string;
+  description?: string;
+  isActive?: boolean;
+}
+
 export interface InventoryItem {
   _id: string;
   id?: string;
@@ -369,6 +378,10 @@ interface DataContextType {
   deleteDynamicCategory: (id: string) => Promise<void>;
   addSubCategoryToCategory: (categoryId: string, subCategory: string) => Promise<DynamicInventoryCategory>;
   removeSubCategoryFromCategory: (categoryId: string, subCategory: string) => Promise<DynamicInventoryCategory>;
+  dynamicUnits: DynamicInventoryUnit[];
+  fetchDynamicUnits: () => Promise<DynamicInventoryUnit[]>;
+  createDynamicUnit: (name: string, description?: string) => Promise<DynamicInventoryUnit>;
+  deleteDynamicUnit: (id: string) => Promise<void>;
   seedDefaultInventory: () => Promise<any>;
   fetchBookingInvoice: (bookingId: string) => Promise<{ invoice: Invoice | null; provisional?: any }>;
   saveBookingInvoice: (bookingId: string, invoicePayload: any) => Promise<{ invoice: Invoice; alert?: any }>;
@@ -448,6 +461,7 @@ export const DataProvider = ({ children }: { children: ReactNode }) => {
   const [currentGarage, setCurrentGarage] = useState<Garage | null>(null);
   const [inventoryItems, setInventoryItems] = useState<InventoryItem[]>([]);
   const [dynamicCategories, setDynamicCategories] = useState<DynamicInventoryCategory[]>([]);
+  const [dynamicUnits, setDynamicUnits] = useState<DynamicInventoryUnit[]>([]);
   const [inventoryStats, setInventoryStats] = useState<InventoryStats | null>(null);
   const [loadingInventory, setLoadingInventory] = useState<boolean>(false);
   const [isProfileMandatory, setIsProfileMandatory] = useState<boolean>(false);
@@ -2107,6 +2121,66 @@ export const DataProvider = ({ children }: { children: ReactNode }) => {
     [authFetch]
   );
 
+  const fetchDynamicUnits = useCallback(async (): Promise<DynamicInventoryUnit[]> => {
+    try {
+      const res = await authFetch(`${BASE_URL}/inventory/units`);
+      const data = await parseJsonResponse(res);
+      if (res.ok && Array.isArray(data.units)) {
+        setDynamicUnits(data.units);
+        return data.units;
+      }
+      return [];
+    } catch (err) {
+      console.error('[DATA CONTEXT] fetchDynamicUnits error:', err);
+      return [];
+    }
+  }, [authFetch]);
+
+  const createDynamicUnit = useCallback(
+    async (name: string, description = ''): Promise<DynamicInventoryUnit> => {
+      try {
+        const res = await authFetch(`${BASE_URL}/inventory/units`, {
+          method: 'POST',
+          headers: { 'Content-Type': 'application/json' },
+          body: JSON.stringify({ name, description }),
+        });
+        const data = await parseJsonResponse(res);
+        if (!res.ok) {
+          throw new Error(data.error || 'Failed to create unit');
+        }
+        const newUnit = data.unit;
+        setDynamicUnits((prev) => {
+          const filtered = prev.filter((u) => u._id !== newUnit._id);
+          return [...filtered, newUnit].sort((a, b) => a.name.localeCompare(b.name));
+        });
+        return newUnit;
+      } catch (err) {
+        console.error('[DATA CONTEXT] createDynamicUnit error:', err);
+        throw err;
+      }
+    },
+    [authFetch]
+  );
+
+  const deleteDynamicUnit = useCallback(
+    async (id: string): Promise<void> => {
+      try {
+        const res = await authFetch(`${BASE_URL}/inventory/units/${id}`, {
+          method: 'DELETE',
+        });
+        const data = await parseJsonResponse(res);
+        if (!res.ok) {
+          throw new Error(data.error || 'Failed to delete unit');
+        }
+        setDynamicUnits((prev) => prev.filter((u) => u._id !== id));
+      } catch (err) {
+        console.error('[DATA CONTEXT] deleteDynamicUnit error:', err);
+        throw err;
+      }
+    },
+    [authFetch]
+  );
+
   const seedDefaultInventory = useCallback(async (): Promise<any> => {
     try {
       const res = await authFetch(`${BASE_URL}/inventory/seed-defaults`, {
@@ -2270,6 +2344,10 @@ export const DataProvider = ({ children }: { children: ReactNode }) => {
         deleteDynamicCategory,
         addSubCategoryToCategory,
         removeSubCategoryFromCategory,
+        dynamicUnits,
+        fetchDynamicUnits,
+        createDynamicUnit,
+        deleteDynamicUnit,
         seedDefaultInventory,
         fetchBookingInvoice,
         saveBookingInvoice,

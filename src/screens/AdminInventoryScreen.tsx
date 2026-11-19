@@ -21,24 +21,12 @@ import {
   useAppValues,
   InventoryItem,
   DynamicInventoryCategory,
+  DynamicInventoryUnit,
 } from '../context/DataContext';
 import HeaderMenuButton from '../components/HeaderMenuButton';
 import { fonts } from '../theme/theme';
 
 const { width } = Dimensions.get('window');
-
-const DEFAULT_UNITS = [
-  'piece',
-  'set',
-  'pair',
-  'litre',
-  'bottle',
-  'can',
-  'kg',
-  'box',
-  'metre',
-  'kit',
-];
 
 // Aesthetic category badge colors based on category name
 function getCategoryColor(name: string): { icon: string; color: string; bg: string } {
@@ -70,11 +58,15 @@ export default function AdminInventoryScreen({ navigation }: any) {
     inventoryStats,
     loadingInventory,
     dynamicCategories,
+    dynamicUnits,
     fetchInventory,
     fetchInventoryStats,
     fetchDynamicCategories,
+    fetchDynamicUnits,
     createDynamicCategory,
     addSubCategoryToCategory,
+    createDynamicUnit,
+    deleteDynamicUnit,
     addInventoryItem,
     updateInventoryItem,
     adjustInventoryStock,
@@ -99,16 +91,16 @@ export default function AdminInventoryScreen({ navigation }: any) {
   const [formBrand, setFormBrand] = useState('');
   const [formCategory, setFormCategory] = useState('');
   const [formSubCategory, setFormSubCategory] = useState('');
-  const [formUnit, setFormUnit] = useState('piece');
-  const [customUnitInput, setCustomUnitInput] = useState('');
-  const [isCustomUnitActive, setIsCustomUnitActive] = useState(false);
+  const [formUnit, setFormUnit] = useState('');
+  const [inlineNewUnitActive, setInlineNewUnitActive] = useState(false);
+  const [inlineNewUnitInput, setInlineNewUnitInput] = useState('');
   const [formStatus, setFormStatus] = useState<'Active' | 'Inactive' | 'Out of Stock'>('Active');
   const [formDescription, setFormDescription] = useState('');
   const [formQuantity, setFormQuantity] = useState('0');
   const [formCostPrice, setFormCostPrice] = useState('');
   const [formSellingPrice, setFormSellingPrice] = useState('');
 
-  // Quick Inline Category/SubCategory Creation inside Item Modal
+  // Quick Inline Category/SubCategory/Unit Creation inside Item Modal
   const [inlineNewCatActive, setInlineNewCatActive] = useState(false);
   const [inlineNewCatInput, setInlineNewCatInput] = useState('');
   const [inlineNewSubActive, setInlineNewSubActive] = useState(false);
@@ -137,11 +129,12 @@ export default function AdminInventoryScreen({ navigation }: any) {
         }),
         fetchInventoryStats(),
         fetchDynamicCategories(),
+        fetchDynamicUnits(),
       ]);
     } catch (e) {
       // Handled in context
     }
-  }, [fetchInventory, fetchInventoryStats, fetchDynamicCategories, searchQuery, selectedCategory, statusFilter]);
+  }, [fetchInventory, fetchInventoryStats, fetchDynamicCategories, fetchDynamicUnits, searchQuery, selectedCategory, statusFilter]);
 
   useEffect(() => {
     loadData();
@@ -285,9 +278,10 @@ export default function AdminInventoryScreen({ navigation }: any) {
     const initialCat = dynamicCategories.length > 0 ? dynamicCategories[0].name : '';
     setFormCategory(initialCat);
     setFormSubCategory('');
-    setFormUnit('piece');
-    setIsCustomUnitActive(false);
-    setCustomUnitInput('');
+    const initialUnit = dynamicUnits.length > 0 ? dynamicUnits[0].name : '';
+    setFormUnit(initialUnit);
+    setInlineNewUnitInput('');
+    setInlineNewUnitActive(!initialUnit);
     setFormStatus('Active');
     setFormDescription('');
     setFormQuantity('0');
@@ -306,18 +300,9 @@ export default function AdminInventoryScreen({ navigation }: any) {
     setFormBrand(item.brand || '');
     setFormCategory(item.category || (dynamicCategories.length > 0 ? dynamicCategories[0].name : ''));
     setFormSubCategory(item.subCategory || '');
-
-    const isKnownUnit = DEFAULT_UNITS.includes(item.unit || '');
-    if (!isKnownUnit && item.unit) {
-      setFormUnit('__CUSTOM__');
-      setIsCustomUnitActive(true);
-      setCustomUnitInput(item.unit);
-    } else {
-      setFormUnit(item.unit || 'piece');
-      setIsCustomUnitActive(false);
-      setCustomUnitInput('');
-    }
-
+    setFormUnit(item.unit || (dynamicUnits.length > 0 ? dynamicUnits[0].name : ''));
+    setInlineNewUnitActive(false);
+    setInlineNewUnitInput('');
     setFormStatus(item.status || ((item.quantity ?? 0) <= 0 ? 'Out of Stock' : 'Active'));
     setFormDescription(item.description || '');
     setFormQuantity(String(item.quantity ?? 0));
@@ -342,6 +327,10 @@ export default function AdminInventoryScreen({ navigation }: any) {
       Alert.alert('Required Field', 'Please select or create a Category.');
       return;
     }
+    if (!formUnit.trim()) {
+      Alert.alert('Required Field', 'Please select or create a Unit.');
+      return;
+    }
 
     const sellingPriceNum = parseFloat(formSellingPrice);
     if (isNaN(sellingPriceNum) || sellingPriceNum < 0) {
@@ -361,7 +350,7 @@ export default function AdminInventoryScreen({ navigation }: any) {
       return;
     }
 
-    const finalUnit = isCustomUnitActive ? customUnitInput.trim().toLowerCase() || 'piece' : formUnit;
+    const finalUnit = formUnit.trim().toLowerCase();
 
     setSavingItem(true);
     try {
@@ -408,6 +397,19 @@ export default function AdminInventoryScreen({ navigation }: any) {
       setInlineNewCatActive(false);
     } catch (err: any) {
       Alert.alert('Error', err.message || 'Could not create category');
+    }
+  };
+
+  // Quick Inline Unit Addition
+  const handleAddInlineUnit = async () => {
+    if (!inlineNewUnitInput.trim()) return;
+    try {
+      const created = await createDynamicUnit(inlineNewUnitInput.trim());
+      setFormUnit(created.name);
+      setInlineNewUnitInput('');
+      setInlineNewUnitActive(false);
+    } catch (err: any) {
+      Alert.alert('Error', err.message || 'Could not create unit');
     }
   };
 
@@ -1302,60 +1304,62 @@ export default function AdminInventoryScreen({ navigation }: any) {
                 />
               )}
 
-              {/* Field 6: Unit * */}
-              <View style={{ flexDirection: 'row', justifyContent: 'space-between', alignItems: 'center' }}>
-                <Text style={[styles.inputLabel, { color: theme.colors.text }]}>Unit *</Text>
-                {isCustomUnitActive && (
-                  <TouchableOpacity onPress={() => setIsCustomUnitActive(false)}>
-                    <Text style={{ color: theme.colors.primary, fontSize: 11, fontFamily: fonts.semiBold }}>
-                      ← Standard Units
-                    </Text>
-                  </TouchableOpacity>
-                )}
+              {/* Field 6: Unit * (Selected from Dynamic Units + Quick Inline Add) */}
+              <View style={{ flexDirection: 'row', justifyContent: 'space-between', alignItems: 'center', marginBottom: 3 }}>
+                <Text style={[styles.inputLabel, { color: theme.colors.text, marginBottom: 0 }]}>Unit *</Text>
+                <TouchableOpacity onPress={() => setInlineNewUnitActive(!inlineNewUnitActive)}>
+                  <Text style={{ color: theme.colors.primary, fontSize: 11, fontFamily: fonts.semiBold }}>
+                    {inlineNewUnitActive ? 'Cancel' : '+ New Unit'}
+                  </Text>
+                </TouchableOpacity>
               </View>
 
-              {isCustomUnitActive ? (
-                <TextInput
-                  style={[styles.input, { backgroundColor: theme.colors.background, borderColor: theme.colors.primary, color: theme.colors.text }]}
-                  placeholder="Type unit (e.g. metre, roll, tub)"
-                  placeholderTextColor={theme.colors.placeholder}
-                  value={customUnitInput}
-                  onChangeText={setCustomUnitInput}
-                  autoFocus
-                />
+              {inlineNewUnitActive && (
+                <View style={styles.inlineAddRow}>
+                  <TextInput
+                    style={[styles.inlineInput, { backgroundColor: theme.colors.background, borderColor: theme.colors.primary, color: theme.colors.text }]}
+                    placeholder="New unit (e.g. piece, set, bottle, litre)..."
+                    placeholderTextColor={theme.colors.placeholder}
+                    value={inlineNewUnitInput}
+                    onChangeText={setInlineNewUnitInput}
+                    autoFocus
+                  />
+                  <TouchableOpacity
+                    style={[styles.inlineAddBtn, { backgroundColor: theme.colors.primary }]}
+                    onPress={handleAddInlineUnit}
+                  >
+                    <Text style={styles.inlineAddBtnText}>Save</Text>
+                  </TouchableOpacity>
+                </View>
+              )}
+
+              {dynamicUnits.length === 0 ? (
+                <View style={{ marginBottom: 10, padding: 10, borderRadius: 8, backgroundColor: theme.colors.background, borderWidth: 1, borderColor: theme.colors.border }}>
+                  <Text style={{ color: theme.colors.placeholder, fontSize: 11 }}>
+                    No units created yet. Click "+ New Unit" above to create one.
+                  </Text>
+                </View>
               ) : (
                 <ScrollView horizontal showsHorizontalScrollIndicator={false} style={{ marginBottom: 10 }}>
-                  {DEFAULT_UNITS.map((u) => {
-                    const isSel = formUnit === u && !isCustomUnitActive;
+                  {dynamicUnits.map((u) => {
+                    const isSel = formUnit.toLowerCase() === u.name.toLowerCase();
                     return (
                       <TouchableOpacity
-                        key={u}
+                        key={u._id || u.name}
                         style={[
                           styles.unitChip,
                           isSel
                             ? { backgroundColor: theme.colors.primary, borderColor: theme.colors.primary }
                             : { backgroundColor: theme.colors.background, borderColor: theme.colors.border },
                         ]}
-                        onPress={() => {
-                          setFormUnit(u);
-                          setIsCustomUnitActive(false);
-                        }}
+                        onPress={() => setFormUnit(u.name)}
                       >
                         <Text style={{ color: isSel ? '#FFFFFF' : theme.colors.text, fontSize: 11, fontFamily: fonts.semiBold }}>
-                          {u}
+                          {u.name}
                         </Text>
                       </TouchableOpacity>
                     );
                   })}
-                  <TouchableOpacity
-                    style={[styles.unitChip, { backgroundColor: '#6366F115', borderColor: '#6366F150' }]}
-                    onPress={() => {
-                      setIsCustomUnitActive(true);
-                      setFormUnit('__CUSTOM__');
-                    }}
-                  >
-                    <Text style={{ color: '#6366F1', fontSize: 11, fontFamily: fonts.bold }}>+ Custom</Text>
-                  </TouchableOpacity>
                 </ScrollView>
               )}
 
