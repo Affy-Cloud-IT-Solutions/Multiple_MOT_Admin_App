@@ -135,6 +135,11 @@ export interface Garage {
   staffCount?: number;
   bookingsCount?: number;
   customerCount?: number;
+  isClaimed?: boolean;
+  isImported?: boolean;
+  source?: 'EXCEL_IMPORT' | 'ORGANIC' | string;
+  internalPhone?: string;
+  claimToken?: string;
 }
 
 export interface UserProfile {
@@ -359,8 +364,20 @@ interface DataContextType {
   deleteGarageService: (garageId: string, serviceId: string) => Promise<any>;
   seedGarageDefaultServices: (garageId: string) => Promise<any>;
   isProfileMandatory: boolean;
-  getPlatformSettings: () => Promise<{ requireFullProfileForVisibility: boolean }>;
-  updatePlatformSettings: (requireFullProfileForVisibility: boolean) => Promise<{ requireFullProfileForVisibility: boolean }>;
+  requireFullProfileForVisibility: boolean;
+  isConciergeMode: boolean;
+  bookingMode: 'CONCIERGE_CALL' | 'HYBRID' | 'DIRECT_ONLINE';
+  conciergePhoneNumber: string;
+  conciergeWhatsappNumber: string;
+  conciergeEmail: string;
+  hideDirectGaragePhone: boolean;
+  getPlatformSettings: () => Promise<any>;
+  updatePlatformSettings: (settingsOrBool: any) => Promise<any>;
+  bulkImportGaragesExcel: (formData: any) => Promise<any>;
+  bookingLeads: any[];
+  fetchBookingLeads: (status?: string, search?: string) => Promise<any[]>;
+  updateBookingLead: (id: string, payload: any) => Promise<any>;
+  convertLeadToBooking: (id: string, bookingData: { bookingDate?: string; slotTime?: string; managerNotes?: string }) => Promise<any>;
   inventoryItems: InventoryItem[];
   inventoryStats: InventoryStats | null;
   loadingInventory: boolean;
@@ -395,8 +412,8 @@ const DataContext = createContext<DataContextType | undefined>(undefined);
 export const LOCAL_IP = '192.168.1.15';
 // export const BASE_URL = `http://${LOCAL_IP}:5000/api`;
 // export const BASE_URL = 'http://10.0.2.2:5000/api'; // Android Emulator alias
-export const BASE_URL = 'https://api.ondoorcarservice.com/api'; // Production server
-// export const BASE_URL = 'http://localhost:5000/api';
+// export const BASE_URL = 'https://api.ondoorcarservice.com/api'; // Production server
+export const BASE_URL = 'http://localhost:5000/api';
 
 const parseJsonResponse = async (response: Response): Promise<any> => {
   const text = await response.text();
@@ -465,6 +482,12 @@ export const DataProvider = ({ children }: { children: ReactNode }) => {
   const [inventoryStats, setInventoryStats] = useState<InventoryStats | null>(null);
   const [loadingInventory, setLoadingInventory] = useState<boolean>(false);
   const [isProfileMandatory, setIsProfileMandatory] = useState<boolean>(false);
+  const [bookingMode, setBookingMode] = useState<'CONCIERGE_CALL' | 'HYBRID' | 'DIRECT_ONLINE'>('CONCIERGE_CALL');
+  const [conciergePhoneNumber, setConciergePhoneNumber] = useState<string>('9999999999');
+  const [conciergeWhatsappNumber, setConciergeWhatsappNumber] = useState<string>('');
+  const [conciergeEmail, setConciergeEmail] = useState<string>('');
+  const [hideDirectGaragePhone, setHideDirectGaragePhone] = useState<boolean>(true);
+  const [bookingLeads, setBookingLeads] = useState<any[]>([]);
   const [serviceCategories, setServiceCategories] = useState<ServiceCategory[]>([]);
   const [pendingCustomServicesCount, setPendingCustomServicesCount] = useState<number>(0);
   const [isLoggingOut, setIsLoggingOut] = useState<boolean>(false);
@@ -1807,47 +1830,155 @@ export const DataProvider = ({ children }: { children: ReactNode }) => {
     return data;
   }, [authFetch]);
 
-  const getPlatformSettings = useCallback(async (): Promise<{ requireFullProfileForVisibility: boolean }> => {
+  const getPlatformSettings = useCallback(async (): Promise<any> => {
     try {
       const response = await authFetch(`${BASE_URL}/settings/platform`);
       if (response && response.ok) {
         const data = await response.json();
-        if (data && typeof data.requireFullProfileForVisibility === 'boolean') {
-          setIsProfileMandatory(data.requireFullProfileForVisibility);
-          await AsyncStorage.setItem('platform_setting_require_full_profile', String(data.requireFullProfileForVisibility));
+        if (data) {
+          if (typeof data.requireFullProfileForVisibility === 'boolean') {
+            setIsProfileMandatory(data.requireFullProfileForVisibility);
+            await AsyncStorage.setItem('platform_setting_require_full_profile', String(data.requireFullProfileForVisibility));
+          }
+          if (data.bookingMode) setBookingMode(data.bookingMode);
+          if (data.conciergePhoneNumber) setConciergePhoneNumber(data.conciergePhoneNumber);
+          if (data.conciergeWhatsappNumber !== undefined) setConciergeWhatsappNumber(data.conciergeWhatsappNumber);
+          if (data.conciergeEmail !== undefined) setConciergeEmail(data.conciergeEmail);
+          if (typeof data.hideDirectGaragePhone === 'boolean') setHideDirectGaragePhone(data.hideDirectGaragePhone);
           return data;
         }
       }
     } catch (e) {
-      // Remote server may not have new endpoint yet until deployed
+      // Remote server gracefully handled via local cache
     }
     const cached = await AsyncStorage.getItem('platform_setting_require_full_profile');
     const val = cached === 'true';
     setIsProfileMandatory(val);
-    return { requireFullProfileForVisibility: val };
-  }, [authFetch]);
+    return {
+      requireFullProfileForVisibility: val,
+      bookingMode,
+      conciergePhoneNumber,
+      conciergeWhatsappNumber,
+      conciergeEmail,
+      hideDirectGaragePhone,
+    };
+  }, [authFetch, bookingMode, conciergePhoneNumber, conciergeWhatsappNumber, conciergeEmail, hideDirectGaragePhone]);
 
-  const updatePlatformSettings = useCallback(async (requireFullProfileForVisibility: boolean): Promise<{ requireFullProfileForVisibility: boolean }> => {
-    // 1. Immediately persist locally in state and AsyncStorage
-    setIsProfileMandatory(requireFullProfileForVisibility);
-    await AsyncStorage.setItem('platform_setting_require_full_profile', String(requireFullProfileForVisibility));
+  const updatePlatformSettings = useCallback(async (payload: any): Promise<any> => {
+    const bodyPayload = typeof payload === 'boolean'
+      ? { requireFullProfileForVisibility: payload }
+      : payload;
 
-    // 2. Sync with server if endpoint is deployed
+    if (bodyPayload.requireFullProfileForVisibility !== undefined) {
+      setIsProfileMandatory(bodyPayload.requireFullProfileForVisibility);
+      await AsyncStorage.setItem('platform_setting_require_full_profile', String(bodyPayload.requireFullProfileForVisibility));
+    }
+    if (bodyPayload.isConciergeMode !== undefined) {
+      const mode = bodyPayload.isConciergeMode ? 'CONCIERGE_CALL' : 'DIRECT_ONLINE';
+      setBookingMode(mode);
+      setHideDirectGaragePhone(Boolean(bodyPayload.isConciergeMode));
+      bodyPayload.bookingMode = mode;
+      bodyPayload.hideDirectGaragePhone = Boolean(bodyPayload.isConciergeMode);
+    }
+    if (bodyPayload.bookingMode) setBookingMode(bodyPayload.bookingMode);
+    if (bodyPayload.conciergePhoneNumber) setConciergePhoneNumber(bodyPayload.conciergePhoneNumber);
+    if (bodyPayload.conciergeWhatsappNumber !== undefined) setConciergeWhatsappNumber(bodyPayload.conciergeWhatsappNumber);
+    if (bodyPayload.conciergeEmail !== undefined) setConciergeEmail(bodyPayload.conciergeEmail);
+    if (typeof bodyPayload.hideDirectGaragePhone === 'boolean') setHideDirectGaragePhone(bodyPayload.hideDirectGaragePhone);
+
     try {
       const response = await authFetch(`${BASE_URL}/settings/platform`, {
         method: 'PATCH',
         headers: { 'Content-Type': 'application/json' },
-        body: JSON.stringify({ requireFullProfileForVisibility }),
+        body: JSON.stringify(bodyPayload),
       });
       if (response && response.ok) {
         const data = await response.json();
         return data;
       }
     } catch (e) {
-      // Server not deployed yet - gracefully handled via local cache
+      // Server gracefully handled via local cache
     }
-    return { requireFullProfileForVisibility };
+    return bodyPayload;
   }, [authFetch]);
+
+  const bulkImportGaragesExcel = useCallback(async (formData: any): Promise<any> => {
+    try {
+      const response = await authFetch(`${BASE_URL}/garages/bulk-import-excel`, {
+        method: 'POST',
+        body: formData,
+      });
+      const data = await parseJsonResponse(response);
+      if (!response.ok) {
+        throw new Error(data.error || 'Failed to import garages from spreadsheet');
+      }
+      return data;
+    } catch (error) {
+      console.error('[DATA CONTEXT] bulkImportGaragesExcel error:', error);
+      throw error;
+    }
+  }, [authFetch]);
+
+  const fetchBookingLeads = useCallback(async (status?: string, search?: string): Promise<any[]> => {
+    try {
+      const queryParams = new URLSearchParams();
+      if (status && status !== 'ALL') queryParams.append('status', status);
+      if (search) queryParams.append('search', search);
+
+      const response = await authFetch(`${BASE_URL}/leads?${queryParams.toString()}`);
+      const data = await parseJsonResponse(response);
+      if (response.ok && Array.isArray(data.leads)) {
+        setBookingLeads(data.leads);
+        return data.leads;
+      }
+      return [];
+    } catch (error) {
+      console.error('[DATA CONTEXT] fetchBookingLeads error:', error);
+      return [];
+    }
+  }, [authFetch]);
+
+  const updateBookingLead = useCallback(async (id: string, payload: any): Promise<any> => {
+    try {
+      const response = await authFetch(`${BASE_URL}/leads/${id}`, {
+        method: 'PATCH',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify(payload),
+      });
+      const data = await parseJsonResponse(response);
+      if (!response.ok) {
+        throw new Error(data.error || 'Failed to update lead');
+      }
+      const updated = data.lead;
+      setBookingLeads((prev) => prev.map((l) => (l._id === id ? updated : l)));
+      return updated;
+    } catch (error) {
+      console.error('[DATA CONTEXT] updateBookingLead error:', error);
+      throw error;
+    }
+  }, [authFetch]);
+
+  const convertLeadToBooking = useCallback(async (id: string, bookingData: { bookingDate?: string; slotTime?: string; managerNotes?: string }): Promise<any> => {
+    try {
+      const response = await authFetch(`${BASE_URL}/leads/${id}/convert-to-booking`, {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify(bookingData),
+      });
+      const data = await parseJsonResponse(response);
+      if (!response.ok) {
+        throw new Error(data.error || 'Failed to convert lead to booking');
+      }
+      if (data.lead) {
+        setBookingLeads((prev) => prev.map((l) => (l._id === id || l.id === id ? data.lead : l)));
+      }
+      await refreshData();
+      return data;
+    } catch (error) {
+      console.error('[DATA CONTEXT] convertLeadToBooking error:', error);
+      throw error;
+    }
+  }, [authFetch, refreshData]);
 
   // Inventory Management API Calls
   const fetchInventory = useCallback(async (filters?: { search?: string; category?: string; status?: string }): Promise<InventoryItem[]> => {
@@ -2325,8 +2456,20 @@ export const DataProvider = ({ children }: { children: ReactNode }) => {
         deleteGarageService,
         seedGarageDefaultServices,
         isProfileMandatory,
+        requireFullProfileForVisibility: isProfileMandatory,
+        isConciergeMode: bookingMode === 'CONCIERGE_CALL',
+        bookingMode,
+        conciergePhoneNumber,
+        conciergeWhatsappNumber,
+        conciergeEmail,
+        hideDirectGaragePhone,
         getPlatformSettings,
         updatePlatformSettings,
+        bulkImportGaragesExcel,
+        bookingLeads,
+        fetchBookingLeads,
+        updateBookingLead,
+        convertLeadToBooking,
         inventoryItems,
         inventoryStats,
         loadingInventory,

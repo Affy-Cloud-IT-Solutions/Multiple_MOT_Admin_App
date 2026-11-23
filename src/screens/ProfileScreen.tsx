@@ -42,6 +42,9 @@ export default function ProfileScreen({ navigation }: any) {
     alerts = [],
     getPlatformSettings,
     updatePlatformSettings,
+    isConciergeMode,
+    bookingMode,
+    conciergePhoneNumber,
   } = useAppValues();
   const [notificationsEnabled, setNotificationsEnabled] = useState(true);
   const [loggingOut, setLoggingOut] = useState(false);
@@ -85,6 +88,28 @@ export default function ProfileScreen({ navigation }: any) {
       );
     } catch (err: any) {
       Alert.alert('Update Failed', err.message || 'Could not update platform setting.');
+    } finally {
+      setSavingPlatformSetting(false);
+    }
+  };
+
+  const handleToggleConciergeMode = async (newValue: boolean) => {
+    if (!updatePlatformSettings) return;
+    setSavingPlatformSetting(true);
+    try {
+      await updatePlatformSettings({
+        isConciergeMode: newValue,
+        bookingMode: newValue ? 'CONCIERGE_CALL' : 'DIRECT_ONLINE',
+        hideDirectGaragePhone: newValue,
+      });
+      Alert.alert(
+        'Platform Mode Updated',
+        newValue
+          ? `Concierge Mode is now ON:\n\n• Bulk upload & call leads board are now active in the Garages tab.\n• All customer apps will show "Call to Book" (${conciergePhoneNumber || '9999999999'}) instead of slots.`
+          : 'Concierge Mode is now OFF:\n\n• Normal full booking process restored.\n• Live slot calendar, date/time picker, and instant online booking are active for all garages.'
+      );
+    } catch (err: any) {
+      Alert.alert('Update Failed', err.message || 'Could not update concierge mode.');
     } finally {
       setSavingPlatformSetting(false);
     }
@@ -632,8 +657,42 @@ export default function ProfileScreen({ navigation }: any) {
               )
             }
             theme={theme}
-            isLast
           />
+          <SettingRow
+            icon="phone-in-talk"
+            title="Concierge Mode (Call to Book)"
+            subtitle={
+              isConciergeMode
+                ? `Concierge Active: Garages show 'Call to Book' (${conciergePhoneNumber || '9999999999'}). Bulk upload & call leads active.`
+                : 'Direct Online Booking Active: Normal whole booking process (slots, dates, times) enabled for all garages.'
+            }
+            control={
+              savingPlatformSetting ? (
+                <ActivityIndicator size="small" color="#10B981" />
+              ) : (
+                <Switch
+                  value={isConciergeMode}
+                  onValueChange={handleToggleConciergeMode}
+                  trackColor={{ false: '#E0E0E0', true: '#10B981' }}
+                  thumbColor="#FFFFFF"
+                  ios_backgroundColor="#E0E0E0"
+                />
+              )
+            }
+            theme={theme}
+            isLast={!isConciergeMode}
+          />
+          {isConciergeMode && (
+            <MenuRow
+              icon="file-excel-outline"
+              iconColor="#0284C7"
+              title="Bulk Upload Garages & Leads Board"
+              subtitle={`Helpline: ${conciergePhoneNumber || '9999999999'} • Tap to manage in Garages`}
+              onPress={() => navigation.navigate('Garages')}
+              theme={theme}
+              isLast
+            />
+          )}
         </Section>
       )}
 
