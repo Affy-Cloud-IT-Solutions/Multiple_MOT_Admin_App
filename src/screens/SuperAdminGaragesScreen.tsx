@@ -60,16 +60,10 @@ export default function SuperAdminGaragesScreen({ navigation }: any) {
   const [tempConciergePhone, setTempConciergePhone] = useState(conciergePhoneNumber || '9999999999');
   const [tempConciergeWhatsapp, setTempConciergeWhatsapp] = useState(conciergeWhatsappNumber || '9999999999');
   const [tempHideDirectPhone, setTempHideDirectPhone] = useState(hideDirectGaragePhone !== false);
-  const [tempRequireProfile, setTempRequireProfile] = useState(requireFullProfileForVisibility !== false);
 
   // Excel Bulk Import States
   const [importingExcel, setImportingExcel] = useState(false);
-
-  // Leads Board States
-  const [leadsModalVisible, setLeadsModalVisible] = useState(false);
-  const [leadsLoading, setLeadsLoading] = useState(false);
-  const [selectedLeadFilter, setSelectedLeadFilter] = useState<'ALL' | 'NEW' | 'CONTACTED' | 'CONVERTED' | 'LOST'>('ALL');
-  const [updatingLeadId, setUpdatingLeadId] = useState<string | null>(null);
+  const [uploadModalVisible, setUploadModalVisible] = useState(false);
 
   // Dynamic Garage Images Management States
   const [garageImages, setGarageImages] = useState<string[]>([]);
@@ -107,8 +101,8 @@ export default function SuperAdminGaragesScreen({ navigation }: any) {
       Alert.alert(
         'Platform Mode Updated',
         newValue
-          ? `Concierge Mode is now ON:\n\n• Bulk upload & call leads are now active below.\n• Customer apps show "Call to Book" (${conciergePhoneNumber || '9999999999'}).`
-          : 'Concierge Mode is now OFF:\n\n• Normal full booking process restored.\n• Live slots, date/time calendar, and direct booking are active.'
+          ? `Call to Book Mode is now ON:\n\n• Bulk upload & call leads are now active below.\n• Customer apps show "Call to Book" (${conciergePhoneNumber || '9999999999'}).`
+          : 'Call to Book Mode is now OFF:\n\n• Normal full booking process restored.\n• Live slots, date/time calendar, and direct booking are active.'
       );
     } catch (err: any) {
       Alert.alert('Update Failed', err.message || 'Could not update mode.');
@@ -122,7 +116,6 @@ export default function SuperAdminGaragesScreen({ navigation }: any) {
     setTempConciergePhone(conciergePhoneNumber || '9999999999');
     setTempConciergeWhatsapp(conciergeWhatsappNumber || '9999999999');
     setTempHideDirectPhone(hideDirectGaragePhone !== false);
-    setTempRequireProfile(requireFullProfileForVisibility !== false);
     setSettingsModalVisible(true);
   };
 
@@ -134,11 +127,10 @@ export default function SuperAdminGaragesScreen({ navigation }: any) {
         conciergePhoneNumber: tempConciergePhone.trim() || '9999999999',
         conciergeWhatsappNumber: tempConciergeWhatsapp.trim() || '9999999999',
         hideDirectGaragePhone: tempHideDirectPhone,
-        requireFullProfileForVisibility: tempRequireProfile,
       });
       setSettingsModalVisible(false);
       await refreshData();
-      Alert.alert('Settings Updated', 'Marketplace booking mode & concierge helpline settings saved successfully!');
+      Alert.alert('Settings Updated', 'Booking helpline and masking settings saved successfully!');
     } catch (err: any) {
       Alert.alert('Update Failed', err.message || 'Could not save platform settings.');
     } finally {
@@ -161,6 +153,7 @@ export default function SuperAdminGaragesScreen({ navigation }: any) {
         type: file.type || 'application/vnd.openxmlformats-officedocument.spreadsheetml.sheet',
       });
       await refreshData();
+      setUploadModalVisible(false);
       Alert.alert(
         'Excel Import Completed',
         `Processed: ${res?.summary?.totalProcessed ?? 0} rows\nCreated: ${res?.summary?.created ?? 0}\nUpdated: ${res?.summary?.updated ?? 0}\nFailed: ${res?.summary?.failed ?? 0}`
@@ -180,58 +173,8 @@ export default function SuperAdminGaragesScreen({ navigation }: any) {
     });
   };
 
-  const handleOpenLeads = async () => {
-    setLeadsLoading(true);
-    setLeadsModalVisible(true);
-    try {
-      await fetchBookingLeads();
-    } catch (err) {
-      console.error('Error fetching leads:', err);
-    } finally {
-      setLeadsLoading(false);
-    }
-  };
-
-  const handleUpdateLeadStatus = async (leadId: string, status: string, notes?: string) => {
-    setUpdatingLeadId(leadId);
-    try {
-      await updateBookingLead(leadId, { status, internalNotes: notes });
-      await fetchBookingLeads();
-    } catch (err: any) {
-      Alert.alert('Error', err.message || 'Could not update lead status.');
-    } finally {
-      setUpdatingLeadId(null);
-    }
-  };
-
-  const handleConvertLeadToBooking = (lead: any) => {
-    Alert.alert(
-      'Confirm Customer Booking',
-      `Convert lead for ${lead.customerName || 'Customer'} into an official confirmed booking at ${lead.garageName || 'the garage'}?\n\nThis will instantly generate an approved appointment that the customer will see in their "My Bookings" screen.`,
-      [
-        { text: 'Cancel', style: 'cancel' },
-        {
-          text: 'Confirm Booking',
-          onPress: async () => {
-            const leadId = lead.id || lead._id;
-            setUpdatingLeadId(leadId);
-            try {
-              await convertLeadToBooking(leadId, {
-                bookingDate: new Date().toISOString(),
-                slotTime: '10:00 AM',
-                managerNotes: 'Confirmed by Concierge Desk',
-              });
-              await fetchBookingLeads();
-              Alert.alert('Booking Confirmed', 'Official booking created! The customer can now see it in their "My Bookings" screen.');
-            } catch (err: any) {
-              Alert.alert('Conversion Failed', err.message || 'Could not convert lead to booking.');
-            } finally {
-              setUpdatingLeadId(null);
-            }
-          },
-        },
-      ]
-    );
+  const handleOpenLeads = () => {
+    navigation.navigate('ConciergeLeads');
   };
 
   const fetchFullGarageDetails = async (garageId: string) => {
@@ -459,12 +402,12 @@ export default function SuperAdminGaragesScreen({ navigation }: any) {
                 color={isConciergeMode ? '#10B981' : '#6B7280'}
               />
               <Text style={[styles.strategyBadgeTitle, { color: theme.colors.text }]}>
-                {isConciergeMode ? 'Concierge Mode (Call to Book)' : 'Direct Online Booking Active'}
+                {isConciergeMode ? 'Call to Book Mode Active' : 'Direct Online Booking Active'}
               </Text>
             </View>
             <Text style={[styles.strategySubtitle, { color: theme.colors.placeholder }]}>
               {isConciergeMode
-                ? `Helpline: ${conciergePhoneNumber || '9999999999'} • Customer apps show "Call to Book"`
+                ? `Booking Helpline: ${conciergePhoneNumber || '9999999999'} • Customer apps show "Call to Book"`
                 : 'Whole normal booking process active (live slots, calendar, times)'}
             </Text>
           </View>
@@ -481,7 +424,7 @@ export default function SuperAdminGaragesScreen({ navigation }: any) {
           <View style={styles.strategyActionRow}>
             <TouchableOpacity
               style={[styles.strategyBtn, { backgroundColor: '#0284C7', flex: 1.2 }]}
-              onPress={handlePickAndImportExcel}
+              onPress={() => setUploadModalVisible(true)}
               disabled={importingExcel}
             >
               {importingExcel ? (
@@ -1488,7 +1431,7 @@ export default function SuperAdminGaragesScreen({ navigation }: any) {
         </View>
       </Modal>
 
-      {/* Platform Strategy & Helpline Settings Modal */}
+      {/* Booking Helpline Settings Modal */}
       <Modal
         visible={settingsModalVisible}
         animationType="slide"
@@ -1500,12 +1443,12 @@ export default function SuperAdminGaragesScreen({ navigation }: any) {
             {/* Header */}
             <View style={[styles.modalHeader, { borderBottomColor: theme.colors.border }]}>
               <View style={{ flexDirection: 'row', alignItems: 'center', gap: 10 }}>
-                <View style={{ width: 40, height: 40, borderRadius: 10, backgroundColor: '#6366F120', justifyContent: 'center', alignItems: 'center' }}>
-                  <MaterialCommunityIcons name="cog" size={24} color="#6366F1" />
+                <View style={{ width: 40, height: 40, borderRadius: 10, backgroundColor: '#0284C715', justifyContent: 'center', alignItems: 'center' }}>
+                  <MaterialCommunityIcons name="phone-settings" size={22} color="#0284C7" />
                 </View>
                 <View>
-                  <Text style={[styles.modalTitle, { color: theme.colors.text }]}>Platform Strategy</Text>
-                  <Text style={[styles.modalSubtitle, { color: theme.colors.placeholder }]}>Booking modes & manager helpline</Text>
+                  <Text style={[styles.modalTitle, { color: theme.colors.text }]}>Booking Helpline Settings</Text>
+                  <Text style={[styles.modalSubtitle, { color: theme.colors.placeholder }]}>Manage customer booking lines & privacy</Text>
                 </View>
               </View>
               <TouchableOpacity onPress={() => setSettingsModalVisible(false)}>
@@ -1513,120 +1456,15 @@ export default function SuperAdminGaragesScreen({ navigation }: any) {
               </TouchableOpacity>
             </View>
 
-            <ScrollView showsVerticalScrollIndicator={false} style={{ maxHeight: 520, paddingHorizontal: 16, paddingTop: 16 }}>
-              {/* Strategy Booking Mode Selector */}
-              <Text style={[styles.settingSectionTitle, { color: theme.colors.text }]}>Marketplace Booking Mode</Text>
-              
-              {/* Concierge Call Mode Card */}
-              <TouchableOpacity
-                activeOpacity={0.8}
-                onPress={() => setTempBookingMode('CONCIERGE_CALL')}
-                style={[
-                  styles.modeOptionCard,
-                  {
-                    borderColor: tempBookingMode === 'CONCIERGE_CALL' ? '#F59E0B' : theme.colors.border,
-                    backgroundColor: tempBookingMode === 'CONCIERGE_CALL' ? '#F59E0B12' : theme.colors.background,
-                  }
-                ]}
-              >
-                <View style={{ flexDirection: 'row', alignItems: 'flex-start', gap: 10 }}>
-                  <MaterialCommunityIcons
-                    name="phone-in-talk"
-                    size={24}
-                    color={tempBookingMode === 'CONCIERGE_CALL' ? '#F59E0B' : theme.colors.placeholder}
-                  />
-                  <View style={{ flex: 1 }}>
-                    <View style={{ flexDirection: 'row', alignItems: 'center', justifyContent: 'space-between' }}>
-                      <Text style={[styles.modeTitle, { color: tempBookingMode === 'CONCIERGE_CALL' ? '#F59E0B' : theme.colors.text }]}>
-                        Concierge Call Helpline Mode
-                      </Text>
-                      {tempBookingMode === 'CONCIERGE_CALL' && (
-                        <MaterialCommunityIcons name="check-circle" size={18} color="#F59E0B" />
-                      )}
-                    </View>
-                    <Text style={[styles.modeDesc, { color: theme.colors.placeholder }]}>
-                      Recommended for cold start. Customer app replaces online booking slots with a direct "Call to Book" button dialing the Marketing Manager.
-                    </Text>
-                  </View>
-                </View>
-              </TouchableOpacity>
-
-              {/* Hybrid Mode Card */}
-              <TouchableOpacity
-                activeOpacity={0.8}
-                onPress={() => setTempBookingMode('HYBRID')}
-                style={[
-                  styles.modeOptionCard,
-                  {
-                    borderColor: tempBookingMode === 'HYBRID' ? '#6366F1' : theme.colors.border,
-                    backgroundColor: tempBookingMode === 'HYBRID' ? '#6366F112' : theme.colors.background,
-                  }
-                ]}
-              >
-                <View style={{ flexDirection: 'row', alignItems: 'flex-start', gap: 10 }}>
-                  <MaterialCommunityIcons
-                    name="swap-horizontal"
-                    size={24}
-                    color={tempBookingMode === 'HYBRID' ? '#6366F1' : theme.colors.placeholder}
-                  />
-                  <View style={{ flex: 1 }}>
-                    <View style={{ flexDirection: 'row', alignItems: 'center', justifyContent: 'space-between' }}>
-                      <Text style={[styles.modeTitle, { color: tempBookingMode === 'HYBRID' ? '#6366F1' : theme.colors.text }]}>
-                        Hybrid Marketplace Mode
-                      </Text>
-                      {tempBookingMode === 'HYBRID' && (
-                        <MaterialCommunityIcons name="check-circle" size={18} color="#6366F1" />
-                      )}
-                    </View>
-                    <Text style={[styles.modeDesc, { color: theme.colors.placeholder }]}>
-                      Claimed/Registered workshops offer online slots; imported directory workshops route to the Concierge Helpline.
-                    </Text>
-                  </View>
-                </View>
-              </TouchableOpacity>
-
-              {/* Direct Online Mode Card */}
-              <TouchableOpacity
-                activeOpacity={0.8}
-                onPress={() => setTempBookingMode('DIRECT_ONLINE')}
-                style={[
-                  styles.modeOptionCard,
-                  {
-                    borderColor: tempBookingMode === 'DIRECT_ONLINE' ? '#10B981' : theme.colors.border,
-                    backgroundColor: tempBookingMode === 'DIRECT_ONLINE' ? '#10B98112' : theme.colors.background,
-                  }
-                ]}
-              >
-                <View style={{ flexDirection: 'row', alignItems: 'flex-start', gap: 10 }}>
-                  <MaterialCommunityIcons
-                    name="calendar-check"
-                    size={24}
-                    color={tempBookingMode === 'DIRECT_ONLINE' ? '#10B981' : theme.colors.placeholder}
-                  />
-                  <View style={{ flex: 1 }}>
-                    <View style={{ flexDirection: 'row', alignItems: 'center', justifyContent: 'space-between' }}>
-                      <Text style={[styles.modeTitle, { color: tempBookingMode === 'DIRECT_ONLINE' ? '#10B981' : theme.colors.text }]}>
-                        Direct Online Booking Mode
-                      </Text>
-                      {tempBookingMode === 'DIRECT_ONLINE' && (
-                        <MaterialCommunityIcons name="check-circle" size={18} color="#10B981" />
-                      )}
-                    </View>
-                    <Text style={[styles.modeDesc, { color: theme.colors.placeholder }]}>
-                      Full live online booking system active for all verified and approved garages.
-                    </Text>
-                  </View>
-                </View>
-              </TouchableOpacity>
-
-              {/* Concierge Phone Number Input */}
-              <View style={{ marginTop: 14 }}>
-                <Text style={[styles.inputLabel, { color: theme.colors.text }]}>Marketing Manager Helpline Phone</Text>
+            <ScrollView showsVerticalScrollIndicator={false} style={{ maxHeight: 480, paddingHorizontal: 18, paddingTop: 16 }}>
+              {/* Marketing Manager Phone */}
+              <View style={{ marginBottom: 14 }}>
+                <Text style={[styles.inputLabel, { color: theme.colors.text }]}>Central Helpline Phone Number</Text>
                 <Text style={[styles.inputHint, { color: theme.colors.placeholder }]}>
-                  This number is shown publicly to all customers across directory workshops.
+                  Dialed by customers when tapping "Call to Book" across all directory workshops.
                 </Text>
-                <View style={[styles.inputWrapper, { backgroundColor: theme.colors.background, borderColor: theme.colors.border }]}>
-                  <MaterialCommunityIcons name="phone" size={18} color="#F59E0B" />
+                <View style={[styles.inputWrapper, { backgroundColor: theme.colors.background, borderColor: theme.colors.border, marginTop: 6 }]}>
+                  <MaterialCommunityIcons name="phone" size={18} color="#0284C7" />
                   <TextInput
                     style={[styles.modalTextInput, { color: theme.colors.text }]}
                     value={tempConciergePhone}
@@ -1638,10 +1476,13 @@ export default function SuperAdminGaragesScreen({ navigation }: any) {
                 </View>
               </View>
 
-              {/* WhatsApp Support Number Input */}
-              <View style={{ marginTop: 12 }}>
-                <Text style={[styles.inputLabel, { color: theme.colors.text }]}>WhatsApp Helpline Number</Text>
-                <View style={[styles.inputWrapper, { backgroundColor: theme.colors.background, borderColor: theme.colors.border }]}>
+              {/* WhatsApp Support Number */}
+              <View style={{ marginBottom: 16 }}>
+                <Text style={[styles.inputLabel, { color: theme.colors.text }]}>WhatsApp Support Helpline</Text>
+                <Text style={[styles.inputHint, { color: theme.colors.placeholder }]}>
+                  Used for instant customer chat inquiries and callback confirmations.
+                </Text>
+                <View style={[styles.inputWrapper, { backgroundColor: theme.colors.background, borderColor: theme.colors.border, marginTop: 6 }]}>
                   <MaterialCommunityIcons name="whatsapp" size={18} color="#10B981" />
                   <TextInput
                     style={[styles.modalTextInput, { color: theme.colors.text }]}
@@ -1659,29 +1500,13 @@ export default function SuperAdminGaragesScreen({ navigation }: any) {
                 <View style={{ flex: 1, paddingRight: 12 }}>
                   <Text style={[styles.switchTitle, { color: theme.colors.text }]}>Mask Direct Workshop Phone</Text>
                   <Text style={[styles.switchSubtitle, { color: theme.colors.placeholder }]}>
-                    When active, customers never see the real garage phone—only your marketing manager's helpline.
+                    When enabled, customers never see the real garage phone—only your booking helpline.
                   </Text>
                 </View>
                 <Switch
                   value={tempHideDirectPhone}
                   onValueChange={setTempHideDirectPhone}
-                  trackColor={{ false: '#767577', true: '#6366F1' }}
-                  thumbColor="#FFFFFF"
-                />
-              </View>
-
-              {/* Require Profile Setup Switch */}
-              <View style={[styles.switchRow, { borderTopColor: theme.colors.border }]}>
-                <View style={{ flex: 1, paddingRight: 12 }}>
-                  <Text style={[styles.switchTitle, { color: theme.colors.text }]}>Require Setup Profile for Visibility</Text>
-                  <Text style={[styles.switchSubtitle, { color: theme.colors.placeholder }]}>
-                    When enabled, only workshops with complete setup profiles appear on the Customer app.
-                  </Text>
-                </View>
-                <Switch
-                  value={tempRequireProfile}
-                  onValueChange={setTempRequireProfile}
-                  trackColor={{ false: '#767577', true: '#10B981' }}
+                  trackColor={{ false: '#767577', true: '#0284C7' }}
                   thumbColor="#FFFFFF"
                 />
               </View>
@@ -1689,11 +1514,11 @@ export default function SuperAdminGaragesScreen({ navigation }: any) {
               {/* Template Download Link */}
               <TouchableOpacity
                 onPress={handleDownloadSampleExcel}
-                style={[styles.templateDownloadBtn, { borderColor: theme.colors.border }]}
+                style={[styles.templateDownloadBtn, { borderColor: theme.colors.border, marginTop: 18 }]}
               >
                 <MaterialCommunityIcons name="file-download-outline" size={18} color="#0284C7" />
                 <Text style={[styles.templateDownloadText, { color: '#0284C7' }]}>
-                  Download Sample Bulk Import Excel Template
+                  Download Sample Bulk Import Template (.xlsx)
                 </Text>
               </TouchableOpacity>
             </ScrollView>
@@ -1709,14 +1534,14 @@ export default function SuperAdminGaragesScreen({ navigation }: any) {
               <TouchableOpacity
                 onPress={handleSavePlatformSettings}
                 disabled={savingSettings}
-                style={[styles.modalSaveBtn, { backgroundColor: '#6366F1' }]}
+                style={[styles.modalSaveBtn, { backgroundColor: '#0284C7' }]}
               >
                 {savingSettings ? (
                   <ActivityIndicator size="small" color="#FFFFFF" />
                 ) : (
                   <>
                     <MaterialCommunityIcons name="content-save" size={16} color="#FFFFFF" style={{ marginRight: 6 }} />
-                    <Text style={styles.modalSaveText}>Save Strategy</Text>
+                    <Text style={styles.modalSaveText}>Save Configuration</Text>
                   </>
                 )}
               </TouchableOpacity>
@@ -1725,169 +1550,194 @@ export default function SuperAdminGaragesScreen({ navigation }: any) {
         </View>
       </Modal>
 
-      {/* Concierge Booking Leads Modal */}
+      {/* ================= MODAL: BULK UPLOAD EXCEL GUIDANCE & IMPORT ================= */}
       <Modal
-        visible={leadsModalVisible}
+        visible={uploadModalVisible}
         animationType="slide"
         transparent={true}
-        onRequestClose={() => setLeadsModalVisible(false)}
+        onRequestClose={() => {
+          if (!importingExcel) setUploadModalVisible(false);
+        }}
       >
         <View style={styles.modalOverlay}>
-          <View style={[styles.strategyModalContainer, { backgroundColor: theme.colors.card, maxHeight: '90%' }]}>
+          <View style={[styles.strategyModalContainer, { backgroundColor: theme.colors.card }]}>
             {/* Header */}
             <View style={[styles.modalHeader, { borderBottomColor: theme.colors.border }]}>
               <View style={{ flexDirection: 'row', alignItems: 'center', gap: 10 }}>
-                <View style={{ width: 40, height: 40, borderRadius: 10, backgroundColor: '#10B98120', justifyContent: 'center', alignItems: 'center' }}>
-                  <MaterialCommunityIcons name="clipboard-text-clock" size={24} color="#10B981" />
+                <View style={{ width: 40, height: 40, borderRadius: 10, backgroundColor: '#0284C715', justifyContent: 'center', alignItems: 'center' }}>
+                  <MaterialCommunityIcons name="file-excel-box" size={24} color="#0284C7" />
                 </View>
                 <View>
-                  <Text style={[styles.modalTitle, { color: theme.colors.text }]}>Concierge Leads Board</Text>
-                  <Text style={[styles.modalSubtitle, { color: theme.colors.placeholder }]}>
-                    Incoming calls & booking inquiries ({bookingLeads?.length || 0} total)
-                  </Text>
+                  <Text style={[styles.modalTitle, { color: theme.colors.text }]}>Bulk Upload Garages</Text>
+                  <Text style={[styles.modalSubtitle, { color: theme.colors.placeholder }]}>Import workshops via Excel (.xlsx) or CSV</Text>
                 </View>
               </View>
-              <TouchableOpacity onPress={() => setLeadsModalVisible(false)}>
+              <TouchableOpacity onPress={() => !importingExcel && setUploadModalVisible(false)}>
                 <MaterialCommunityIcons name="close" size={24} color={theme.colors.placeholder} />
               </TouchableOpacity>
             </View>
 
-            {/* Filter Chips */}
-            <View style={{ paddingHorizontal: 16, paddingTop: 10 }}>
-              <ScrollView horizontal showsHorizontalScrollIndicator={false}>
-                {(['ALL', 'NEW', 'CONTACTED', 'CONVERTED', 'LOST'] as const).map((st) => {
-                  const isSel = selectedLeadFilter === st;
-                  const count = st === 'ALL' ? (bookingLeads?.length || 0) : (bookingLeads?.filter((l: any) => l.status === st)?.length || 0);
-                  return (
-                    <TouchableOpacity
-                      key={st}
-                      onPress={() => setSelectedLeadFilter(st)}
-                      style={[
-                        styles.leadFilterChip,
-                        {
-                          backgroundColor: isSel ? '#10B981' : theme.colors.background,
-                          borderColor: isSel ? '#10B981' : theme.colors.border,
-                        }
-                      ]}
-                    >
-                      <Text style={{ fontFamily: fonts.bold, fontSize: 11, color: isSel ? '#FFFFFF' : theme.colors.text }}>
-                        {st} ({count})
-                      </Text>
-                    </TouchableOpacity>
-                  );
-                })}
-              </ScrollView>
-            </View>
-
-            {/* Leads List */}
-            {leadsLoading ? (
-              <View style={{ padding: 40, alignItems: 'center' }}>
-                <ActivityIndicator size="large" color="#10B981" />
-                <Text style={{ marginTop: 10, fontFamily: fonts.regular, color: theme.colors.placeholder }}>Loading customer inquiries...</Text>
+            <ScrollView showsVerticalScrollIndicator={false} style={{ maxHeight: 480, paddingHorizontal: 18, paddingTop: 14 }}>
+              {/* Guidance Notice */}
+              <View style={[styles.uploadInfoBanner, { backgroundColor: '#0284C710', borderColor: '#0284C730' }]}>
+                <MaterialCommunityIcons name="information-outline" size={18} color="#0284C7" style={{ marginTop: 2 }} />
+                <Text style={[styles.uploadInfoBannerText, { color: theme.colors.text }]}>
+                  Ensure your spreadsheet includes the exact columns below. The system automatically validates every row before adding garages to the live platform.
+                </Text>
               </View>
-            ) : (
-              <ScrollView showsVerticalScrollIndicator={false} style={{ paddingHorizontal: 16, paddingTop: 10, flex: 1 }}>
-                {(bookingLeads || [])
-                  .filter((l: any) => selectedLeadFilter === 'ALL' || l.status === selectedLeadFilter)
-                  .map((lead: any) => {
-                    const stColor = lead.status === 'NEW' ? '#0284C7' : lead.status === 'CONTACTED' ? '#F59E0B' : lead.status === 'CONVERTED' ? '#10B981' : '#6B7280';
-                    return (
-                      <View
-                        key={lead.id || lead._id}
-                        style={[styles.leadItemCard, { backgroundColor: theme.colors.background, borderColor: theme.colors.border }]}
-                      >
-                        <View style={{ flexDirection: 'row', justifyContent: 'space-between', alignItems: 'center', marginBottom: 6 }}>
-                          <View style={{ flexDirection: 'row', alignItems: 'center', gap: 6 }}>
-                            <MaterialCommunityIcons
-                              name={lead.leadType === 'WHATSAPP_CHAT' ? 'whatsapp' : lead.leadType === 'WEB_CALLBACK' ? 'web' : 'phone'}
-                              size={16}
-                              color={lead.leadType === 'WHATSAPP_CHAT' ? '#10B981' : '#0284C7'}
-                            />
-                            <Text style={[styles.leadCustomerName, { color: theme.colors.text }]}>
-                              {lead.customerName || 'Inquiring Customer'}
-                            </Text>
-                          </View>
-                          <View style={[styles.leadStatusPill, { backgroundColor: stColor + '20', borderColor: stColor }]}>
-                            <Text style={[styles.leadStatusText, { color: stColor }]}>{lead.status}</Text>
-                          </View>
-                        </View>
 
-                        <Text style={[styles.leadDetailsText, { color: theme.colors.placeholder }]}>
-                          📞 Phone: <Text style={{ fontFamily: fonts.bold, color: theme.colors.text }}>{lead.customerPhone}</Text>
-                        </Text>
-                        {lead.vehicleRegistration ? (
-                          <Text style={[styles.leadDetailsText, { color: theme.colors.placeholder }]}>
-                            🚗 Vehicle: <Text style={{ fontFamily: fonts.bold, color: '#D97706' }}>{lead.vehicleRegistration}</Text>
-                          </Text>
-                        ) : null}
-                        {lead.garageName ? (
-                          <Text style={[styles.leadDetailsText, { color: theme.colors.placeholder }]}>
-                            🏢 Garage: <Text style={{ fontFamily: fonts.semiBold, color: theme.colors.text }}>{lead.garageName}</Text>
-                          </Text>
-                        ) : null}
-                        <Text style={[styles.leadDateText, { color: theme.colors.placeholder }]}>
-                          📅 {lead.createdAt ? formatShortDate(lead.createdAt) : 'Recently'}
-                        </Text>
+              {/* Mandatory Fields Section */}
+              <View style={{ marginTop: 14 }}>
+                <View style={{ flexDirection: 'row', alignItems: 'center', marginBottom: 8, gap: 6 }}>
+                  <MaterialCommunityIcons name="alert-circle" size={16} color="#EF4444" />
+                  <Text style={[styles.sectionHeadingTitle, { color: theme.colors.text }]}>
+                    Mandatory Columns (Required)
+                  </Text>
+                  <View style={styles.requiredBadge}>
+                    <Text style={styles.requiredBadgeText}>4 REQUIRED</Text>
+                  </View>
+                </View>
 
-                        {/* Action buttons */}
-                        <View style={styles.leadActionsRow}>
-                          <TouchableOpacity
-                            onPress={() => Linking.openURL(`tel:${lead.customerPhone}`)}
-                            style={[styles.leadCallBtn, { backgroundColor: '#10B981' }]}
-                          >
-                            <MaterialCommunityIcons name="phone" size={14} color="#FFFFFF" style={{ marginRight: 4 }} />
-                            <Text style={styles.leadCallBtnText}>Call Customer</Text>
-                          </TouchableOpacity>
+                {/* 1. Garage Name */}
+                <View style={[styles.fieldRequirementCard, { backgroundColor: theme.colors.background, borderColor: theme.colors.border }]}>
+                  <View style={{ flexDirection: 'row', alignItems: 'center', justifyContent: 'space-between' }}>
+                    <View style={{ flexDirection: 'row', alignItems: 'center', gap: 8 }}>
+                      <View style={[styles.fieldDot, { backgroundColor: '#EF4444' }]} />
+                      <Text style={[styles.fieldRequirementTitle, { color: theme.colors.text }]}>Garage Name</Text>
+                    </View>
+                    <Text style={styles.fieldTagRed}>Required</Text>
+                  </View>
+                  <Text style={[styles.fieldRequirementDesc, { color: theme.colors.placeholder }]}>
+                    Official workshop or trading business name (minimum 2 characters).
+                  </Text>
+                  <Text style={[styles.fieldRequirementExample, { color: '#0284C7' }]}>
+                    e.g. "Apex MOT & Service Centre"
+                  </Text>
+                </View>
 
-                          {updatingLeadId === (lead.id || lead._id) ? (
-                            <ActivityIndicator size="small" color="#6366F1" style={{ marginLeft: 10 }} />
-                          ) : (
-                            <View style={{ flexDirection: 'row', gap: 6 }}>
-                              {lead.status !== 'CONTACTED' && (
-                                <TouchableOpacity
-                                  onPress={() => handleUpdateLeadStatus(lead.id || lead._id, 'CONTACTED')}
-                                  style={[styles.leadStatusActionBtn, { borderColor: '#F59E0B' }]}
-                                >
-                                  <Text style={{ fontFamily: fonts.bold, fontSize: 10, color: '#F59E0B' }}>Contacted</Text>
-                                </TouchableOpacity>
-                              )}
-                              {lead.status !== 'CONVERTED' ? (
-                                <TouchableOpacity
-                                  onPress={() => handleConvertLeadToBooking(lead)}
-                                  style={[styles.leadStatusActionBtn, { borderColor: '#10B981', backgroundColor: '#10B98115', flexDirection: 'row', alignItems: 'center', paddingHorizontal: 8 }]}
-                                >
-                                  <MaterialCommunityIcons name="calendar-check" size={13} color="#10B981" style={{ marginRight: 3 }} />
-                                  <Text style={{ fontFamily: fonts.bold, fontSize: 10, color: '#10B981' }}>Book for Customer</Text>
-                                </TouchableOpacity>
-                              ) : (
-                                <View style={{ flexDirection: 'row', alignItems: 'center', paddingHorizontal: 6, gap: 3 }}>
-                                  <MaterialCommunityIcons name="check-circle" size={14} color="#10B981" />
-                                  <Text style={{ fontFamily: fonts.bold, fontSize: 10, color: '#10B981' }}>Booked</Text>
-                                </View>
-                              )}
-                              {lead.status !== 'LOST' && (
-                                <TouchableOpacity
-                                  onPress={() => handleUpdateLeadStatus(lead.id || lead._id, 'LOST')}
-                                  style={[styles.leadStatusActionBtn, { borderColor: '#6B7280' }]}
-                                >
-                                  <Text style={{ fontFamily: fonts.bold, fontSize: 10, color: '#6B7280' }}>Lost</Text>
-                                </TouchableOpacity>
-                              )}
-                            </View>
-                          )}
-                        </View>
-                      </View>
-                    );
-                  })}
-              </ScrollView>
-            )}
+                {/* 2. Email */}
+                <View style={[styles.fieldRequirementCard, { backgroundColor: theme.colors.background, borderColor: theme.colors.border }]}>
+                  <View style={{ flexDirection: 'row', alignItems: 'center', justifyContent: 'space-between' }}>
+                    <View style={{ flexDirection: 'row', alignItems: 'center', gap: 8 }}>
+                      <View style={[styles.fieldDot, { backgroundColor: '#EF4444' }]} />
+                      <Text style={[styles.fieldRequirementTitle, { color: theme.colors.text }]}>Email Address</Text>
+                    </View>
+                    <Text style={styles.fieldTagRed}>Required</Text>
+                  </View>
+                  <Text style={[styles.fieldRequirementDesc, { color: theme.colors.placeholder }]}>
+                    Valid workshop email address for booking alerts and notifications.
+                  </Text>
+                  <Text style={[styles.fieldRequirementExample, { color: '#0284C7' }]}>
+                    e.g. "info@apexmot.co.uk"
+                  </Text>
+                </View>
 
-            <View style={[styles.modalActionButtons, { borderTopColor: theme.colors.border, padding: 12 }]}>
+                {/* 3. Internal Phone */}
+                <View style={[styles.fieldRequirementCard, { backgroundColor: theme.colors.background, borderColor: theme.colors.border }]}>
+                  <View style={{ flexDirection: 'row', alignItems: 'center', justifyContent: 'space-between' }}>
+                    <View style={{ flexDirection: 'row', alignItems: 'center', gap: 8 }}>
+                      <View style={[styles.fieldDot, { backgroundColor: '#EF4444' }]} />
+                      <Text style={[styles.fieldRequirementTitle, { color: theme.colors.text }]}>Internal Phone</Text>
+                    </View>
+                    <Text style={styles.fieldTagRed}>Required</Text>
+                  </View>
+                  <Text style={[styles.fieldRequirementDesc, { color: theme.colors.placeholder }]}>
+                    Direct workshop contact number (7 to 15 digits) for booking helpline coordinators.
+                  </Text>
+                  <Text style={[styles.fieldRequirementExample, { color: '#0284C7' }]}>
+                    e.g. "020 7946 0192" or "07700 900123"
+                  </Text>
+                </View>
+
+                {/* 4. Postcode */}
+                <View style={[styles.fieldRequirementCard, { backgroundColor: theme.colors.background, borderColor: theme.colors.border }]}>
+                  <View style={{ flexDirection: 'row', alignItems: 'center', justifyContent: 'space-between' }}>
+                    <View style={{ flexDirection: 'row', alignItems: 'center', gap: 8 }}>
+                      <View style={[styles.fieldDot, { backgroundColor: '#EF4444' }]} />
+                      <Text style={[styles.fieldRequirementTitle, { color: theme.colors.text }]}>Postcode</Text>
+                    </View>
+                    <Text style={styles.fieldTagRed}>Required</Text>
+                  </View>
+                  <Text style={[styles.fieldRequirementDesc, { color: theme.colors.placeholder }]}>
+                    Valid UK postcode used to locate and match nearby customers.
+                  </Text>
+                  <Text style={[styles.fieldRequirementExample, { color: '#0284C7' }]}>
+                    e.g. "SE1 7PB", "SW1A 1AA", "EC1A 1BB"
+                  </Text>
+                </View>
+              </View>
+
+              {/* Optional Fields Section */}
+              <View style={{ marginTop: 14 }}>
+                <View style={{ flexDirection: 'row', alignItems: 'center', marginBottom: 8, gap: 6 }}>
+                  <MaterialCommunityIcons name="check-circle-outline" size={16} color="#10B981" />
+                  <Text style={[styles.sectionHeadingTitle, { color: theme.colors.text }]}>
+                    Optional Columns (Auto-filled if omitted)
+                  </Text>
+                </View>
+
+                <View style={[styles.optionalGridCard, { backgroundColor: theme.colors.background, borderColor: theme.colors.border }]}>
+                  <View style={styles.optionalRow}>
+                    <Text style={[styles.optionalLabel, { color: theme.colors.text }]}>• Address / Street:</Text>
+                    <Text style={[styles.optionalValue, { color: theme.colors.placeholder }]}>Premises street address</Text>
+                  </View>
+                  <View style={styles.optionalRow}>
+                    <Text style={[styles.optionalLabel, { color: theme.colors.text }]}>• City / Town:</Text>
+                    <Text style={[styles.optionalValue, { color: theme.colors.placeholder }]}>Defaults to "London" if blank</Text>
+                  </View>
+                  <View style={styles.optionalRow}>
+                    <Text style={[styles.optionalLabel, { color: theme.colors.text }]}>• VTS Number:</Text>
+                    <Text style={[styles.optionalValue, { color: theme.colors.placeholder }]}>DVSA MOT station site number</Text>
+                  </View>
+                  <View style={styles.optionalRow}>
+                    <Text style={[styles.optionalLabel, { color: theme.colors.text }]}>• MOT AE Number:</Text>
+                    <Text style={[styles.optionalValue, { color: theme.colors.placeholder }]}>Authorised Examiner reference</Text>
+                  </View>
+                  <View style={styles.optionalRow}>
+                    <Text style={[styles.optionalLabel, { color: theme.colors.text }]}>• Opening Hours:</Text>
+                    <Text style={[styles.optionalValue, { color: theme.colors.placeholder }]}>Defaults to 08:00 – 18:00</Text>
+                  </View>
+                  <View style={styles.optionalRow}>
+                    <Text style={[styles.optionalLabel, { color: theme.colors.text }]}>• Coordinates:</Text>
+                    <Text style={[styles.optionalValue, { color: theme.colors.placeholder }]}>Latitude / Longitude (auto-defaults)</Text>
+                  </View>
+                </View>
+              </View>
+
+              {/* Download Sample Template Button */}
               <TouchableOpacity
-                onPress={() => setLeadsModalVisible(false)}
-                style={[styles.modalCancelBtn, { borderColor: theme.colors.border, flex: 1 }]}
+                onPress={handleDownloadSampleExcel}
+                style={[styles.templateDownloadBtn, { borderColor: theme.colors.border, marginTop: 16 }]}
               >
-                <Text style={[styles.modalCancelText, { color: theme.colors.text }]}>Close Board</Text>
+                <MaterialCommunityIcons name="file-download-outline" size={18} color="#0284C7" />
+                <Text style={[styles.templateDownloadText, { color: '#0284C7' }]}>
+                  Download Sample Bulk Import Template (.xlsx)
+                </Text>
+              </TouchableOpacity>
+            </ScrollView>
+
+            {/* Modal Actions */}
+            <View style={[styles.modalActionButtons, { borderTopColor: theme.colors.border }]}>
+              <TouchableOpacity
+                onPress={() => setUploadModalVisible(false)}
+                disabled={importingExcel}
+                style={[styles.modalCancelBtn, { borderColor: theme.colors.border }]}
+              >
+                <Text style={[styles.modalCancelText, { color: theme.colors.text }]}>Cancel</Text>
+              </TouchableOpacity>
+              <TouchableOpacity
+                onPress={handlePickAndImportExcel}
+                disabled={importingExcel}
+                style={[styles.modalSaveBtn, { backgroundColor: '#0284C7' }]}
+              >
+                {importingExcel ? (
+                  <ActivityIndicator size="small" color="#FFFFFF" />
+                ) : (
+                  <>
+                    <MaterialCommunityIcons name="cloud-upload" size={18} color="#FFFFFF" style={{ marginRight: 6 }} />
+                    <Text style={styles.modalSaveText}>Select & Upload Spreadsheet</Text>
+                  </>
+                )}
               </TouchableOpacity>
             </View>
           </View>
@@ -2547,5 +2397,85 @@ const styles = StyleSheet.create({
     paddingVertical: 4,
     borderRadius: 6,
     borderWidth: 1,
+  },
+  uploadInfoBanner: {
+    flexDirection: 'row',
+    gap: 8,
+    borderWidth: 1,
+    borderRadius: 8,
+    padding: 10,
+    alignItems: 'flex-start',
+  },
+  uploadInfoBannerText: {
+    flex: 1,
+    fontFamily: fonts.regular,
+    fontSize: 11.5,
+    lineHeight: 16,
+  },
+  sectionHeadingTitle: {
+    fontFamily: fonts.bold,
+    fontSize: 12.5,
+  },
+  requiredBadge: {
+    backgroundColor: '#EF444415',
+    paddingHorizontal: 6,
+    paddingVertical: 2,
+    borderRadius: 4,
+  },
+  requiredBadgeText: {
+    fontFamily: fonts.bold,
+    fontSize: 9.5,
+    color: '#EF4444',
+    letterSpacing: 0.5,
+  },
+  fieldRequirementCard: {
+    borderWidth: 1,
+    borderRadius: 8,
+    padding: 10,
+    marginBottom: 8,
+  },
+  fieldDot: {
+    width: 7,
+    height: 7,
+    borderRadius: 4,
+  },
+  fieldRequirementTitle: {
+    fontFamily: fonts.bold,
+    fontSize: 12,
+  },
+  fieldTagRed: {
+    fontFamily: fonts.bold,
+    fontSize: 10,
+    color: '#EF4444',
+  },
+  fieldRequirementDesc: {
+    fontFamily: fonts.regular,
+    fontSize: 11,
+    marginTop: 3,
+    lineHeight: 15,
+  },
+  fieldRequirementExample: {
+    fontFamily: fonts.medium,
+    fontSize: 10.5,
+    marginTop: 3,
+  },
+  optionalGridCard: {
+    borderWidth: 1,
+    borderRadius: 8,
+    padding: 10,
+    gap: 6,
+  },
+  optionalRow: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    gap: 6,
+  },
+  optionalLabel: {
+    fontFamily: fonts.semiBold,
+    fontSize: 11,
+  },
+  optionalValue: {
+    fontFamily: fonts.regular,
+    fontSize: 11,
   },
 });

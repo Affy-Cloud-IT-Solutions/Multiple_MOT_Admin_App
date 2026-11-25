@@ -105,8 +105,8 @@ export default function ProfileScreen({ navigation }: any) {
       Alert.alert(
         'Platform Mode Updated',
         newValue
-          ? `Concierge Mode is now ON:\n\n• Bulk upload & call leads board are now active in the Garages tab.\n• All customer apps will show "Call to Book" (${conciergePhoneNumber || '9999999999'}) instead of slots.`
-          : 'Concierge Mode is now OFF:\n\n• Normal full booking process restored.\n• Live slot calendar, date/time picker, and instant online booking are active for all garages.'
+          ? `Call to Book Mode is now ON:\n\n• Bulk upload & call leads board are now active in the Garages tab.\n• All customer apps will show "Call to Book" (${conciergePhoneNumber || '9999999999'}) instead of slots.`
+          : 'Call to Book Mode is now OFF:\n\n• Normal full booking process restored.\n• Live slot calendar, date/time picker, and instant online booking are active for all garages.'
       );
     } catch (err: any) {
       Alert.alert('Update Failed', err.message || 'Could not update concierge mode.');
@@ -660,10 +660,10 @@ export default function ProfileScreen({ navigation }: any) {
           />
           <SettingRow
             icon="phone-in-talk"
-            title="Concierge Mode (Call to Book)"
+            title="Call to Book Mode"
             subtitle={
               isConciergeMode
-                ? `Concierge Active: Garages show 'Call to Book' (${conciergePhoneNumber || '9999999999'}). Bulk upload & call leads active.`
+                ? `Helpline Active: Garages show 'Call to Book' (${conciergePhoneNumber || '9999999999'}). Bulk upload & call leads active.`
                 : 'Direct Online Booking Active: Normal whole booking process (slots, dates, times) enabled for all garages.'
             }
             control={
