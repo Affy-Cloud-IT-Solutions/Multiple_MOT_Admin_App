@@ -59,7 +59,6 @@ export default function SuperAdminGaragesScreen({ navigation }: any) {
   const [tempBookingMode, setTempBookingMode] = useState<'CONCIERGE_CALL' | 'HYBRID' | 'DIRECT_ONLINE'>(bookingMode || 'CONCIERGE_CALL');
   const [tempConciergePhone, setTempConciergePhone] = useState(conciergePhoneNumber || '9999999999');
   const [tempConciergeWhatsapp, setTempConciergeWhatsapp] = useState(conciergeWhatsappNumber || '9999999999');
-  const [tempHideDirectPhone, setTempHideDirectPhone] = useState(hideDirectGaragePhone !== false);
 
   // Excel Bulk Import States
   const [importingExcel, setImportingExcel] = useState(false);
@@ -115,7 +114,6 @@ export default function SuperAdminGaragesScreen({ navigation }: any) {
     setTempBookingMode(bookingMode || 'CONCIERGE_CALL');
     setTempConciergePhone(conciergePhoneNumber || '9999999999');
     setTempConciergeWhatsapp(conciergeWhatsappNumber || '9999999999');
-    setTempHideDirectPhone(hideDirectGaragePhone !== false);
     setSettingsModalVisible(true);
   };
 
@@ -126,11 +124,11 @@ export default function SuperAdminGaragesScreen({ navigation }: any) {
         bookingMode: tempBookingMode,
         conciergePhoneNumber: tempConciergePhone.trim() || '9999999999',
         conciergeWhatsappNumber: tempConciergeWhatsapp.trim() || '9999999999',
-        hideDirectGaragePhone: tempHideDirectPhone,
+        hideDirectGaragePhone: isConciergeMode,
       });
       setSettingsModalVisible(false);
       await refreshData();
-      Alert.alert('Settings Updated', 'Booking helpline and masking settings saved successfully!');
+      Alert.alert('Settings Updated', 'Booking helpline settings saved successfully!');
     } catch (err: any) {
       Alert.alert('Update Failed', err.message || 'Could not save platform settings.');
     } finally {
@@ -1493,22 +1491,6 @@ export default function SuperAdminGaragesScreen({ navigation }: any) {
                     keyboardType="phone-pad"
                   />
                 </View>
-              </View>
-
-              {/* Mask Real Garage Phone Switch */}
-              <View style={[styles.switchRow, { borderTopColor: theme.colors.border }]}>
-                <View style={{ flex: 1, paddingRight: 12 }}>
-                  <Text style={[styles.switchTitle, { color: theme.colors.text }]}>Mask Direct Workshop Phone</Text>
-                  <Text style={[styles.switchSubtitle, { color: theme.colors.placeholder }]}>
-                    When enabled, customers never see the real garage phone—only your booking helpline.
-                  </Text>
-                </View>
-                <Switch
-                  value={tempHideDirectPhone}
-                  onValueChange={setTempHideDirectPhone}
-                  trackColor={{ false: '#767577', true: '#0284C7' }}
-                  thumbColor="#FFFFFF"
-                />
               </View>
 
               {/* Template Download Link */}
