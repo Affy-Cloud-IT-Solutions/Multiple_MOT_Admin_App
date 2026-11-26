@@ -120,15 +120,24 @@ export default function SuperAdminGaragesScreen({ navigation }: any) {
   const handleSavePlatformSettings = async () => {
     setSavingSettings(true);
     try {
+      const isCallActive = tempBookingMode === 'CONCIERGE_CALL' || tempBookingMode === 'HYBRID';
       await updatePlatformSettings({
         bookingMode: tempBookingMode,
+        isConciergeMode: isCallActive,
+        hideDirectGaragePhone: isCallActive,
         conciergePhoneNumber: tempConciergePhone.trim() || '9999999999',
         conciergeWhatsappNumber: tempConciergeWhatsapp.trim() || '9999999999',
-        hideDirectGaragePhone: isConciergeMode,
       });
       setSettingsModalVisible(false);
       await refreshData();
-      Alert.alert('Settings Updated', 'Booking helpline settings saved successfully!');
+      Alert.alert(
+        'Platform Mode Updated',
+        tempBookingMode === 'CONCIERGE_CALL'
+          ? 'Call to Book Mode is now active for all garages.'
+          : tempBookingMode === 'HYBRID'
+          ? 'Hybrid Mode is now active: Claimed garages take online bookings, directory garages route to Call to Book.'
+          : 'Direct Online Booking is now active for all verified garages.'
+      );
     } catch (err: any) {
       Alert.alert('Update Failed', err.message || 'Could not save platform settings.');
     } finally {
@@ -389,22 +398,31 @@ export default function SuperAdminGaragesScreen({ navigation }: any) {
 
   return (
     <View style={[styles.container, { backgroundColor: theme.colors.background }]}>
-      {/* Marketplace & Concierge Strategy Banner */}
-      <View style={[styles.strategyCard, { backgroundColor: theme.colors.card, borderColor: isConciergeMode ? '#10B98150' : theme.colors.border }]}>
+      {/* Marketplace & Platform Booking Mode Strategy Banner */}
+      <View style={[styles.strategyCard, { 
+        backgroundColor: theme.colors.card, 
+        borderColor: bookingMode === 'HYBRID' ? '#6366F160' : isConciergeMode ? '#10B98150' : theme.colors.border 
+      }]}>
         <View style={styles.strategyTopRow}>
           <View style={{ flex: 1, paddingRight: 8 }}>
             <View style={{ flexDirection: 'row', alignItems: 'center', gap: 6, marginBottom: 2 }}>
               <MaterialCommunityIcons
-                name={isConciergeMode ? 'phone-in-talk' : 'calendar-check'}
+                name={bookingMode === 'HYBRID' ? 'swap-horizontal' : isConciergeMode ? 'phone-in-talk' : 'calendar-check'}
                 size={18}
-                color={isConciergeMode ? '#10B981' : '#6B7280'}
+                color={bookingMode === 'HYBRID' ? '#6366F1' : isConciergeMode ? '#10B981' : '#6B7280'}
               />
               <Text style={[styles.strategyBadgeTitle, { color: theme.colors.text }]}>
-                {isConciergeMode ? 'Call to Book Mode Active' : 'Direct Online Booking Active'}
+                {bookingMode === 'HYBRID'
+                  ? 'Hybrid Mode Active'
+                  : isConciergeMode
+                  ? 'Call to Book Mode Active'
+                  : 'Direct Online Booking Active'}
               </Text>
             </View>
             <Text style={[styles.strategySubtitle, { color: theme.colors.placeholder }]}>
-              {isConciergeMode
+              {bookingMode === 'HYBRID'
+                ? `Partners: online slots • Directory: Helpline (${conciergePhoneNumber || '9999999999'})`
+                : isConciergeMode
                 ? `Booking Helpline: ${conciergePhoneNumber || '9999999999'} • Customer apps show "Call to Book"`
                 : 'Whole normal booking process active (live slots, calendar, times)'}
             </Text>
@@ -417,8 +435,8 @@ export default function SuperAdminGaragesScreen({ navigation }: any) {
           />
         </View>
 
-        {/* When Concierge Mode is ON: Show Bulk Upload, Leads Board, and Settings */}
-        {isConciergeMode && (
+        {/* When Concierge or Hybrid Mode is ON: Show Bulk Upload, Leads Board, and Settings */}
+        {(isConciergeMode || bookingMode === 'HYBRID') && (
           <View style={styles.strategyActionRow}>
             <TouchableOpacity
               style={[styles.strategyBtn, { backgroundColor: '#0284C7', flex: 1.2 }]}
@@ -1439,91 +1457,163 @@ export default function SuperAdminGaragesScreen({ navigation }: any) {
         <View style={styles.modalOverlay}>
           <View style={[styles.strategyModalContainer, { backgroundColor: theme.colors.card }]}>
             {/* Header */}
-            <View style={[styles.modalHeader, { borderBottomColor: theme.colors.border }]}>
-              <View style={{ flexDirection: 'row', alignItems: 'center', gap: 10 }}>
-                <View style={{ width: 40, height: 40, borderRadius: 10, backgroundColor: '#0284C715', justifyContent: 'center', alignItems: 'center' }}>
-                  <MaterialCommunityIcons name="phone-settings" size={22} color="#0284C7" />
-                </View>
-                <View>
-                  <Text style={[styles.modalTitle, { color: theme.colors.text }]}>Booking Helpline Settings</Text>
-                  <Text style={[styles.modalSubtitle, { color: theme.colors.placeholder }]}>Manage customer booking lines & privacy</Text>
-                </View>
+            <View style={[styles.modalHeader, { borderBottomColor: theme.colors.border, paddingHorizontal: 16, paddingVertical: 12 }]}>
+              <View style={{ flexDirection: 'row', alignItems: 'center', gap: 8 }}>
+                <MaterialCommunityIcons name="cog-outline" size={20} color="#0284C7" />
+                <Text style={[styles.modalTitle, { color: theme.colors.text, fontSize: 15 }]}>Booking Mode & Helpline</Text>
               </View>
-              <TouchableOpacity onPress={() => setSettingsModalVisible(false)}>
-                <MaterialCommunityIcons name="close" size={24} color={theme.colors.placeholder} />
+              <TouchableOpacity onPress={() => setSettingsModalVisible(false)} hitSlop={{ top: 10, bottom: 10, left: 10, right: 10 }}>
+                <MaterialCommunityIcons name="close" size={20} color={theme.colors.placeholder} />
               </TouchableOpacity>
             </View>
 
-            <ScrollView showsVerticalScrollIndicator={false} style={{ maxHeight: 480, paddingHorizontal: 18, paddingTop: 16 }}>
-              {/* Marketing Manager Phone */}
-              <View style={{ marginBottom: 14 }}>
-                <Text style={[styles.inputLabel, { color: theme.colors.text }]}>Central Helpline Phone Number</Text>
-                <Text style={[styles.inputHint, { color: theme.colors.placeholder }]}>
-                  Dialed by customers when tapping "Call to Book" across all directory workshops.
-                </Text>
-                <View style={[styles.inputWrapper, { backgroundColor: theme.colors.background, borderColor: theme.colors.border, marginTop: 6 }]}>
-                  <MaterialCommunityIcons name="phone" size={18} color="#0284C7" />
-                  <TextInput
-                    style={[styles.modalTextInput, { color: theme.colors.text }]}
-                    value={tempConciergePhone}
-                    onChangeText={setTempConciergePhone}
-                    placeholder="9999999999"
-                    placeholderTextColor={theme.colors.placeholder}
-                    keyboardType="phone-pad"
+            <View style={{ paddingHorizontal: 16, paddingTop: 10, paddingBottom: 4 }}>
+              {/* 3 Compact Mode Rows */}
+              <View style={styles.compactModeGroup}>
+                {/* 1. Call to Book */}
+                <TouchableOpacity
+                  activeOpacity={0.7}
+                  onPress={() => setTempBookingMode('CONCIERGE_CALL')}
+                  style={[
+                    styles.compactModeRow,
+                    { borderColor: tempBookingMode === 'CONCIERGE_CALL' ? '#F59E0B' : theme.colors.border },
+                    tempBookingMode === 'CONCIERGE_CALL' && { backgroundColor: '#F59E0B12' }
+                  ]}
+                >
+                  <MaterialCommunityIcons
+                    name="phone-in-talk"
+                    size={17}
+                    color={tempBookingMode === 'CONCIERGE_CALL' ? '#F59E0B' : theme.colors.placeholder}
                   />
-                </View>
+                  <View style={{ flex: 1, marginLeft: 8 }}>
+                    <Text style={[styles.compactModeTitle, { color: tempBookingMode === 'CONCIERGE_CALL' ? '#F59E0B' : theme.colors.text }]}>
+                      Call to Book (All Garages)
+                    </Text>
+                    <Text style={[styles.compactModeSub, { color: theme.colors.placeholder }]}>
+                      All workshops show "Call to Book" connected to helpline
+                    </Text>
+                  </View>
+                  <MaterialCommunityIcons
+                    name={tempBookingMode === 'CONCIERGE_CALL' ? 'radiobox-marked' : 'radiobox-blank'}
+                    size={18}
+                    color={tempBookingMode === 'CONCIERGE_CALL' ? '#F59E0B' : theme.colors.placeholder}
+                  />
+                </TouchableOpacity>
+
+                {/* 2. Hybrid Mode */}
+                <TouchableOpacity
+                  activeOpacity={0.7}
+                  onPress={() => setTempBookingMode('HYBRID')}
+                  style={[
+                    styles.compactModeRow,
+                    { borderColor: tempBookingMode === 'HYBRID' ? '#6366F1' : theme.colors.border },
+                    tempBookingMode === 'HYBRID' && { backgroundColor: '#6366F112' }
+                  ]}
+                >
+                  <MaterialCommunityIcons
+                    name="swap-horizontal"
+                    size={17}
+                    color={tempBookingMode === 'HYBRID' ? '#6366F1' : theme.colors.placeholder}
+                  />
+                  <View style={{ flex: 1, marginLeft: 8 }}>
+                    <Text style={[styles.compactModeTitle, { color: tempBookingMode === 'HYBRID' ? '#6366F1' : theme.colors.text }]}>
+                      Hybrid Mode (Recommended)
+                    </Text>
+                    <Text style={[styles.compactModeSub, { color: theme.colors.placeholder }]}>
+                      Partners: online booking · Directory: helpline
+                    </Text>
+                  </View>
+                  <MaterialCommunityIcons
+                    name={tempBookingMode === 'HYBRID' ? 'radiobox-marked' : 'radiobox-blank'}
+                    size={18}
+                    color={tempBookingMode === 'HYBRID' ? '#6366F1' : theme.colors.placeholder}
+                  />
+                </TouchableOpacity>
+
+                {/* 3. Direct Online Booking */}
+                <TouchableOpacity
+                  activeOpacity={0.7}
+                  onPress={() => setTempBookingMode('DIRECT_ONLINE')}
+                  style={[
+                    styles.compactModeRow,
+                    { borderColor: tempBookingMode === 'DIRECT_ONLINE' ? '#10B981' : theme.colors.border },
+                    tempBookingMode === 'DIRECT_ONLINE' && { backgroundColor: '#10B98112' }
+                  ]}
+                >
+                  <MaterialCommunityIcons
+                    name="calendar-check"
+                    size={17}
+                    color={tempBookingMode === 'DIRECT_ONLINE' ? '#10B981' : theme.colors.placeholder}
+                  />
+                  <View style={{ flex: 1, marginLeft: 8 }}>
+                    <Text style={[styles.compactModeTitle, { color: tempBookingMode === 'DIRECT_ONLINE' ? '#10B981' : theme.colors.text }]}>
+                      Direct Online Booking
+                    </Text>
+                    <Text style={[styles.compactModeSub, { color: theme.colors.placeholder }]}>
+                      Full live slot booking calendar across all workshops
+                    </Text>
+                  </View>
+                  <MaterialCommunityIcons
+                    name={tempBookingMode === 'DIRECT_ONLINE' ? 'radiobox-marked' : 'radiobox-blank'}
+                    size={18}
+                    color={tempBookingMode === 'DIRECT_ONLINE' ? '#10B981' : theme.colors.placeholder}
+                  />
+                </TouchableOpacity>
               </View>
 
-              {/* WhatsApp Support Number */}
-              <View style={{ marginBottom: 16 }}>
-                <Text style={[styles.inputLabel, { color: theme.colors.text }]}>WhatsApp Support Helpline</Text>
-                <Text style={[styles.inputHint, { color: theme.colors.placeholder }]}>
-                  Used for instant customer chat inquiries and callback confirmations.
-                </Text>
-                <View style={[styles.inputWrapper, { backgroundColor: theme.colors.background, borderColor: theme.colors.border, marginTop: 6 }]}>
-                  <MaterialCommunityIcons name="whatsapp" size={18} color="#10B981" />
-                  <TextInput
-                    style={[styles.modalTextInput, { color: theme.colors.text }]}
-                    value={tempConciergeWhatsapp}
-                    onChangeText={setTempConciergeWhatsapp}
-                    placeholder="9999999999"
-                    placeholderTextColor={theme.colors.placeholder}
-                    keyboardType="phone-pad"
-                  />
+              {/* 2-Column Compact Phone Inputs */}
+              <View style={{ flexDirection: 'row', gap: 10, marginTop: 8 }}>
+                <View style={{ flex: 1 }}>
+                  <Text style={[styles.compactInputLabel, { color: theme.colors.text }]}>Helpline Phone</Text>
+                  <View style={[styles.compactInputWrapper, { backgroundColor: theme.colors.background, borderColor: theme.colors.border }]}>
+                    <MaterialCommunityIcons name="phone" size={15} color="#0284C7" />
+                    <TextInput
+                      style={[styles.compactTextInput, { color: theme.colors.text }]}
+                      value={tempConciergePhone}
+                      onChangeText={setTempConciergePhone}
+                      placeholder="9999999999"
+                      placeholderTextColor={theme.colors.placeholder}
+                      keyboardType="phone-pad"
+                    />
+                  </View>
+                </View>
+
+                <View style={{ flex: 1 }}>
+                  <Text style={[styles.compactInputLabel, { color: theme.colors.text }]}>WhatsApp Line</Text>
+                  <View style={[styles.compactInputWrapper, { backgroundColor: theme.colors.background, borderColor: theme.colors.border }]}>
+                    <MaterialCommunityIcons name="whatsapp" size={15} color="#10B981" />
+                    <TextInput
+                      style={[styles.compactTextInput, { color: theme.colors.text }]}
+                      value={tempConciergeWhatsapp}
+                      onChangeText={setTempConciergeWhatsapp}
+                      placeholder="9999999999"
+                      placeholderTextColor={theme.colors.placeholder}
+                      keyboardType="phone-pad"
+                    />
+                  </View>
                 </View>
               </View>
-
-              {/* Template Download Link */}
-              <TouchableOpacity
-                onPress={handleDownloadSampleExcel}
-                style={[styles.templateDownloadBtn, { borderColor: theme.colors.border, marginTop: 18 }]}
-              >
-                <MaterialCommunityIcons name="file-download-outline" size={18} color="#0284C7" />
-                <Text style={[styles.templateDownloadText, { color: '#0284C7' }]}>
-                  Download Sample Bulk Import Template (.xlsx)
-                </Text>
-              </TouchableOpacity>
-            </ScrollView>
+            </View>
 
             {/* Modal Actions */}
-            <View style={[styles.modalActionButtons, { borderTopColor: theme.colors.border }]}>
+            <View style={[styles.modalActionButtons, { borderTopColor: theme.colors.border, paddingVertical: 10, paddingHorizontal: 16 }]}>
               <TouchableOpacity
                 onPress={() => setSettingsModalVisible(false)}
-                style={[styles.modalCancelBtn, { borderColor: theme.colors.border }]}
+                style={[styles.modalCancelBtn, { borderColor: theme.colors.border, paddingVertical: 8 }]}
               >
-                <Text style={[styles.modalCancelText, { color: theme.colors.text }]}>Cancel</Text>
+                <Text style={[styles.modalCancelText, { color: theme.colors.text, fontSize: 12 }]}>Cancel</Text>
               </TouchableOpacity>
               <TouchableOpacity
                 onPress={handleSavePlatformSettings}
                 disabled={savingSettings}
-                style={[styles.modalSaveBtn, { backgroundColor: '#0284C7' }]}
+                style={[styles.modalSaveBtn, { backgroundColor: '#0284C7', paddingVertical: 8 }]}
               >
                 {savingSettings ? (
                   <ActivityIndicator size="small" color="#FFFFFF" />
                 ) : (
                   <>
-                    <MaterialCommunityIcons name="content-save" size={16} color="#FFFFFF" style={{ marginRight: 6 }} />
-                    <Text style={styles.modalSaveText}>Save Configuration</Text>
+                    <MaterialCommunityIcons name="content-save" size={15} color="#FFFFFF" style={{ marginRight: 5 }} />
+                    <Text style={[styles.modalSaveText, { fontSize: 12 }]}>Save Configuration</Text>
                   </>
                 )}
               </TouchableOpacity>
@@ -2205,6 +2295,46 @@ const styles = StyleSheet.create({
     alignSelf: 'center',
     borderRadius: 16,
     overflow: 'hidden',
+  },
+  compactModeGroup: {
+    gap: 6,
+  },
+  compactModeRow: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    paddingVertical: 7,
+    paddingHorizontal: 10,
+    borderRadius: 8,
+    borderWidth: 1.5,
+  },
+  compactModeTitle: {
+    fontFamily: fonts.bold,
+    fontSize: 12,
+  },
+  compactModeSub: {
+    fontFamily: fonts.regular,
+    fontSize: 10,
+    marginTop: 1,
+  },
+  compactInputLabel: {
+    fontFamily: fonts.semiBold,
+    fontSize: 11,
+    marginBottom: 4,
+  },
+  compactInputWrapper: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    borderWidth: 1,
+    borderRadius: 8,
+    paddingHorizontal: 8,
+    height: 38,
+  },
+  compactTextInput: {
+    flex: 1,
+    fontFamily: fonts.medium,
+    fontSize: 12,
+    marginLeft: 6,
+    paddingVertical: 0,
   },
   settingSectionTitle: {
     fontFamily: fonts.bold,
