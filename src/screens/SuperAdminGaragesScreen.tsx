@@ -161,10 +161,23 @@ export default function SuperAdminGaragesScreen({ navigation }: any) {
       });
       await refreshData();
       setUploadModalVisible(false);
-      Alert.alert(
-        'Excel Import Completed',
-        `Processed: ${res?.summary?.totalProcessed ?? 0} rows\nCreated: ${res?.summary?.created ?? 0}\nUpdated: ${res?.summary?.updated ?? 0}\nFailed: ${res?.summary?.failed ?? 0}`
-      );
+
+      const total = res?.totalRows ?? res?.summary?.totalProcessed ?? 0;
+      const created = res?.importedCount ?? res?.summary?.created ?? 0;
+      const updated = res?.updatedCount ?? res?.summary?.updated ?? 0;
+      const failed = (res?.errors?.length) ?? (res?.summary?.failed) ?? 0;
+
+      if (failed > 0 && (created > 0 || updated > 0)) {
+        Alert.alert(
+          'Excel Import Completed With Warnings',
+          `Processed: ${total} rows\nCreated: ${created}\nUpdated: ${updated}\nFailed: ${failed}\n\nFirst issue (Row ${res.errors[0]?.row}): ${res.errors[0]?.field} - ${res.errors[0]?.error}`
+        );
+      } else {
+        Alert.alert(
+          'Excel Import Completed',
+          `Processed: ${total} rows\nCreated: ${created}\nUpdated: ${updated}\nFailed: ${failed}`
+        );
+      }
     } catch (err: any) {
       if (err.message && err.message.includes('User canceled')) return;
       Alert.alert('Import Failed', err.message || 'Could not process Excel file.');
@@ -1666,7 +1679,7 @@ export default function SuperAdminGaragesScreen({ navigation }: any) {
                     Mandatory Columns (Required)
                   </Text>
                   <View style={styles.requiredBadge}>
-                    <Text style={styles.requiredBadgeText}>4 REQUIRED</Text>
+                    <Text style={styles.requiredBadgeText}>6 REQUIRED</Text>
                   </View>
                 </View>
 
@@ -1675,7 +1688,7 @@ export default function SuperAdminGaragesScreen({ navigation }: any) {
                   <View style={{ flexDirection: 'row', alignItems: 'center', justifyContent: 'space-between' }}>
                     <View style={{ flexDirection: 'row', alignItems: 'center', gap: 8 }}>
                       <View style={[styles.fieldDot, { backgroundColor: '#EF4444' }]} />
-                      <Text style={[styles.fieldRequirementTitle, { color: theme.colors.text }]}>Garage Name</Text>
+                      <Text style={[styles.fieldRequirementTitle, { color: theme.colors.text }]}>1. Garage Name</Text>
                     </View>
                     <Text style={styles.fieldTagRed}>Required</Text>
                   </View>
@@ -1687,37 +1700,37 @@ export default function SuperAdminGaragesScreen({ navigation }: any) {
                   </Text>
                 </View>
 
-                {/* 2. Email */}
+                {/* 2. Address / Street */}
                 <View style={[styles.fieldRequirementCard, { backgroundColor: theme.colors.background, borderColor: theme.colors.border }]}>
                   <View style={{ flexDirection: 'row', alignItems: 'center', justifyContent: 'space-between' }}>
                     <View style={{ flexDirection: 'row', alignItems: 'center', gap: 8 }}>
                       <View style={[styles.fieldDot, { backgroundColor: '#EF4444' }]} />
-                      <Text style={[styles.fieldRequirementTitle, { color: theme.colors.text }]}>Email Address</Text>
+                      <Text style={[styles.fieldRequirementTitle, { color: theme.colors.text }]}>2. Street Address</Text>
                     </View>
                     <Text style={styles.fieldTagRed}>Required</Text>
                   </View>
                   <Text style={[styles.fieldRequirementDesc, { color: theme.colors.placeholder }]}>
-                    Valid workshop email address for booking alerts and notifications.
+                    Workshop physical premises street address (minimum 3 characters).
                   </Text>
                   <Text style={[styles.fieldRequirementExample, { color: '#0284C7' }]}>
-                    e.g. "info@apexmot.co.uk"
+                    e.g. "10 Industrial Estate, London Road"
                   </Text>
                 </View>
 
-                {/* 3. Internal Phone */}
+                {/* 3. City / Town */}
                 <View style={[styles.fieldRequirementCard, { backgroundColor: theme.colors.background, borderColor: theme.colors.border }]}>
                   <View style={{ flexDirection: 'row', alignItems: 'center', justifyContent: 'space-between' }}>
                     <View style={{ flexDirection: 'row', alignItems: 'center', gap: 8 }}>
                       <View style={[styles.fieldDot, { backgroundColor: '#EF4444' }]} />
-                      <Text style={[styles.fieldRequirementTitle, { color: theme.colors.text }]}>Internal Phone</Text>
+                      <Text style={[styles.fieldRequirementTitle, { color: theme.colors.text }]}>3. City / Town</Text>
                     </View>
                     <Text style={styles.fieldTagRed}>Required</Text>
                   </View>
                   <Text style={[styles.fieldRequirementDesc, { color: theme.colors.placeholder }]}>
-                    Direct workshop contact number (7 to 15 digits) for booking helpline coordinators.
+                    Actual city or town name where the workshop is located (minimum 2 characters).
                   </Text>
                   <Text style={[styles.fieldRequirementExample, { color: '#0284C7' }]}>
-                    e.g. "020 7946 0192" or "07700 900123"
+                    e.g. "London", "Manchester", "Birmingham", "Leeds"
                   </Text>
                 </View>
 
@@ -1726,7 +1739,7 @@ export default function SuperAdminGaragesScreen({ navigation }: any) {
                   <View style={{ flexDirection: 'row', alignItems: 'center', justifyContent: 'space-between' }}>
                     <View style={{ flexDirection: 'row', alignItems: 'center', gap: 8 }}>
                       <View style={[styles.fieldDot, { backgroundColor: '#EF4444' }]} />
-                      <Text style={[styles.fieldRequirementTitle, { color: theme.colors.text }]}>Postcode</Text>
+                      <Text style={[styles.fieldRequirementTitle, { color: theme.colors.text }]}>4. Postcode</Text>
                     </View>
                     <Text style={styles.fieldTagRed}>Required</Text>
                   </View>
@@ -1737,6 +1750,40 @@ export default function SuperAdminGaragesScreen({ navigation }: any) {
                     e.g. "SE1 7PB", "SW1A 1AA", "EC1A 1BB"
                   </Text>
                 </View>
+
+                {/* 5. Internal Phone */}
+                <View style={[styles.fieldRequirementCard, { backgroundColor: theme.colors.background, borderColor: theme.colors.border }]}>
+                  <View style={{ flexDirection: 'row', alignItems: 'center', justifyContent: 'space-between' }}>
+                    <View style={{ flexDirection: 'row', alignItems: 'center', gap: 8 }}>
+                      <View style={[styles.fieldDot, { backgroundColor: '#EF4444' }]} />
+                      <Text style={[styles.fieldRequirementTitle, { color: theme.colors.text }]}>5. Internal Phone</Text>
+                    </View>
+                    <Text style={styles.fieldTagRed}>Required</Text>
+                  </View>
+                  <Text style={[styles.fieldRequirementDesc, { color: theme.colors.placeholder }]}>
+                    Direct workshop contact number (7 to 15 digits) for helpline coordinators.
+                  </Text>
+                  <Text style={[styles.fieldRequirementExample, { color: '#0284C7' }]}>
+                    e.g. "020 7946 0192" or "07700 900123"
+                  </Text>
+                </View>
+
+                {/* 6. Email */}
+                <View style={[styles.fieldRequirementCard, { backgroundColor: theme.colors.background, borderColor: theme.colors.border }]}>
+                  <View style={{ flexDirection: 'row', alignItems: 'center', justifyContent: 'space-between' }}>
+                    <View style={{ flexDirection: 'row', alignItems: 'center', gap: 8 }}>
+                      <View style={[styles.fieldDot, { backgroundColor: '#EF4444' }]} />
+                      <Text style={[styles.fieldRequirementTitle, { color: theme.colors.text }]}>6. Email Address</Text>
+                    </View>
+                    <Text style={styles.fieldTagRed}>Required</Text>
+                  </View>
+                  <Text style={[styles.fieldRequirementDesc, { color: theme.colors.placeholder }]}>
+                    Valid workshop email address for booking alerts and notifications.
+                  </Text>
+                  <Text style={[styles.fieldRequirementExample, { color: '#0284C7' }]}>
+                    e.g. "info@apexmot.co.uk"
+                  </Text>
+                </View>
               </View>
 
               {/* Optional Fields Section */}
@@ -1744,34 +1791,30 @@ export default function SuperAdminGaragesScreen({ navigation }: any) {
                 <View style={{ flexDirection: 'row', alignItems: 'center', marginBottom: 8, gap: 6 }}>
                   <MaterialCommunityIcons name="check-circle-outline" size={16} color="#10B981" />
                   <Text style={[styles.sectionHeadingTitle, { color: theme.colors.text }]}>
-                    Optional Columns (Auto-filled if omitted)
+                    Optional Columns (Leave Blank if None)
                   </Text>
                 </View>
 
                 <View style={[styles.optionalGridCard, { backgroundColor: theme.colors.background, borderColor: theme.colors.border }]}>
                   <View style={styles.optionalRow}>
-                    <Text style={[styles.optionalLabel, { color: theme.colors.text }]}>• Address / Street:</Text>
-                    <Text style={[styles.optionalValue, { color: theme.colors.placeholder }]}>Premises street address</Text>
-                  </View>
-                  <View style={styles.optionalRow}>
-                    <Text style={[styles.optionalLabel, { color: theme.colors.text }]}>• City / Town:</Text>
-                    <Text style={[styles.optionalValue, { color: theme.colors.placeholder }]}>Defaults to "London" if blank</Text>
+                    <Text style={[styles.optionalLabel, { color: theme.colors.text }]}>• Working Hours:</Text>
+                    <Text style={[styles.optionalValue, { color: theme.colors.placeholder }]}>Defaults to 08:30 – 17:30 if omitted</Text>
                   </View>
                   <View style={styles.optionalRow}>
                     <Text style={[styles.optionalLabel, { color: theme.colors.text }]}>• VTS Number:</Text>
-                    <Text style={[styles.optionalValue, { color: theme.colors.placeholder }]}>DVSA MOT station site number</Text>
+                    <Text style={[styles.optionalValue, { color: theme.colors.placeholder }]}>DVSA MOT station site number (optional)</Text>
                   </View>
                   <View style={styles.optionalRow}>
                     <Text style={[styles.optionalLabel, { color: theme.colors.text }]}>• MOT AE Number:</Text>
-                    <Text style={[styles.optionalValue, { color: theme.colors.placeholder }]}>Authorised Examiner reference</Text>
-                  </View>
-                  <View style={styles.optionalRow}>
-                    <Text style={[styles.optionalLabel, { color: theme.colors.text }]}>• Opening Hours:</Text>
-                    <Text style={[styles.optionalValue, { color: theme.colors.placeholder }]}>Defaults to 08:00 – 18:00</Text>
+                    <Text style={[styles.optionalValue, { color: theme.colors.placeholder }]}>Authorised Examiner reference (optional)</Text>
                   </View>
                   <View style={styles.optionalRow}>
                     <Text style={[styles.optionalLabel, { color: theme.colors.text }]}>• Coordinates:</Text>
-                    <Text style={[styles.optionalValue, { color: theme.colors.placeholder }]}>Latitude / Longitude (auto-defaults)</Text>
+                    <Text style={[styles.optionalValue, { color: theme.colors.placeholder }]}>Latitude / Longitude (optional)</Text>
+                  </View>
+                  <View style={styles.optionalRow}>
+                    <Text style={[styles.optionalLabel, { color: theme.colors.text }]}>• Description:</Text>
+                    <Text style={[styles.optionalValue, { color: theme.colors.placeholder }]}>Workshop specialties & overview (optional)</Text>
                   </View>
                 </View>
               </View>

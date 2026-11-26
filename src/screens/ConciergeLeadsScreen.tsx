@@ -25,7 +25,10 @@ interface LeadItem {
   customerName?: string;
   customerPhone?: string;
   customerEmail?: string;
+  registrationNumber?: string;
   vehicleRegistration?: string;
+  makeModel?: string;
+  vehicleMakeModel?: string;
   garageName?: string;
   garageId?: any;
   serviceName?: string;
@@ -96,13 +99,15 @@ export default function ConciergeLeadsScreen({ navigation }: any) {
       list = list.filter((l) => {
         const name = (l.customerName || '').toLowerCase();
         const phone = (l.customerPhone || '').toLowerCase();
-        const reg = (l.vehicleRegistration || '').toLowerCase();
+        const reg = (l.vehicleRegistration || l.registrationNumber || '').toLowerCase();
+        const mm = (l.makeModel || l.vehicleMakeModel || '').toLowerCase();
         const garage = (l.garageName || '').toLowerCase();
         const service = (l.serviceName || '').toLowerCase();
         return (
           name.includes(q) ||
           phone.includes(q) ||
           reg.includes(q) ||
+          mm.includes(q) ||
           garage.includes(q) ||
           service.includes(q)
         );
@@ -250,7 +255,7 @@ export default function ConciergeLeadsScreen({ navigation }: any) {
           ]}
         >
           {/* Phone & UK Plate */}
-          <View style={{ flexDirection: 'row', justifyContent: 'space-between', alignItems: 'center' }}>
+          <View style={{ flexDirection: 'row', justifyContent: 'space-between', alignItems: 'center', flexWrap: 'wrap', gap: 6 }}>
             <TouchableOpacity
               onPress={() => handleCallCustomer(item.customerPhone)}
               style={{ flexDirection: 'row', alignItems: 'center', gap: 6 }}
@@ -264,12 +269,31 @@ export default function ConciergeLeadsScreen({ navigation }: any) {
               </Text>
             </TouchableOpacity>
 
-            {item.vehicleRegistration ? (
+            {(item.vehicleRegistration || item.registrationNumber) ? (
               <View style={styles.ukPlateBadge}>
-                <Text style={styles.ukPlateText}>{item.vehicleRegistration}</Text>
+                <Text style={styles.ukPlateText}>
+                  {item.vehicleRegistration || item.registrationNumber}
+                </Text>
               </View>
             ) : null}
           </View>
+
+          {/* Vehicle Make/Model */}
+          {(item.makeModel || item.vehicleMakeModel) ? (
+            <View style={{ flexDirection: 'row', alignItems: 'center', gap: 6, marginTop: 6 }}>
+              <MaterialCommunityIcons name="car" size={15} color="#0284C7" />
+              <Text style={[styles.vehicleMakeModelText, { color: theme.colors.text }]} numberOfLines={1}>
+                {item.makeModel || item.vehicleMakeModel}
+              </Text>
+            </View>
+          ) : !(item.vehicleRegistration || item.registrationNumber) ? (
+            <View style={{ flexDirection: 'row', alignItems: 'center', gap: 6, marginTop: 6 }}>
+              <MaterialCommunityIcons name="car-off" size={14} color={theme.colors.placeholder} />
+              <Text style={[styles.vehicleMakeModelText, { color: theme.colors.placeholder }]}>
+                Vehicle details not provided
+              </Text>
+            </View>
+          ) : null}
 
           {/* Garage Name */}
           {item.garageName ? (
@@ -659,6 +683,10 @@ const styles = StyleSheet.create({
     fontSize: 11.5,
     color: '#1E293B',
     letterSpacing: 0.8,
+  },
+  vehicleMakeModelText: {
+    fontFamily: fonts.semiBold,
+    fontSize: 12,
   },
   garageNameText: {
     fontFamily: fonts.semiBold,
