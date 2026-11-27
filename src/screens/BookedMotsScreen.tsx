@@ -803,6 +803,7 @@ export default function BookedMotsScreen({ navigation }: any) {
             let cleanMake = 'Vehicle';
             if (typeof anyItem.makeModel === 'string' && anyItem.makeModel.trim()) {
               cleanMake = anyItem.makeModel
+                .split(' | Mobility:')[0]
                 .split(' (Slot:')[0]
                 .split(' at ')[0]
                 .split(' - Slot:')[0]
@@ -814,6 +815,14 @@ export default function BookedMotsScreen({ navigation }: any) {
             } else if (typeof anyItem.vehicle === 'object' && anyItem.vehicle) {
               cleanMake = `${anyItem.vehicle.make || ''} ${anyItem.vehicle.model || ''}`.trim() || 'Vehicle';
             }
+
+            const mobilityDisplay = anyItem.mobilityOption === 'collectAndDeliver' 
+              ? 'Collect & Deliver'
+              : anyItem.mobilityOption === 'courtesyCar'
+              ? 'Courtesy Car'
+              : (typeof anyItem.makeModel === 'string' && anyItem.makeModel.includes('Mobility: ') 
+                  ? anyItem.makeModel.split('Mobility: ')[1]?.trim()
+                  : null);
 
             const vrnText = typeof anyItem.registrationNumber === 'string' && anyItem.registrationNumber.trim()
               ? anyItem.registrationNumber.toUpperCase()
@@ -887,6 +896,15 @@ export default function BookedMotsScreen({ navigation }: any) {
                       {serviceNameText}{priceDisplay}
                     </Text>
                   </View>
+
+                  {mobilityDisplay ? (
+                    <View style={[styles.serviceTagBadge, { backgroundColor: '#F59E0B15', borderColor: '#F59E0B35', flexDirection: 'row', alignItems: 'center' }]}>
+                      <MaterialCommunityIcons name="car-pickup" size={11} color="#D97706" style={{ marginRight: 3 }} />
+                      <Text style={[styles.serviceTagText, { color: '#D97706', fontFamily: fonts.bold }]} numberOfLines={1}>
+                        {mobilityDisplay}
+                      </Text>
+                    </View>
+                  ) : null}
                 </View>
 
                 {/* 3. Customer Info Row & Bay / Extra Service */}

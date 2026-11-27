@@ -16,7 +16,7 @@ import {
 import { pick, types } from '@react-native-documents/picker';
 import MaterialCommunityIcons from 'react-native-vector-icons/MaterialCommunityIcons';
 import { useAppTheme } from '../context/ThemeContext';
-import { useAppValues, Garage, BASE_URL } from '../context/DataContext';
+import { useAppValues, Garage, BASE_URL, DEFAULT_UK_BENCHMARK_PRICING } from '../context/DataContext';
 import { fonts } from '../theme/theme';
 import { formatShortDate } from '../utils/dateUtils';
 
@@ -43,11 +43,14 @@ export default function SuperAdminGaragesScreen({ navigation }: any) {
     fetchBookingLeads,
     updateBookingLead,
     convertLeadToBooking,
+    fetchGaragePricing,
+    updateGaragePricing,
   } = useAppValues();
 
   const [searchQuery, setSearchQuery] = useState('');
   const [selectedFilter, setSelectedFilter] = useState<'ALL' | 'Approved' | 'Directory' | 'Claimed' | 'Pending' | 'Suspended'>('ALL');
   const [selectedGarage, setSelectedGarage] = useState<Garage | null>(null);
+  const [garagePricing, setGaragePricing] = useState<any>(null);
   const [modalVisible, setModalVisible] = useState(false);
   const [loadingAction, setLoadingAction] = useState(false);
   const [garageDetails, setGarageDetails] = useState<any>(null);
@@ -222,8 +225,42 @@ export default function SuperAdminGaragesScreen({ navigation }: any) {
     setGarageImages(garage.images || []);
     setNewImageUrl('');
     setGarageDetails(null);
+    setGaragePricing(null);
     setModalVisible(true);
-    fetchFullGarageDetails(garage.id || garage._id || '');
+    const gId = garage.id || garage._id || '';
+    if (gId) {
+      fetchFullGarageDetails(gId);
+      fetchGaragePricing(gId)
+        .then((p) => setGaragePricing(p))
+        .catch(() => setGaragePricing(null));
+    }
+  };
+
+  const handleResetGaragePricing = async () => {
+    if (!selectedGarage) return;
+    const gId = selectedGarage.id || selectedGarage._id || '';
+    Alert.alert(
+      'Apply Standard UK Rates? 🇬🇧',
+      `Reset ${selectedGarage.name}'s servicing matrix, MOT combo rules, and delivery fees to standard UK benchmark rates?`,
+      [
+        { text: 'Cancel', style: 'cancel' },
+        {
+          text: 'Apply Standard Rates',
+          onPress: async () => {
+            try {
+              setLoadingAction(true);
+              await updateGaragePricing(gId, DEFAULT_UK_BENCHMARK_PRICING);
+              setGaragePricing(DEFAULT_UK_BENCHMARK_PRICING);
+              Alert.alert('Success', 'Applied standard UK benchmark pricing rates.');
+            } catch (err: any) {
+              Alert.alert('Error', err.message || 'Failed to update pricing.');
+            } finally {
+              setLoadingAction(false);
+            }
+          },
+        },
+      ]
+    );
   };
 
   const handleOpenDocModal = (doc: any) => {
@@ -1171,6 +1208,82 @@ export default function SuperAdminGaragesScreen({ navigation }: any) {
                         );
                       })
                     )}
+                  </View>
+
+                  {/* BookMyGarage Tiered Rates & Pricing Section */}
+                  <View style={[styles.infoSection, { backgroundColor: theme.colors.background, borderColor: theme.colors.border }]}>
+                    <View style={{ flexDirection: 'row', justifyContent: 'space-between', alignItems: 'center', marginBottom: 10 }}>
+                      <View style={{ flexDirection: 'row', alignItems: 'center' }}>
+                        <MaterialCommunityIcons name="calculator-variant-outline" size={18} color={theme.colors.primary} style={{ marginRight: 6 }} />
+                        <Text style={[styles.infoSectionTitle, { color: theme.colors.text, marginBottom: 0 }]}>
+                          BookMyGarage Pricing Structure
+                        </Text>
+                      </View>
+                      <View style={{ backgroundColor: garagePricing?.isConfigured ? '#10B98120' : '#F59E0B20', paddingHorizontal: 8, paddingVertical: 2, borderRadius: 6 }}>
+                        <Text style={{ fontFamily: fonts.bold, fontSize: 11, color: garagePricing?.isConfigured ? '#10B981' : '#F59E0B' }}>
+                          {garagePricing?.isConfigured ? 'Active CC Tiers' : 'Default Benchmarks'}
+                        </Text>
+                      </View>
+                    </View>
+
+                    {/* Quick rate highlights */}
+                    <View style={{ backgroundColor: theme.colors.card, borderRadius: 8, padding: 10, borderWidth: 1, borderColor: theme.colors.border, marginBottom: 10 }}>
+                      <Text style={{ fontFamily: fonts.bold, fontSize: 11.5, color: theme.colors.text, marginBottom: 6 }}>
+                        Benchmark Servicing Rates (Mid-Bracket 1501-2000cc):
+                      </Text>
+                      <View style={{ flexDirection: 'row', flexWrap: 'wrap', gap: 6 }}>
+                        <View style={{ flex: 1, minWidth: '45%', backgroundColor: theme.colors.background, padding: 6, borderRadius: 6 }}>
+                          <Text style={{ fontFamily: fonts.regular, fontSize: 10.5, color: theme.colors.placeholder }}>Interim Service</Text>
+                          <Text style={{ fontFamily: fonts.bold, fontSize: 13, color: theme.colors.text }}>
+                            £{garagePricing?.servicing?.find((s: any) => s.bracket === '1501-2000cc')?.interim || 125}
+                          </Text>
+                        </View>
+                        <View style={{ flex: 1, minWidth: '45%', backgroundColor: theme.colors.background, padding: 6, borderRadius: 6 }}>
+                          <Text style={{ fontFamily: fonts.regular, fontSize: 10.5, color: theme.colors.placeholder }}>Full Service</Text>
+                          <Text style={{ fontFamily: fonts.bold, fontSize: 13, color: theme.colors.text }}>
+                            £{garagePricing?.servicing?.find((s: any) => s.bracket === '1501-2000cc')?.full || 185}
+                          </Text>
+                        </View>
+                        <View style={{ flex: 1, minWidth: '45%', backgroundColor: theme.colors.background, padding: 6, borderRadius: 6 }}>
+                          <Text style={{ fontFamily: fonts.regular, fontSize: 10.5, color: theme.colors.placeholder }}>Major Service</Text>
+                          <Text style={{ fontFamily: fonts.bold, fontSize: 13, color: theme.colors.text }}>
+                            £{garagePricing?.servicing?.find((s: any) => s.bracket === '1501-2000cc')?.major || 245}
+                          </Text>
+                        </View>
+                        <View style={{ flex: 1, minWidth: '45%', backgroundColor: theme.colors.background, padding: 6, borderRadius: 6 }}>
+                          <Text style={{ fontFamily: fonts.regular, fontSize: 10.5, color: theme.colors.placeholder }}>MOT (Standalone / Combo)</Text>
+                          <Text style={{ fontFamily: fonts.bold, fontSize: 13, color: '#10B981' }}>
+                            £{garagePricing?.mot?.standalonePrice || 54.85} / £{garagePricing?.mot?.comboWithFullMajor || 34.85}
+                          </Text>
+                        </View>
+                      </View>
+                    </View>
+
+                    <TouchableOpacity
+                      style={{
+                        flexDirection: 'row',
+                        alignItems: 'center',
+                        justifyContent: 'center',
+                        backgroundColor: '#6366F1',
+                        paddingVertical: 9,
+                        paddingHorizontal: 12,
+                        borderRadius: 8,
+                        gap: 6,
+                      }}
+                      disabled={loadingAction}
+                      onPress={handleResetGaragePricing}
+                    >
+                      {loadingAction ? (
+                        <ActivityIndicator size="small" color="#FFFFFF" />
+                      ) : (
+                        <>
+                          <MaterialCommunityIcons name="flash" size={16} color="#FFFFFF" />
+                          <Text style={{ fontFamily: fonts.bold, fontSize: 12, color: '#FFFFFF' }}>
+                            Apply Recommended UK Benchmark Rates
+                          </Text>
+                        </>
+                      )}
+                    </TouchableOpacity>
                   </View>
 
                   {/* Action Buttons - Only displayed when garage application is Pending */}

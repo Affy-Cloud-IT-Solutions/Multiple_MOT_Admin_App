@@ -18,6 +18,7 @@ import { useAppTheme } from '../context/ThemeContext';
 import { useAppValues } from '../context/DataContext';
 import { fonts } from '../theme/theme';
 import { formatShortDate, formatDateTime } from '../utils/dateUtils';
+import { useFocusEffect } from '@react-navigation/native';
 
 interface LeadItem {
   id?: string;
@@ -53,12 +54,14 @@ export default function ConciergeLeadsScreen({ navigation }: any) {
   const [refreshing, setRefreshing] = useState(false);
   const [convertingLeadId, setConvertingLeadId] = useState<string | null>(null);
 
-  // Load leads on mount
-  useEffect(() => {
-    fetchBookingLeads().catch((err: any) =>
-      console.error('[ConciergeLeadsScreen] Fetch error:', err)
-    );
-  }, [fetchBookingLeads]);
+  // Load leads on mount and when screen regains focus (e.g. switching between admin tabs)
+  useFocusEffect(
+    useCallback(() => {
+      fetchBookingLeads().catch((err: any) =>
+        console.error('[ConciergeLeadsScreen] Fetch error:', err)
+      );
+    }, [fetchBookingLeads])
+  );
 
   // Pull to refresh
   const handleRefresh = useCallback(async () => {
@@ -114,7 +117,15 @@ export default function ConciergeLeadsScreen({ navigation }: any) {
       });
     }
 
-    return list;
+    // Deduplicate any identical lead IDs defensively
+    const seenIds = new Set<string>();
+    return list.filter((l) => {
+      const id = String(l._id || l.id || '');
+      if (!id) return true;
+      if (seenIds.has(id)) return false;
+      seenIds.add(id);
+      return true;
+    });
   }, [bookingLeads, selectedTab, searchQuery]);
 
   // Safe Phone Calling Helper with sanitization & error handling

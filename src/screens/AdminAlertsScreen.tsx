@@ -439,6 +439,18 @@ export default function AdminAlertsScreen({ navigation }: any) {
                           </Text>
                         </View>
                       )}
+                      {(item.mobilityOption || item.deliveryFee || (item.makeModel && item.makeModel.includes('Mobility: '))) ? (
+                        <View style={{ flexDirection: 'row', alignItems: 'center', marginTop: 4 }}>
+                          <MaterialCommunityIcons name="car-pickup" size={14} color="#D97706" style={{ marginRight: 6 }} />
+                          <Text style={{ fontSize: 12, fontFamily: fonts.bold, color: '#D97706' }}>
+                            {item.mobilityOption === 'collectAndDeliver'
+                              ? `Collect & Deliver${item.deliveryFee ? ` (+£${item.deliveryFee})` : ''}`
+                              : item.mobilityOption === 'courtesyCar'
+                              ? `Courtesy Car${item.deliveryFee ? ` (+£${item.deliveryFee})` : ''}`
+                              : (item.makeModel && item.makeModel.includes('Mobility: ') ? item.makeModel.split('Mobility: ')[1]?.trim() : 'Customer Drop-off')}
+                          </Text>
+                        </View>
+                      ) : null}
                     </View>
                   )}
                 </View>

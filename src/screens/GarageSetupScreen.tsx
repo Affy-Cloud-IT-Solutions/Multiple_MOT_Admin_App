@@ -20,7 +20,8 @@ import { launchImageLibrary } from 'react-native-image-picker';
 import { pick, types } from '@react-native-documents/picker';
 import AsyncStorage from '@react-native-async-storage/async-storage';
 import { useAppTheme } from '../context/ThemeContext';
-import { useAppValues, BASE_URL, ServiceCatalogGroup } from '../context/DataContext';
+import { useAppValues, BASE_URL, ServiceCatalogGroup, GaragePricing, DEFAULT_UK_BENCHMARK_PRICING } from '../context/DataContext';
+import TieredPricingConfigurator from '../components/TieredPricingConfigurator';
 import { fonts } from '../theme/theme';
 import { resolveImageUrl, API_ORIGIN } from '../utils/imageUtils';
 import {
@@ -242,6 +243,7 @@ function TabDot({ show }: { show: boolean }) {
 
 export default function GarageSetupScreen({ route, navigation }: any) {
   const { theme, isDarkMode } = useAppTheme();
+  const LOGO_BLUE = isDarkMode ? '#1677FF' : '#012652';
   const {
     user,
     currentGarage,
@@ -250,6 +252,8 @@ export default function GarageSetupScreen({ route, navigation }: any) {
     uploadGarageDocument,
     submitCurrentGarageForReview,
     fetchServiceCatalog,
+    fetchGaragePricing,
+    updateGaragePricing,
     isProfileMandatory: contextIsProfileMandatory,
   } = useAppValues();
   const isProfileMandatory = typeof contextIsProfileMandatory === 'boolean'
@@ -291,7 +295,9 @@ export default function GarageSetupScreen({ route, navigation }: any) {
   const [autofillSuccessNotice, setAutofillSuccessNotice] = useState<string | null>(null);
   const streetSearchDebounceRef = React.useRef<any>(null);
 
-  // Tab 2: Services
+  // Tab 2: Services & CC-Tiered Pricing
+  const [pricing, setPricing] = useState<GaragePricing>(DEFAULT_UK_BENCHMARK_PRICING);
+  const [pricingLoaded, setPricingLoaded] = useState(false);
   const [servicesList, setServicesList] = useState<ServiceItemState[]>([]);
   const [catalog, setCatalog] = useState<ServiceCatalogGroup[] | null>(null);
   const [catalogLoading, setCatalogLoading] = useState(true);
@@ -386,6 +392,21 @@ export default function GarageSetupScreen({ route, navigation }: any) {
   useEffect(() => {
     loadCatalog();
   }, [loadCatalog]);
+
+  // Load CC-tiered pricing model for current garage
+  useEffect(() => {
+    const garageId = currentGarage?.id || currentGarage?._id || user?.garageId;
+    if (garageId && !pricingLoaded) {
+      fetchGaragePricing(garageId)
+        .then((p: any) => {
+          if (p && p.servicingTiers) {
+            setPricing(p);
+          }
+          setPricingLoaded(true);
+        })
+        .catch(() => setPricingLoaded(true));
+    }
+  }, [currentGarage, user, pricingLoaded, fetchGaragePricing]);
 
   // Rebuild the list only when the catalog or the saved services change, so unsaved ticks aren't lost
   const savedServicesKey = JSON.stringify([currentGarage?.servicesConfigured, currentGarage?.services || []]);
@@ -761,33 +782,45 @@ export default function GarageSetupScreen({ route, navigation }: any) {
     setServicesList(prev => prev.map(item => item.id === id ? { ...item, duration: newDuration } : item));
   };
 
-  // Save Services (Tab 2)
+  // Save Services & CC-Tiered Pricing (Tab 2)
   const handleSaveServices = async () => {
-    const selected = servicesList.filter(s => s.selected);
-    const badPrice = selected.find(s => !s.price.trim() || isNaN(parseFloat(s.price)) || parseFloat(s.price) < 0);
-    if (badPrice) {
-      Alert.alert('Check Your Prices', `Please enter a valid price for "${badPrice.name}".`);
-      return;
-    }
-    if (selected.length === 0) {
-      Alert.alert('No Services Selected', 'Please select at least one service you offer and set its price.');
-      return;
-    }
-
     setSavingServices(true);
     try {
       const garageId = currentGarage?.id || currentGarage?._id || user?.garageId;
       if (!garageId) throw new Error('No garage account identified.');
 
-      const payload = selected.map(s => ({
-        name: s.name,
-        category: s.category,
-        price: parseFloat(s.price) || s.defaultPrice || 45,
-        duration: parseInt(String(s.duration), 10) || 45,
-        description: `${s.name} at ${currentGarage?.name || 'our garage'}`,
+      // 1. Persist CC-Tiered Pricing Matrix to backend
+      await updateGaragePricing(garageId, pricing);
+
+      // 2. Prepare baseline services from the standard 1501-2000cc bracket + custom workshop products
+      const standardTier = pricing.servicingTiers?.['1501_to_2000'] || { interim: 118, full: 136, major: 149, oilChange: 89 };
+      const defaultCoreServices = [
+        { name: 'Interim Service', category: 'Servicing', price: standardTier.interim, duration: 90, description: 'Interim service check + oil & filter' },
+        { name: 'Full Service', category: 'Servicing', price: standardTier.full, duration: 120, description: 'Comprehensive 70+ point service check' },
+        { name: 'Major Service', category: 'Servicing', price: standardTier.major, duration: 150, description: 'Major service including filters & spark plugs' },
+        { name: 'Oil & Filter Change', category: 'Servicing', price: standardTier.oilChange || 89, duration: 60, description: 'Engine oil drain & filter replacement' },
+        { name: 'MOT Test', category: 'MOT', price: pricing.mot?.class4Standalone || 54.85, duration: 45, description: 'DVSA Class 4 vehicle safety inspection' },
+      ];
+
+      // Merge with custom workshop products
+      const customPayload = (pricing.customProducts || []).map((cp: any) => ({
+        name: cp.name,
+        category: 'Others',
+        price: cp.price || 50,
+        duration: 45,
+        description: cp.description || `${cp.name} at ${currentGarage?.name || 'our garage'}`,
         availability: ['Monday', 'Tuesday', 'Wednesday', 'Thursday', 'Friday'],
-        isActive: true
+        isActive: cp.enabled !== false,
       }));
+
+      const payload = [
+        ...defaultCoreServices.map(s => ({
+          ...s,
+          availability: ['Monday', 'Tuesday', 'Wednesday', 'Thursday', 'Friday'],
+          isActive: true
+        })),
+        ...customPayload
+      ];
 
       await updateGarageProfile(garageId, { 
         services: payload,
@@ -795,10 +828,10 @@ export default function GarageSetupScreen({ route, navigation }: any) {
       });
       await AsyncStorage.setItem(`garage_srv_${garageId}`, 'true');
       await fetchCurrentGarage();
-      Alert.alert('Services Saved! 🏷️', `You have saved ${payload.length} service(s) with your custom pricing rates.`);
+      Alert.alert('Pricing Rates Saved! 🏷️', 'Successfully configured 6-tier engine pricing rates, MOT combos, and workshop options.');
       setActiveTab('documents');
     } catch (err: any) {
-      Alert.alert('Error', err.message || 'Failed to save services.');
+      Alert.alert('Error', err.message || 'Failed to save pricing configuration.');
     } finally {
       setSavingServices(false);
     }
@@ -1404,181 +1437,24 @@ export default function GarageSetupScreen({ route, navigation }: any) {
               </View>
             )}
 
-            {catalogLoading ? (
-              <View style={styles.catalogState}>
-                <ActivityIndicator color={theme.colors.primary} />
-                <Text style={[styles.catalogStateText, { color: theme.colors.placeholder }]}>Loading service categories...</Text>
-              </View>
-            ) : catalogError ? (
-              <View style={styles.catalogState}>
-                <MaterialCommunityIcons name="cloud-alert" size={30} color={theme.colors.placeholder} />
-                <Text style={[styles.catalogStateText, { color: theme.colors.text }]}>{catalogError}</Text>
-                <TouchableOpacity style={[styles.retryBtn, { backgroundColor: theme.colors.primary }]} onPress={loadCatalog}>
-                  <Text style={[styles.retryBtnText, { color: onPrimary }]}>Try Again</Text>
-                </TouchableOpacity>
-              </View>
-            ) : servicesList.length === 0 ? (
-              <View style={styles.catalogState}>
-                <MaterialCommunityIcons name="shape-outline" size={30} color={theme.colors.placeholder} />
-                <Text style={[styles.catalogStateText, { color: theme.colors.text }]}>No service categories are available yet.</Text>
-                <Text style={[styles.catalogStateText, { color: theme.colors.placeholder }]}>Please check back soon or contact support.</Text>
-              </View>
-            ) : (
-              <>
-                {/* Catalog Search & Category Tabs */}
-                <View style={{ marginBottom: 12 }}>
-                  <View style={[styles.searchInputWrapper, { backgroundColor: isDarkMode ? '#1E293B' : '#F1F5F9', borderColor: theme.colors.border, marginBottom: 10 }]}>
-                    <MaterialCommunityIcons name="magnify" size={18} color={theme.colors.placeholder} style={{ marginRight: 6 }} />
-                    <TextInput
-                      style={[styles.searchInput, { color: theme.colors.text }]}
-                      placeholder="Search catalog services..."
-                      placeholderTextColor={theme.colors.placeholder}
-                      value={catalogSearch}
-                      onChangeText={setCatalogSearch}
-                    />
-                    {catalogSearch.length > 0 && (
-                      <TouchableOpacity onPress={() => setCatalogSearch('')}>
-                        <MaterialCommunityIcons name="close-circle" size={16} color={theme.colors.placeholder} />
-                      </TouchableOpacity>
-                    )}
-                  </View>
-
-                  <ScrollView horizontal showsHorizontalScrollIndicator={false}>
-                    {allCategoryTabs.map((cat) => {
-                      const isSelected = catalogActiveCategory === cat;
-                      return (
-                        <TouchableOpacity
-                          key={cat}
-                          style={[
-                            styles.catSelectPill,
-                            isSelected
-                              ? { backgroundColor: theme.colors.primary, borderColor: theme.colors.primary }
-                              : { backgroundColor: isDarkMode ? '#1E293B' : '#F1F5F9', borderColor: theme.colors.border },
-                          ]}
-                          onPress={() => setCatalogActiveCategory(cat)}
-                        >
-                          <Text style={{ fontFamily: fonts.bold, color: isSelected ? '#FFFFFF' : theme.colors.text, fontSize: 11.5 }}>
-                            {cat}
-                          </Text>
-                        </TouchableOpacity>
-                      );
-                    })}
-                  </ScrollView>
-                </View>
-
-                {/* Filtered Services List */}
-                {filteredServices.length === 0 ? (
-                  <View style={{ padding: 30, alignItems: 'center' }}>
-                    <MaterialCommunityIcons name="magnify-close" size={36} color={theme.colors.placeholder} style={{ marginBottom: 6 }} />
-                    <Text style={{ fontFamily: fonts.bold, color: theme.colors.text, fontSize: 14 }}>No catalog services found</Text>
-                    <Text style={{ fontFamily: fonts.regular, color: theme.colors.placeholder, fontSize: 12, marginTop: 2 }}>
-                      Try another search or category.
-                    </Text>
-                  </View>
-                ) : (
-                  <View style={styles.servicesContainer}>
-                    {filteredServices.map((item) => {
-                      const isSelected = item.selected;
-                      const catInfo = getCategoryMeta(item.category);
-
-                      return (
-                        <View
-                          key={item.id}
-                          style={[
-                            styles.catalogItemCard,
-                            {
-                              backgroundColor: isSelected ? theme.colors.primary + '0C' : (isDarkMode ? '#1E293B' : '#F8FAFC'),
-                              borderColor: isSelected ? theme.colors.primary : theme.colors.border,
-                            },
-                          ]}
-                        >
-                          <TouchableOpacity
-                            style={{ flexDirection: 'row', alignItems: 'center', width: '100%' }}
-                            onPress={() => handleToggleService(item.id)}
-                            activeOpacity={0.7}
-                          >
-                            <View style={[styles.checkboxSquare, { borderColor: isSelected ? theme.colors.primary : theme.colors.border, backgroundColor: isSelected ? theme.colors.primary : 'transparent' }]}>
-                              {isSelected && <MaterialCommunityIcons name="check" size={14} color="#FFFFFF" />}
-                            </View>
-
-                            <View style={[styles.catIconCircle, { width: 34, height: 34, marginLeft: 10, marginRight: 10, backgroundColor: catInfo.bg }]}>
-                              <MaterialCommunityIcons name={(item.icon || catInfo.icon) as any} size={18} color={catInfo.text} />
-                            </View>
-
-                            <View style={{ flex: 1 }}>
-                              <Text style={[styles.catalogItemName, { color: theme.colors.text }]} numberOfLines={1}>
-                                {item.name}
-                              </Text>
-                              <Text style={[styles.catalogItemCat, { color: theme.colors.placeholder }]}>
-                                {item.category}
-                              </Text>
-                            </View>
-
-                            {isSelected && (
-                              <View style={[styles.catalogActiveTag, { backgroundColor: theme.colors.primary + '18' }]}>
-                                <Text style={[styles.catalogActiveTagText, { color: theme.colors.primary }]}>Active</Text>
-                              </View>
-                            )}
-                          </TouchableOpacity>
-
-                          {/* Custom Rate & Timing Fields */}
-                          {isSelected && (
-                            <View style={[styles.catalogConfigBox, { backgroundColor: isDarkMode ? '#0F172A' : '#FFFFFF', borderColor: theme.colors.border }]}>
-                              <View style={styles.catalogConfigField}>
-                                <Text style={[styles.catalogConfigLabel, { color: theme.colors.placeholder }]}>
-                                  Rate (£)
-                                </Text>
-                                <View style={[styles.catalogInputWrap, { backgroundColor: isDarkMode ? '#1E293B' : '#F8FAFC', borderColor: theme.colors.border }]}>
-                                  <Text style={[styles.catalogCurrencyText, { color: theme.colors.primary }]}>£</Text>
-                                  <TextInput
-                                    style={[styles.catalogInputText, { color: theme.colors.text }]}
-                                    keyboardType="decimal-pad"
-                                    value={item.price}
-                                    placeholder={String(item.defaultPrice || '45')}
-                                    placeholderTextColor={theme.colors.placeholder}
-                                    onChangeText={(val) => handlePriceChange(item.id, val)}
-                                  />
-                                </View>
-                              </View>
-
-                              <View style={styles.catalogConfigField}>
-                                <Text style={[styles.catalogConfigLabel, { color: theme.colors.placeholder }]}>
-                                  Timing (mins)
-                                </Text>
-                                <View style={[styles.catalogInputWrap, { backgroundColor: isDarkMode ? '#1E293B' : '#F8FAFC', borderColor: theme.colors.border }]}>
-                                  <MaterialCommunityIcons name="clock-outline" size={13} color={theme.colors.placeholder} style={{ marginRight: 4 }} />
-                                  <TextInput
-                                    style={[styles.catalogInputText, { color: theme.colors.text }]}
-                                    keyboardType="number-pad"
-                                    value={String(item.duration)}
-                                    placeholder="45"
-                                    placeholderTextColor={theme.colors.placeholder}
-                                    onChangeText={(val) => handleDurationChange(item.id, val)}
-                                  />
-                                  <Text style={[styles.catalogUnitText, { color: theme.colors.placeholder }]}>min</Text>
-                                </View>
-                              </View>
-                            </View>
-                          )}
-                        </View>
-                      );
-                    })}
-                  </View>
-                )}
-              </>
-            )}
+            {/* 1. BookMyGarage 6-Tier CC Servicing Matrix, MOT Combos & Delivery Config */}
+            <TieredPricingConfigurator
+              pricing={pricing}
+              onChange={setPricing}
+              onApplyStandardRates={() => setPricing({ ...DEFAULT_UK_BENCHMARK_PRICING })}
+            />
 
             <TouchableOpacity
-              style={[styles.saveBtn, { backgroundColor: theme.colors.primary, marginTop: 16 }]}
+              style={[styles.saveBtn, { backgroundColor: LOGO_BLUE, marginTop: 16 }]}
               onPress={handleSaveServices}
-              disabled={savingServices || catalogLoading || Boolean(catalogError)}
+              disabled={savingServices}
             >
               {savingServices ? (
-                <ActivityIndicator color={onPrimary} />
+                <ActivityIndicator color="#FFFFFF" />
               ) : (
                 <>
-                  <MaterialCommunityIcons name="content-save-check" size={20} color={onPrimary} />
-                  <Text style={[styles.saveBtnText, { color: onPrimary }]}>Save & Continue ({selectedCount}) ➔</Text>
+                  <MaterialCommunityIcons name="content-save-check" size={20} color="#FFFFFF" />
+                  <Text style={[styles.saveBtnText, { color: '#FFFFFF' }]}>Save Pricing Rates & Continue ➔</Text>
                 </>
               )}
             </TouchableOpacity>

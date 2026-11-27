@@ -69,6 +69,9 @@ export interface AlertNotification {
   invoiceId?: string;
   hasInvoice?: boolean;
   invoiceTotal?: number;
+  mobilityOption?: 'dropOff' | 'collectAndDeliver' | 'courtesyCar';
+  deliveryFee?: number;
+  engineBracket?: string;
   cancelledBy?: string;
   cancelledAt?: string;
   createdAt?: string;
@@ -161,6 +164,75 @@ export interface ServiceCatalogGroup {
   iconBg: string;
   services: { name: string; category: string; price: number; duration: number; description?: string; icon: string }[];
 }
+
+export interface ServicingTierPrice {
+  interim: number;
+  full: number;
+  major: number;
+  oilChange?: number;
+}
+
+export interface GaragePricing {
+  pricingModel?: 'TIERED_CC' | 'FLAT';
+  useOverride?: boolean;
+  labourRates?: {
+    mechanical: number;
+    ev: number;
+  };
+  servicing?: any;
+  servicingTiers: {
+    up_to_1200: ServicingTierPrice;
+    '1201_to_1500': ServicingTierPrice;
+    '1501_to_2000': ServicingTierPrice;
+    '2001_to_2400': ServicingTierPrice;
+    '2401_to_3500': ServicingTierPrice;
+    '3501_plus': ServicingTierPrice;
+  };
+  mot?: {
+    enabled?: boolean;
+    class4Standalone?: number;
+    comboWithFullMajor?: number;
+    comboWithInterim?: number;
+  };
+  delivery?: {
+    dropOff?: { enabled: boolean; price: number; leadDays: number; maxMiles: number };
+    collectAndDeliver?: { enabled: boolean; price: number; leadDays: number; maxMiles: number };
+    courtesyCar?: { enabled: boolean; price: number; leadDays: number };
+  };
+  customProducts?: Array<{
+    name: string;
+    category?: string;
+    price: number;
+    description?: string;
+    isActive?: boolean;
+  }>;
+}
+
+export const DEFAULT_UK_BENCHMARK_PRICING: GaragePricing = {
+  pricingModel: 'TIERED_CC',
+  useOverride: true,
+  labourRates: { mechanical: 60, ev: 75 },
+  servicingTiers: {
+    up_to_1200: { interim: 103, full: 123, major: 136, oilChange: 79 },
+    '1201_to_1500': { interim: 112, full: 129, major: 143, oilChange: 85 },
+    '1501_to_2000': { interim: 118, full: 136, major: 149, oilChange: 89 },
+    '2001_to_2400': { interim: 124, full: 143, major: 162, oilChange: 99 },
+    '2401_to_3500': { interim: 133, full: 149, major: 176, oilChange: 109 },
+    '3501_plus': { interim: 149, full: 162, major: 189, oilChange: 129 },
+  },
+  mot: {
+    enabled: true,
+    class4Standalone: 54.85,
+    comboWithFullMajor: 34.85,
+    comboWithInterim: 39.85,
+  },
+  delivery: {
+    dropOff: { enabled: true, price: 0, leadDays: 0, maxMiles: 15 },
+    collectAndDeliver: { enabled: true, price: 15, leadDays: 1, maxMiles: 5 },
+    courtesyCar: { enabled: false, price: 20, leadDays: 2 },
+  },
+  customProducts: [],
+};
 
 export interface ServiceCategory {
   id?: string;
@@ -378,6 +450,9 @@ interface DataContextType {
   fetchBookingLeads: (status?: string, search?: string) => Promise<any[]>;
   updateBookingLead: (id: string, payload: any) => Promise<any>;
   convertLeadToBooking: (id: string, bookingData: { bookingDate?: string; slotTime?: string; managerNotes?: string }) => Promise<any>;
+  fetchGaragePricing: (garageId: string) => Promise<GaragePricing>;
+  updateGaragePricing: (garageId: string, pricingData: any) => Promise<any>;
+  calculateGarageQuote: (garageId: string, quoteParams: any) => Promise<any>;
   inventoryItems: InventoryItem[];
   inventoryStats: InventoryStats | null;
   loadingInventory: boolean;
@@ -412,8 +487,8 @@ const DataContext = createContext<DataContextType | undefined>(undefined);
 export const LOCAL_IP = '192.168.1.15';
 // export const BASE_URL = `http://${LOCAL_IP}:5000/api`;
 // export const BASE_URL = 'http://10.0.2.2:5000/api'; // Android Emulator alias
-export const BASE_URL = 'https://api.ondoorcarservice.com/api'; // Production server
-// export const BASE_URL = 'http://localhost:5000/api';
+// export const BASE_URL = 'https://api.ondoorcarservice.com/api'; // Production server
+export const BASE_URL = 'http://localhost:5000/api';
 
 const parseJsonResponse = async (response: Response): Promise<any> => {
   const text = await response.text();
@@ -1980,6 +2055,56 @@ export const DataProvider = ({ children }: { children: ReactNode }) => {
     }
   }, [authFetch, refreshData]);
 
+  const fetchGaragePricing = useCallback(async (garageId: string): Promise<any> => {
+    try {
+      const response = await authFetch(`${BASE_URL}/garages/${garageId}/pricing`);
+      const data = await parseJsonResponse(response);
+      if (!response.ok) {
+        throw new Error(data.error || 'Failed to fetch garage pricing');
+      }
+      return data.pricing;
+    } catch (error) {
+      console.error('[DATA CONTEXT] fetchGaragePricing error:', error);
+      throw error;
+    }
+  }, [authFetch]);
+
+  const updateGaragePricing = useCallback(async (garageId: string, pricingData: any): Promise<any> => {
+    try {
+      const response = await authFetch(`${BASE_URL}/garages/${garageId}/pricing`, {
+        method: 'PUT',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify(pricingData),
+      });
+      const data = await parseJsonResponse(response);
+      if (!response.ok) {
+        throw new Error(data.error || 'Failed to update garage pricing');
+      }
+      return data;
+    } catch (error) {
+      console.error('[DATA CONTEXT] updateGaragePricing error:', error);
+      throw error;
+    }
+  }, [authFetch]);
+
+  const calculateGarageQuote = useCallback(async (garageId: string, quoteParams: any): Promise<any> => {
+    try {
+      const response = await authFetch(`${BASE_URL}/garages/${garageId}/calculate-quote`, {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify(quoteParams),
+      });
+      const data = await parseJsonResponse(response);
+      if (!response.ok) {
+        throw new Error(data.error || 'Failed to calculate garage quote');
+      }
+      return data.quote;
+    } catch (error) {
+      console.error('[DATA CONTEXT] calculateGarageQuote error:', error);
+      throw error;
+    }
+  }, [authFetch]);
+
   // Inventory Management API Calls
   const fetchInventory = useCallback(async (filters?: { search?: string; category?: string; status?: string }): Promise<InventoryItem[]> => {
     try {
@@ -2470,6 +2595,9 @@ export const DataProvider = ({ children }: { children: ReactNode }) => {
         fetchBookingLeads,
         updateBookingLead,
         convertLeadToBooking,
+        fetchGaragePricing,
+        updateGaragePricing,
+        calculateGarageQuote,
         inventoryItems,
         inventoryStats,
         loadingInventory,

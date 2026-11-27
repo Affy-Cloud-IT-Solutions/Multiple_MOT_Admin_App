@@ -54,10 +54,11 @@ interface GarageServiceItem {
 }
 
 const DEFAULT_SERVICES: GarageServiceItem[] = [
-  { id: 'mot_test', name: 'MOT Test (Class 4)', category: 'MOT', price: 45, duration: 45, description: 'Class 4 annual DVSA vehicle inspection' },
-  { id: 'full_service', name: 'Full Service', category: 'Servicing', price: 155, duration: 120, description: 'Comprehensive annual full car service' },
-  { id: 'interim_service', name: 'Interim Service', category: 'Servicing', price: 85, duration: 60, description: '6-month / 6,000 miles oil & filter inspection' },
-  { id: 'major_service', name: 'Major Service', category: 'Servicing', price: 210, duration: 180, description: 'Complete 24-month overhaul & spark plugs' },
+  { id: 'mot_test', name: 'MOT Test (Class 4)', category: 'MOT', price: 54.85, duration: 45, description: 'Class 4 annual DVSA vehicle inspection' },
+  { id: 'interim_service', name: 'Interim Service', category: 'Servicing', price: 118, duration: 60, description: '6-month / 6,000 miles oil & filter inspection' },
+  { id: 'full_service', name: 'Full Service', category: 'Servicing', price: 136, duration: 120, description: 'Comprehensive annual full car service' },
+  { id: 'major_service', name: 'Major Service', category: 'Servicing', price: 149, duration: 180, description: 'Complete 24-month overhaul & spark plugs' },
+  { id: 'oil_change', name: 'Oil & Filter Change', category: 'Servicing', price: 89, duration: 45, description: 'Engine oil drain & filter replacement' },
   { id: 'brakes', name: 'Brakes & Discs', category: 'Brakes', price: 130, duration: 60, description: 'Brake pads, discs inspection & replacement' },
   { id: 'tyres', name: 'Tyres & Tracking', category: 'Tyre replacement', price: 65, duration: 45, description: 'Tyre fitting, balancing & wheel alignment' },
   { id: 'diagnostics', name: 'Diagnostics Scan', category: 'Diagnostics', price: 50, duration: 45, description: 'Full computerized engine diagnostics' },
