@@ -52,7 +52,7 @@ export default function SuperAdminGaragesScreen({ navigation }: any) {
   const [selectedGarage, setSelectedGarage] = useState<Garage | null>(null);
   const [garagePricing, setGaragePricing] = useState<any>(null);
   const [modalVisible, setModalVisible] = useState(false);
-  const [loadingAction, setLoadingAction] = useState(false);
+  const [loadingAction, setLoadingAction] = useState<string | null>(null);
   const [garageDetails, setGarageDetails] = useState<any>(null);
   const [loadingDetails, setLoadingDetails] = useState(false);
 
@@ -75,7 +75,7 @@ export default function SuperAdminGaragesScreen({ navigation }: any) {
   // Document Review & Verification Modal State
   const [docModalVisible, setDocModalVisible] = useState(false);
   const [selectedDoc, setSelectedDoc] = useState<any>(null);
-  const [docActionLoading, setDocActionLoading] = useState(false);
+  const [docActionLoading, setDocActionLoading] = useState<'Verified' | 'Rejected' | null>(null);
 
   // Garage Application Rejection Modal State
   const [rejectModalVisible, setRejectModalVisible] = useState(false);
@@ -248,14 +248,14 @@ export default function SuperAdminGaragesScreen({ navigation }: any) {
           text: 'Apply Standard Rates',
           onPress: async () => {
             try {
-              setLoadingAction(true);
+              setLoadingAction('reset_pricing');
               await updateGaragePricing(gId, DEFAULT_UK_BENCHMARK_PRICING);
               setGaragePricing(DEFAULT_UK_BENCHMARK_PRICING);
               Alert.alert('Success', 'Applied standard UK benchmark pricing rates.');
             } catch (err: any) {
               Alert.alert('Error', err.message || 'Failed to update pricing.');
             } finally {
-              setLoadingAction(false);
+              setLoadingAction(null);
             }
           },
         },
@@ -276,7 +276,7 @@ export default function SuperAdminGaragesScreen({ navigation }: any) {
       Alert.alert('Notice', 'Document ID not available for individual tracking.');
       return;
     }
-    setDocActionLoading(true);
+    setDocActionLoading(newDocStatus);
     try {
       await updateGarageDocumentStatus(garageId, docId, newDocStatus);
       setSelectedDoc({ ...selectedDoc, status: newDocStatus });
@@ -285,7 +285,7 @@ export default function SuperAdminGaragesScreen({ navigation }: any) {
     } catch (err: any) {
       Alert.alert('Error', err.message || 'Failed to update certificate status.');
     } finally {
-      setDocActionLoading(false);
+      setDocActionLoading(null);
     }
   };
 
@@ -299,7 +299,7 @@ export default function SuperAdminGaragesScreen({ navigation }: any) {
     if (!selectedGarage) return;
     const finalReason = rejectionReasonInput.trim() || selectedPresetReason.trim() || 'Documentation or regulatory criteria not verified.';
     const garageId = selectedGarage.id || selectedGarage._id || '';
-    setLoadingAction(true);
+    setLoadingAction('confirm_rejection');
     try {
       await updateGarageStatus(garageId, 'Rejected', 'Rejected', finalReason);
       setSelectedGarage({
@@ -314,7 +314,7 @@ export default function SuperAdminGaragesScreen({ navigation }: any) {
     } catch (err: any) {
       Alert.alert('Rejection Failed', err.message || 'Could not reject garage application.');
     } finally {
-      setLoadingAction(false);
+      setLoadingAction(null);
     }
   };
 
@@ -360,7 +360,7 @@ export default function SuperAdminGaragesScreen({ navigation }: any) {
   };
 
   const handleStatusChange = async (garageId: string, status: string, verificationStatus?: string) => {
-    setLoadingAction(true);
+    setLoadingAction(`status_${garageId}_${status}`);
     try {
       await updateGarageStatus(garageId, status, verificationStatus);
       if (selectedGarage) {
@@ -375,7 +375,7 @@ export default function SuperAdminGaragesScreen({ navigation }: any) {
     } catch (error: any) {
       Alert.alert('Update Failed', error?.message || 'Could not update garage status.');
     } finally {
-      setLoadingAction(false);
+      setLoadingAction(null);
     }
   };
 
@@ -1269,11 +1269,12 @@ export default function SuperAdminGaragesScreen({ navigation }: any) {
                         paddingHorizontal: 12,
                         borderRadius: 8,
                         gap: 6,
+                        opacity: loadingAction === 'reset_pricing' ? 0.7 : (loadingAction ? 0.8 : 1),
                       }}
-                      disabled={loadingAction}
+                      disabled={Boolean(loadingAction)}
                       onPress={handleResetGaragePricing}
                     >
-                      {loadingAction ? (
+                      {loadingAction === 'reset_pricing' ? (
                         <ActivityIndicator size="small" color="#FFFFFF" />
                       ) : (
                         <>
@@ -1293,11 +1294,17 @@ export default function SuperAdminGaragesScreen({ navigation }: any) {
 
                       <View style={styles.actionButtonContainer}>
                         <TouchableOpacity
-                          style={[styles.modalActionBtn, { backgroundColor: '#10B981' }]}
-                          disabled={loadingAction}
+                          style={[
+                            styles.modalActionBtn, 
+                            { 
+                              backgroundColor: '#10B981',
+                              opacity: loadingAction === `status_${selectedGarage.id || selectedGarage._id || ''}_Approved` ? 0.7 : (loadingAction ? 0.8 : 1)
+                            }
+                          ]}
+                          disabled={Boolean(loadingAction)}
                           onPress={() => handleStatusChange(selectedGarage.id || selectedGarage._id || '', 'Approved', 'Verified')}
                         >
-                          {loadingAction ? (
+                          {loadingAction === `status_${selectedGarage.id || selectedGarage._id || ''}_Approved` ? (
                             <ActivityIndicator size="small" color="#FFFFFF" />
                           ) : (
                             <>
@@ -1308,8 +1315,16 @@ export default function SuperAdminGaragesScreen({ navigation }: any) {
                         </TouchableOpacity>
 
                         <TouchableOpacity
-                          style={[styles.modalActionBtn, { backgroundColor: '#EF444415', borderWidth: 1, borderColor: '#EF4444' }]}
-                          disabled={loadingAction}
+                          style={[
+                            styles.modalActionBtn, 
+                            { 
+                              backgroundColor: '#EF444415', 
+                              borderWidth: 1, 
+                              borderColor: '#EF4444',
+                              opacity: loadingAction ? 0.6 : 1
+                            }
+                          ]}
+                          disabled={Boolean(loadingAction)}
                           onPress={handleOpenRejectModal}
                         >
                           <MaterialCommunityIcons name="close-circle" size={18} color="#EF4444" />
@@ -1391,7 +1406,7 @@ export default function SuperAdminGaragesScreen({ navigation }: any) {
                 {selectedGarage?.status === 'Pending' && (
                   <View style={{ flexDirection: 'row', gap: 10, marginTop: 10 }}>
                     <TouchableOpacity
-                      disabled={docActionLoading}
+                      disabled={Boolean(docActionLoading)}
                       onPress={() => handleSetDocStatus('Rejected')}
                       style={{ 
                         flex: 1, 
@@ -1402,10 +1417,11 @@ export default function SuperAdminGaragesScreen({ navigation }: any) {
                         borderWidth: 1, 
                         borderColor: '#EF4444', 
                         paddingVertical: 10, 
-                        borderRadius: 8 
+                        borderRadius: 8,
+                        opacity: docActionLoading === 'Rejected' ? 0.7 : (docActionLoading ? 0.6 : 1)
                       }}
                     >
-                      {docActionLoading ? (
+                      {docActionLoading === 'Rejected' ? (
                         <ActivityIndicator size="small" color="#EF4444" />
                       ) : (
                         <>
@@ -1416,7 +1432,7 @@ export default function SuperAdminGaragesScreen({ navigation }: any) {
                     </TouchableOpacity>
 
                     <TouchableOpacity
-                      disabled={docActionLoading}
+                      disabled={Boolean(docActionLoading)}
                       onPress={() => handleSetDocStatus('Verified')}
                       style={{ 
                         flex: 1, 
@@ -1425,10 +1441,11 @@ export default function SuperAdminGaragesScreen({ navigation }: any) {
                         justifyContent: 'center', 
                         backgroundColor: '#10B981', 
                         paddingVertical: 10, 
-                        borderRadius: 8 
+                        borderRadius: 8,
+                        opacity: docActionLoading === 'Verified' ? 0.7 : (docActionLoading ? 0.6 : 1)
                       }}
                     >
-                      {docActionLoading ? (
+                      {docActionLoading === 'Verified' ? (
                         <ActivityIndicator size="small" color="#FFFFFF" />
                       ) : (
                         <>
@@ -1547,7 +1564,7 @@ export default function SuperAdminGaragesScreen({ navigation }: any) {
               </TouchableOpacity>
 
               <TouchableOpacity
-                disabled={loadingAction}
+                disabled={Boolean(loadingAction)}
                 onPress={handleConfirmRejection}
                 style={{
                   flex: 1.5,
@@ -1556,10 +1573,11 @@ export default function SuperAdminGaragesScreen({ navigation }: any) {
                   borderRadius: 8,
                   alignItems: 'center',
                   justifyContent: 'center',
-                  flexDirection: 'row'
+                  flexDirection: 'row',
+                  opacity: loadingAction === 'confirm_rejection' ? 0.7 : (loadingAction ? 0.6 : 1)
                 }}
               >
-                {loadingAction ? (
+                {loadingAction === 'confirm_rejection' ? (
                   <ActivityIndicator size="small" color="#FFFFFF" />
                 ) : (
                   <>

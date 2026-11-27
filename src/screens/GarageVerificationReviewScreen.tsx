@@ -844,9 +844,10 @@ export default function GarageVerificationReviewScreen({ route, navigation }: an
                           borderWidth: 1,
                           borderColor: '#EF4444',
                           flexDirection: 'row',
-                          alignItems: 'center'
+                          alignItems: 'center',
+                          opacity: savingStationAction ? 0.6 : 1
                         }}
-                        disabled={isProcessing}
+                        disabled={Boolean(savingStationAction)}
                         onPress={() => handleOpenRejectStationModal(st)}
                       >
                         <MaterialCommunityIcons name="close" size={15} color="#EF4444" style={{ marginRight: 4 }} />
@@ -860,9 +861,10 @@ export default function GarageVerificationReviewScreen({ route, navigation }: an
                           borderRadius: 8,
                           backgroundColor: '#10B981',
                           flexDirection: 'row',
-                          alignItems: 'center'
+                          alignItems: 'center',
+                          opacity: isProcessing ? 0.7 : (savingStationAction ? 0.6 : 1)
                         }}
-                        disabled={isProcessing}
+                        disabled={Boolean(savingStationAction)}
                         onPress={() => handleApproveStation(st)}
                       >
                         {isProcessing ? (

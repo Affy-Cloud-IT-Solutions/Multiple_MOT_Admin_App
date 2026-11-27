@@ -1250,7 +1250,7 @@ export default function AdminSlotsScreen({ navigation, route }: any) {
                               : '#EF4444',
                           },
                         ]}
-                        disabled={isProcessing}
+                        disabled={Boolean(processingSlot)}
                         onPress={() => handleToggleSlotBlock(slot)}
                       >
                         {isProcessing ? (
